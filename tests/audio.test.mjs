@@ -208,6 +208,108 @@ test('pen-only idle has no looping sources and lifts stop the actual contact sou
   });
 });
 
+test('stationary, invalid-speed and lifted contact release sources without muting material cues', async () => {
+  await withAudio(async (audio) => {
+    audio.configure({ ...DEFAULT_SETTINGS, masterVolume: 0.41, writingVolume: 1, ambienceVolume: 0, musicVolume: 0 });
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    audio.cue('paper');
+    for (const sample of [
+      { contact: true, speed: 0, pressure: 1 },
+      { contact: true, speed: NaN, pressure: 1 },
+      { contact: true, speed: Infinity, pressure: 1 },
+      { contact: false, speed: 150, pressure: 1 },
+    ]) {
+      audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
+      const source = audio.contactVoice.source;
+      audio.updateContact(sample);
+      assert.equal(audio.diagnostics.contact, false);
+      assert.equal(audio.diagnostics.writingGain, 0);
+      assert.ok(source.stopTime - ctx.currentTime <= 0.013);
+      ctx.advance(0.02);
+      assert.equal(source.connected, false);
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.activeCues, 1, 'the independent paper cue must remain audible');
+    }
+  });
+});
+
+test('every zero mixer bus schedules bounded exact silence, never an asymptotic target', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    const rainSource = audio.rainVoice.source;
+    const offsets = ctx.gains.slice(0, 4).map((gain) => gain.gain.events.length);
+    audio.configure({ ...DEFAULT_SETTINGS, masterVolume: 0, writingVolume: 0, ambienceVolume: 0, musicVolume: 0 });
+    for (const [index, gain] of ctx.gains.slice(0, 4).entries()) {
+      const events = gain.gain.events.slice(offsets[index]);
+      const ramp = events.find((event) => event[0] === 'linear' && event[1] === 0);
+      const end = events.at(-1);
+      assert.ok(ramp, `mixer bus ${index} must have a finite zero ramp`);
+      assert.deepEqual(end.slice(0, 2), ['set', 0]);
+      assert.ok(end[2] > ctx.currentTime && end[2] - ctx.currentTime <= 0.022);
+      assert.ok(!events.some((event) => event[0] === 'target' && event[1] === 0));
+    }
+    assert.ok(rainSource.stopTime - ctx.currentTime <= 0.013);
+    ctx.advance(0.03);
+    assert.equal(rainSource.connected, false);
+    assert.equal(audio.diagnostics.continuousSources, 0);
+  });
+});
+
+test('saved zero-volume mixes do not start inaudible loops or music on the first gesture', async () => {
+  for (const settings of [
+    { ...DEFAULT_SETTINGS, masterVolume: 0, musicTrack: 'felt' },
+    { ...DEFAULT_SETTINGS, writingVolume: 0, ambienceVolume: 0, musicVolume: 0, musicTrack: 'glass' },
+    { ...DEFAULT_SETTINGS, masterVolume: 0.41, writingVolume: 1, ambienceVolume: 0, musicVolume: 0, musicTrack: 'off' },
+  ]) {
+    await withAudio(async (audio) => {
+      audio.configure(settings);
+      assert.equal(FakeContext.instances.length, 0);
+      await audio.enable();
+      assert.equal(FakeContext.instances[0].sources.length, 0);
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.allocatedVoices, 0);
+      assert.equal(audio.diagnostics.musicTimerActive, false);
+      assert.deepEqual(audio.settings, settings, 'activation must not rewrite saved volume choices');
+    });
+  }
+});
+
+test('the reported pen-only mix stays silent across mute and hidden lifecycle until contact resumes', async () => {
+  await withAudio(async (audio) => {
+    const settings = { ...DEFAULT_SETTINGS, masterVolume: 0.41, writingVolume: 1, ambienceVolume: 0, musicVolume: 0, musicTrack: 'off' };
+    audio.configure(settings);
+    await audio.enable();
+    const sample = { contact: true, speed: 140, pressure: 0.7 };
+    for (const hide of [false, true]) {
+      audio.updateContact(sample);
+      audio.cue('ink');
+      assert.equal(audio.diagnostics.contactSources, 1);
+      if (hide) await audio.setHidden(true);
+      else await audio.disable();
+      assert.equal(audio.diagnostics.contextState, 'suspended');
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.allocatedVoices, 0);
+      if (hide) await audio.setHidden(false);
+      else {
+        await audio.setHidden(true);
+        await audio.setHidden(false);
+        assert.equal(audio.diagnostics.contextState, 'suspended', 'visibility must not override user mute');
+        await audio.enable();
+      }
+      assert.equal(audio.diagnostics.contextState, 'running');
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.writingGain, 0);
+      assert.deepEqual(audio.settings, settings);
+    }
+    assert.equal(FakeContext.instances.length, 1);
+    audio.updateContact(sample);
+    assert.equal(audio.diagnostics.contactSources, 1, 'lifecycle silence must not disable later writing');
+    assert.ok(audio.diagnostics.writingGain > 0);
+  });
+});
+
 test('muted weather is disconnected and cannot reappear when unrelated settings change', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
