@@ -1,10 +1,8 @@
 import './style.css';
-import './design-theme.css';
-import { findDesign, presentDesign } from './designs.ts';
 import { RitualAudio } from './audio.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { DeskScene } from './scene.ts';
-import { DEFAULT_SETTINGS, loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
+import { loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
 import { PaperSurface } from './textures.ts';
 import { icon, renderUI } from './ui.ts';
 import { INKS, PAGE } from './types.ts';
@@ -18,8 +16,6 @@ function element<T extends Element>(selector: string): T {
 }
 
 element<HTMLDivElement>('#app').innerHTML = renderUI();
-const design = findDesign(new URLSearchParams(location.search).get('design'));
-if (design) presentDesign(design);
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 function notify(message: string): void {
   const notice = element<HTMLDivElement>('#notice');
@@ -29,7 +25,7 @@ function notify(message: string): void {
   noticeTimer = setTimeout(() => { notice.hidden = true; }, 7500);
 }
 
-let settings = design ? sanitizeSettings({ ...DEFAULT_SETTINGS, ...design.settings }) : loadSettings(notify);
+let settings = loadSettings(notify);
 const audio = new RitualAudio(notify);
 audio.configure(settings);
 const textarea = element<HTMLTextAreaElement>('#message');
@@ -138,7 +134,7 @@ function updateSettings(next: unknown): void {
   scene?.configure(settings);
   audio.configure(settings);
   engine.updateOptions(settings);
-  if (!design) saveSettings(settings, notify);
+  saveSettings(settings, notify);
   syncSettings();
 }
 
@@ -368,7 +364,6 @@ syncSettings();
 validateDraft();
 syncWriting();
 updateAudioButtons();
-if (design) setTab(design.initialTab);
 animationId = requestAnimationFrame(frame);
 
 if (import.meta.env.DEV) {

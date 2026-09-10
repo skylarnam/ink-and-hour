@@ -10,12 +10,12 @@ export function randomSource(seed: number): () => number {
   };
 }
 
-function canvas2D(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+export function canvas2D(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('A 2D canvas is needed to make the paper and ink.');
+  if (!context) throw new Error('A 2D canvas is needed to make this room\'s procedural textures.');
   return [canvas, context];
 }
 

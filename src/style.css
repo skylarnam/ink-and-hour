@@ -157,7 +157,6 @@ input[type="range"] { width: 100%; accent-color: #7c8b67; cursor: pointer; heigh
 .site-footer > span:first-child { font: italic 11px var(--serif); }
 .site-footer button { font-size: 8px; color: #838472; padding: 5px 0; display: flex; align-items: center; gap: 6px; }
 .site-footer .icon { width: 12px; height: 12px; }
-.design-gallery-link { font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .scene-loading, .scene-error { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 8; background: #e9e4d8; color: #7a826b; font: italic 17px var(--serif); padding: 36px; text-align: center; }
 .loading-nib .icon { width: 28px; height: 28px; color: #a08555; }
 .scene-error { font: 14px/1.8 var(--serif); }
@@ -233,7 +232,6 @@ dialog p { font-size: 12px; line-height: 1.8; }
   .volume-control > span { font-size: 12px; }
   .volume-control small { font-size: 10px; }
   .site-footer { height: auto; min-height: 57px; padding: 15px 22px; gap: 13px; flex-wrap: wrap; }
-  .privacy-note { display: none; }
   .site-footer button { font-size: 9px; }
   .toast { bottom: 22px; }
 }

@@ -43,8 +43,8 @@ The private GitHub repository is connected to Vercel: pushes to `main` deploy
 automatically to the production site on the Hobby plan. For a one-off CLI
 deployment, use `npx vercel@latest --prod`; this uses a current uploader without
 replacing a globally installed CLI.
-The production build includes both HTML entrypoints, all local fonts and
-textures, the attribution notes, and the full Three.js license.
+The production build includes all local fonts and textures, the attribution
+notes, and the full Three.js license.
 
 Local preview servers should run in the app's normal Terminal panel, rather
 than an agent background task. A server intentionally remains running; keeping
@@ -81,44 +81,26 @@ it in a terminal separates its lifetime from the agent's completed work.
   pockets. The dip holder has no cap.
 - **Room** changes the actual 3D materials and palette between Rainy Study,
   Sunlit Atelier, and Storybook Nook. Time controls the sun, sky, and lamp.
-  Clear/rain/storm is independent of mood and time. Rain is confined to the
-  window. Storms have isolated, gentle light pulses with delayed thunder, not
-  repeated rapid flashes.
+  Outside, branching trees and leafy crowns sit on rolling terrain, with
+  distance haze and slowly changing clouds. Clear/rain/storm is independent
+  of mood and time. Varied-depth rain falls outside the window, with small
+  beads and trailing drops on the glass. Clear removes all rain layers.
+  Storms have isolated, gentle light pulses with delayed thunder, not repeated
+  rapid flashes. The coffee cup sits behind the paper, clear of both roll states.
 - Sound is on by default and starts at the first browser-allowed interaction;
   no separate enable click is needed. Click **Sound is on** to mute, even before
   the first interaction. A chosen mute remains in force for the current visit.
   Writing/materials, ambience, music, and overall volume have independent controls. Music starts
   **Off**; **Felt notes** and **Glass garden** are original synthesized beds.
-  Rain has its own restrained mix level beneath the other layers; the ambience
-  slider still controls rain and thunder together. No recording or copyrighted
-  composition is bundled.
+  Pen sound is balanced ahead of default rain. New visits start Pen & materials
+  at 90%; previously saved volume choices are preserved. Muting ambience stops
+  its rain source, and idle/lifted pens have no continuing friction source.
+  The ambience slider controls rain and thunder together. No recording or
+  copyrighted composition is bundled.
 - Leaving the tab pauses writing, silences friction, and suspends audio. On
   return, audio can resume if previously enabled, but writing waits for Resume.
-  Reduced-motion preferences remove storm flashes and floating dust, and make
-  camera/case/cap transitions immediate.
-
-## Five design studies
-
-Open [the comparison gallery](http://127.0.0.1:5173/designs.html) while the dev
-server is running, or use **Explore 5 design studies** in the original site's
-footer. The gallery uses locally captured previews, not five simultaneous
-WebGL scenes. Each preview opens a complete, playable presentation:
-
-| Direction | Presentation | Route |
-| --- | --- | --- |
-| Nocturne | Cinematic night room, literary type, floating console | `/?design=nocturne` |
-| The Airmail Club | Cream paper, vermilion postal marks, postcard editor | `/?design=airmail` |
-| Atelier 04 | Graphic sans-serif, acid-yellow accents, horizontal workbench | `/?design=atelier` |
-| Daydream Department | Powder blue, grape and apricot, rounded storybook diorama | `/?design=daydream` |
-| The Listening Room | Walnut and analog equipment, sound-first console | `/?design=listening` |
-
-These are alternative visual directions, not a chosen replacement for `/`.
-Their initial room/material settings are isolated from saved preferences, and
-changes made inside a design study are not saved. Writing, camera navigation,
-material choices, audio, and export use the same real implementation in every
-direction. The Listening Room's illustrated meter faces are decorative, not
-live audio meters. Both the gallery and all five routes work in the production
-build; the preview images and fonts are bundled locally.
+  Reduced-motion preferences remove storm flashes and floating dust, freeze
+  cloud/leaf motion, and make camera/case/cap transitions immediate.
 
 ## How the writing works
 
@@ -140,13 +122,20 @@ on the relationship between a fixed edge angle and stroke direction. Fine is
 restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 
-The audio graph uses long procedural noise with continuously changing filter
-and gain targets based on contact, speed, pressure, paper, and nib. Pen-up
-friction fades to an explicitly scheduled zero within 21 ms. Cap, paper,
-leather, and bottle events are
-separate short voices. One reusable AudioContext has writing, ambience, and
-music buses behind a bounded master/compressor. Clear weather removes rain;
-changing away from storm also stops a pending thunder voice. Enable, mute, and
+Writing uses original, granular contact textures rather than the weather's
+continuous noise bed. Short, uneven fiber contacts and damped resonances give
+the fountain pen a rounder texture and the dip nib a drier, brighter one.
+Playback rate, filtering, and gain follow speed, pressure, paper, and nib.
+The contact source exists only during moving contact: it fades to exact zero
+within 7 ms of a lift and stops within 12 ms. Live holder changes crossfade
+between textures, while nib and paper changes reshape the current stroke.
+
+Cap, paper, leather, and bottle events are separate short voices. One reusable
+AudioContext has writing, ambience, and music buses behind a bounded
+master/compressor. Mixer mutes reach exact zero within 21 ms, not an asymptotic
+noise floor. Clear weather or zero ambience volume stops the rain source;
+changing away from storm also stops a pending thunder voice. Zero music volume
+or Music Off stops the music timer and releases its voices. Enable, mute, and
 tab-visibility transitions are serialized so a delayed resume cannot override
 a newer mute request.
 
@@ -166,6 +155,8 @@ a newer mute request.
   nib hardware. Broad and flex behavior are deliberately different.
 - Friction/weather/music are synthesized rather than recorded ASMR. Quiet
   headphones are recommended; output character depends on the device.
+- The outdoor view is a lightweight, depth-compressed procedural landscape,
+  not a scanned forest, volumetric sky, or physical rain/refraction simulation.
 - A page is kept only for the current browser session unless exported. Material,
   room, time, pace, and volume preferences persist, but text and ink do not.
 - WebGL rendering and dynamic ink textures can be demanding on older phones.
@@ -175,13 +166,12 @@ a newer mute request.
 
 `src/main.ts` integrates the ritual and lifecycle; `src/ui.ts` and `src/style.css`
 are the responsive, keyboard-labeled interface; `src/scene.ts` builds the room;
-`src/textures.ts` makes procedural materials and ink; `src/writing/` owns layout
-and stroke playback; `src/audio.ts` owns Web Audio; `src/settings.ts` validates
-saved preferences. `tests/` exercises those pure/stateful boundaries.
+`src/outdoors.ts` builds its layered landscape and weather; `src/textures.ts`
+makes procedural materials and ink; `src/writing/` owns layout and stroke
+playback; `src/audio.ts` owns Web Audio, with contact synthesis in
+`src/nib-sound.ts`; `src/settings.ts` validates saved preferences. `tests/`
+exercises those pure/stateful boundaries.
 
-`src/designs.ts` defines the five isolated design studies; `src/design-theme.css`
-styles their presentations. `designs.html` and `src/design-gallery.*` provide
-the comparison gallery, with original screenshots in `public/design-previews/`.
 `src/fonts.css` shares the locally generated editor faces.
 
 During `npm run dev`, `window.__inkAndHour` is a read-only snapshot getter for

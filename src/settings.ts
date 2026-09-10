@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   style: 'correspondence',
   speed: 1,
   masterVolume: 0.68,
-  writingVolume: 0.78,
+  writingVolume: 0.9,
   ambienceVolume: 0.48,
   musicVolume: 0.22,
   musicTrack: 'off',

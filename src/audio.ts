@@ -1,21 +1,24 @@
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings.ts';
-import type { AudioContact, InteractionCue, Settings } from './types.ts';
+import { synthesizeNibTexture } from './nib-sound.ts';
+import type { AudioContact, InteractionCue, PenKind, Settings } from './types.ts';
 
 const clamp = (value: number, max = 1): number => Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : 0;
 
 export function frictionParameters(sample: AudioContact, settings: Settings): {
-  gain: number; frequency: number; lowpass: number;
+  gain: number; frequency: number; lowpass: number; playbackRate: number;
 } {
   const roughness = { smooth: 0.22, parchment: 0.57, cotton: 0.92 }[settings.paper];
-  const nib = { fine: 0.78, broad: 1.13, flex: 0.94 }[settings.nib];
+  const nib = { fine: 0.84, broad: 1.08, flex: 0.98 }[settings.nib];
   const speed = clamp(sample.speed / 200, 2);
   const pressure = clamp(sample.pressure);
   return {
     gain: !sample.contact || speed <= 0 ? 0
-      : Math.min(0.13, (0.021 + roughness * 0.029) * Math.sqrt(speed) * (0.6 + pressure * 0.7)
-        * nib * (settings.pen === 'dip' ? 1.1 : 1)),
-    frequency: 1100 + speed * 1500 + roughness * 1600 + (settings.nib === 'fine' ? 650 : 0),
-    lowpass: 3200 + roughness * 3100 + speed * 700,
+      : Math.min(0.32, (0.18 + roughness * 0.075) * Math.sqrt(speed) * (0.6 + pressure * 0.7)
+        * nib * (settings.pen === 'dip' ? 1.12 : 1)),
+    frequency: 700 + speed * 550 + roughness * 550 + (settings.nib === 'fine' ? 300 : 0)
+      + (settings.pen === 'dip' ? 250 : 0),
+    lowpass: 2700 + roughness * 1900 + speed * 550 + (settings.pen === 'dip' ? 350 : 0),
+    playbackRate: 0.65 + speed * 0.45 + roughness * 0.1,
   };
 }
 
@@ -30,8 +33,11 @@ function target(parameter: AudioParam, value: number, now: number, duration = 0.
     parameter.cancelScheduledValues(now);
     parameter.setValueAtTime(current, now);
   }
-  parameter.setTargetAtTime(value, now, duration);
-  if (value === 0) parameter.setValueAtTime(0, now + duration * 7);
+  if (value === 0) {
+    const end = now + Math.min(duration * 2, 0.02);
+    parameter.linearRampToValueAtTime(0, end);
+    parameter.setValueAtTime(0, end + 0.001);
+  } else parameter.setTargetAtTime(value, now, duration);
 }
 
 interface Voice {
@@ -39,6 +45,13 @@ interface Voice {
   gain: GainNode;
   filter?: BiquadFilterNode;
   kind: 'music' | 'interaction' | 'thunder';
+  releasing: boolean;
+}
+
+interface LoopVoice {
+  source: AudioBufferSourceNode;
+  gate: GainNode;
+  kind: 'contact' | 'rain';
   releasing: boolean;
 }
 
@@ -54,7 +67,11 @@ export class RitualAudio {
   private rain: GainNode | null = null;
   private rainFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
-  private readonly continuous: AudioBufferSourceNode[] = [];
+  private readonly nibTextures = new Map<PenKind, AudioBuffer>();
+  private readonly loops = new Set<LoopVoice>();
+  private contactVoice: LoopVoice | null = null;
+  private rainVoice: LoopVoice | null = null;
+  private rainTarget = 0;
   private readonly voices = new Set<Voice>();
   private settings: Settings = { ...DEFAULT_SETTINGS };
   private userEnabled = true;
@@ -173,6 +190,12 @@ export class RitualAudio {
       pink = pink * 0.96 + white * 0.04;
       samples[i] = white * 0.68 + pink * 2.6;
     }
+    for (const pen of ['fountain', 'dip'] as const) {
+      const data = synthesizeNibTexture(ctx.sampleRate, pen);
+      const texture = ctx.createBuffer(1, data.length, ctx.sampleRate);
+      texture.getChannelData(0).set(data);
+      this.nibTextures.set(pen, texture);
+    }
     this.frictionBand = ctx.createBiquadFilter();
     this.frictionBand.type = 'bandpass';
     this.frictionBand.Q.value = 0.65;
@@ -180,25 +203,55 @@ export class RitualAudio {
     this.frictionLowpass.type = 'lowpass';
     this.friction = ctx.createGain();
     this.friction.gain.value = 0;
-    this.noiseSource(this.frictionBand, 0);
     this.frictionBand.connect(this.frictionLowpass).connect(this.friction).connect(this.writing);
     this.rainFilter = ctx.createBiquadFilter();
     this.rainFilter.type = 'lowpass';
     this.rainFilter.frequency.value = 3200;
     this.rain = ctx.createGain();
     this.rain.gain.value = 0;
-    this.noiseSource(this.rainFilter, 3.17);
     this.rainFilter.connect(this.rain).connect(this.ambience);
   }
 
-  private noiseSource(destination: AudioNode, offset: number): void {
-    if (!this.context || !this.noise) throw new Error('Audio graph is not initialized.');
-    const source = this.context.createBufferSource();
-    source.buffer = this.noise;
+  private startLoop(kind: LoopVoice['kind'], buffer: AudioBuffer, destination: AudioNode): LoopVoice {
+    const ctx = this.context;
+    if (!ctx) throw new Error('Audio graph is not initialized.');
+    const retiring = [...this.loops].filter((voice) => voice.kind === kind && voice.releasing);
+    for (const voice of retiring.slice(0, -1)) this.stopLoop(voice, true);
+    const source = ctx.createBufferSource();
+    const gate = ctx.createGain();
+    source.buffer = buffer;
     source.loop = true;
-    source.connect(destination);
-    source.start(0, offset);
-    this.continuous.push(source);
+    gate.gain.setValueAtTime(0, ctx.currentTime);
+    gate.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.004);
+    source.connect(gate).connect(destination);
+    const voice: LoopVoice = { source, gate, kind, releasing: false };
+    this.loops.add(voice);
+    source.onended = () => this.releaseLoop(voice);
+    source.start(ctx.currentTime, (ctx.currentTime * 0.83) % buffer.duration);
+    return voice;
+  }
+
+  private stopLoop(voice: LoopVoice, immediate = false): void {
+    const now = this.context?.currentTime ?? 0;
+    if (immediate) {
+      voice.gate.gain.cancelScheduledValues(now);
+      voice.gate.gain.setValueAtTime(0, now);
+      voice.source.stop(now);
+      this.releaseLoop(voice);
+    } else if (!voice.releasing) {
+      voice.releasing = true;
+      target(voice.gate.gain, 0, now, 0.003);
+      voice.source.stop(now + 0.012);
+    }
+  }
+
+  private releaseLoop(voice: LoopVoice): void {
+    voice.source.onended = null;
+    voice.source.disconnect();
+    voice.gate.disconnect();
+    this.loops.delete(voice);
+    if (this.contactVoice === voice) this.contactVoice = null;
+    if (this.rainVoice === voice) this.rainVoice = null;
   }
 
   configure(settings: Settings): void {
@@ -208,8 +261,9 @@ export class RitualAudio {
     if (previous.weather !== this.settings.weather && this.settings.weather !== 'storm') this.stopVoices('thunder');
     if (previous.musicTrack !== this.settings.musicTrack) {
       this.stopMusic();
-      this.startMusic();
     }
+    if (this.settings.musicVolume === 0 || this.settings.masterVolume === 0) this.stopMusic();
+    else this.startMusic();
   }
 
   private applyMixer(): void {
@@ -221,19 +275,42 @@ export class RitualAudio {
     target(this.writing.gain, settings.writingVolume, now);
     target(this.ambience.gain, settings.ambienceVolume, now);
     target(this.music.gain, settings.musicVolume, now);
-    target(this.rain.gain, weatherGain(settings), now, settings.weather === 'clear' ? 0.035 : 0.7);
+    this.rainTarget = this.ready() && settings.ambienceVolume > 0 && settings.masterVolume > 0 ? weatherGain(settings) : 0;
+    target(this.rain.gain, this.rainTarget, now, this.rainTarget === 0 ? 0.008 : 0.7);
     target(this.rainFilter.frequency, settings.weather === 'storm' ? 2100 : 3400, now, 0.4);
+    if (this.rainTarget > 0 && !this.rainVoice && this.noise) {
+      this.rainVoice = this.startLoop('rain', this.noise, this.rainFilter);
+    } else if (this.rainTarget === 0 && this.rainVoice) {
+      this.stopLoop(this.rainVoice);
+      this.rainVoice = null;
+    }
+    if (settings.writingVolume === 0 || settings.masterVolume === 0) {
+      this.updateContact({ contact: false, speed: 0, pressure: 0 });
+    }
   }
 
   updateContact(sample: AudioContact): void {
-    const parameters = frictionParameters(this.ready() ? sample : { contact: false, speed: 0, pressure: 0 }, this.settings);
+    const audible = this.ready() && this.settings.writingVolume > 0 && this.settings.masterVolume > 0;
+    const parameters = frictionParameters(audible ? sample : { contact: false, speed: 0, pressure: 0 }, this.settings);
     const previousGain = this.writingTarget;
-    this.contact = this.ready() && sample.contact && sample.speed > 0;
+    this.contact = parameters.gain > 0;
     this.writingTarget = parameters.gain;
     const ctx = this.context;
     if (!ctx || !this.friction || !this.frictionBand || !this.frictionLowpass || (previousGain === 0 && parameters.gain === 0)) return;
-    const modulation = 0.86 + 0.11 * Math.sin(ctx.currentTime * 42) + 0.04 * Math.sin(ctx.currentTime * 117);
-    target(this.friction.gain, parameters.gain * modulation, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
+    target(this.friction.gain, parameters.gain, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
+    if (parameters.gain === 0) {
+      if (this.contactVoice) this.stopLoop(this.contactVoice);
+      this.contactVoice = null;
+      return;
+    }
+    const texture = this.nibTextures.get(this.settings.pen);
+    if (!texture) throw new Error('The selected nib sound is not initialized.');
+    if (this.contactVoice && this.contactVoice.source.buffer !== texture) {
+      this.stopLoop(this.contactVoice);
+      this.contactVoice = null;
+    }
+    if (!this.contactVoice) this.contactVoice = this.startLoop('contact', texture, this.frictionBand);
+    target(this.contactVoice.source.playbackRate, parameters.playbackRate, ctx.currentTime, 0.018);
     target(this.frictionBand.frequency, parameters.frequency, ctx.currentTime, 0.018);
     target(this.frictionLowpass.frequency, parameters.lowpass, ctx.currentTime, 0.018);
   }
@@ -241,13 +318,15 @@ export class RitualAudio {
   private silence(): void {
     this.contact = false;
     this.writingTarget = 0;
+    this.rainTarget = 0;
     const now = this.context?.currentTime ?? 0;
-    for (const gain of [this.master, this.friction]) {
+    for (const gain of [this.master, this.friction, this.rain]) {
       if (gain) {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(0, now);
       }
     }
+    for (const voice of this.loops) this.stopLoop(voice, true);
     this.stopMusic(true);
     this.stopVoices(undefined, true);
   }
@@ -322,7 +401,8 @@ export class RitualAudio {
   }
 
   private startMusic(): void {
-    if (!this.ready() || this.settings.musicTrack === 'off' || this.musicTimer !== null || !this.music) return;
+    if (!this.ready() || this.settings.musicTrack === 'off' || this.settings.musicVolume === 0
+      || this.settings.masterVolume === 0 || this.musicTimer !== null || !this.music) return;
     const play = (): void => {
       if (!this.ready() || !this.music || this.settings.musicTrack === 'off') return;
       const felt = this.settings.musicTrack === 'felt';
@@ -365,9 +445,13 @@ export class RitualAudio {
     return {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
       contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
-      rainGain: weatherGain(this.settings), musicTrack: this.settings.musicTrack,
+      rainGain: this.rainTarget, musicTrack: this.settings.musicTrack,
       activeMusicVoices: [...this.voices].filter((voice) => voice.kind === 'music' && !voice.releasing).length,
-      musicTimerActive: this.musicTimer !== null, continuousSources: this.continuous.length,
+      musicTimerActive: this.musicTimer !== null, continuousSources: this.loops.size,
+      contactSources: [...this.loops].filter((voice) => voice.kind === 'contact' && !voice.releasing).length,
+      weatherSources: [...this.loops].filter((voice) => voice.kind === 'rain' && !voice.releasing).length,
+      mixer: { master: this.master?.gain.value ?? 0, pen: this.writing?.gain.value ?? 0,
+        ambience: this.ambience?.gain.value ?? 0, music: this.music?.gain.value ?? 0 },
       activeCues: [...this.voices].filter((voice) => voice.kind !== 'music' && !voice.releasing).length,
       allocatedVoices: this.voices.size, hidden: this.hidden,
     };
@@ -379,8 +463,7 @@ export class RitualAudio {
     this.userEnabled = false;
     this.revision++;
     this.silence();
-    for (const source of this.continuous) { source.stop(); source.disconnect(); }
-    this.continuous.length = 0;
+    this.nibTextures.clear();
     if (this.context && this.context.state !== 'closed') {
       void this.context.close().catch((error: unknown) => {
         this.onError(`Audio could not close. ${error instanceof Error ? error.message : ''}`);

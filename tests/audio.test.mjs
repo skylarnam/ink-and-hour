@@ -20,7 +20,7 @@ test('speed, paper, pressure, nib and holder affect friction, with a bounded cei
   assert.ok(frictionParameters({ ...sample, pressure: 0.1 }, DEFAULT_SETTINGS).gain < normal.gain);
   for (const speed of [NaN, Infinity, -1, 1e6]) {
     const params = frictionParameters({ ...sample, speed }, { ...DEFAULT_SETTINGS, paper: 'cotton', nib: 'broad' });
-    assert.ok(Number.isFinite(params.gain) && params.gain >= 0 && params.gain <= 0.13);
+    assert.ok(Number.isFinite(params.gain) && params.gain >= 0 && params.gain <= 0.32);
   }
 });
 
@@ -77,7 +77,12 @@ class FakeNode {
 }
 
 class FakeSource extends FakeNode {
-  constructor(context) { super(); this.context = context; this.frequency = new FakeParam(); }
+  constructor(context) {
+    super();
+    this.context = context;
+    this.frequency = new FakeParam();
+    this.playbackRate = new FakeParam();
+  }
   started = false;
   onended = null;
   stopTime = Infinity;
@@ -109,9 +114,9 @@ class FakeContext {
   createDynamicsCompressor() {
     return Object.assign(new FakeNode(), Object.fromEntries(['threshold', 'knee', 'ratio', 'attack', 'release'].map((key) => [key, new FakeParam()])));
   }
-  createBuffer(channels, length) {
+  createBuffer(channels, length, sampleRate = this.sampleRate) {
     const samples = new Float32Array(length);
-    return { getChannelData: () => samples, numberOfChannels: channels };
+    return { getChannelData: () => samples, numberOfChannels: channels, duration: length / sampleRate };
   }
   createBufferSource() { const source = new FakeSource(this); this.sources.push(source); return source; }
   createOscillator() { return this.createBufferSource(); }
@@ -150,13 +155,13 @@ test('a gesture creates one reusable graph across concurrent enable and repeated
     const enabled = await Promise.all([audio.enable(), audio.enable()]);
     assert.deepEqual(enabled, [true, true]);
     assert.equal(FakeContext.instances.length, 1);
-    assert.equal(audio.diagnostics.continuousSources, 2);
+    assert.equal(audio.diagnostics.continuousSources, 1);
     await audio.disable();
     assert.equal(audio.diagnostics.contextState, 'suspended');
     assert.equal(audio.enabled, false);
     assert.equal(await audio.enable(), true);
     assert.equal(FakeContext.instances.length, 1);
-    assert.equal(audio.diagnostics.continuousSources, 2);
+    assert.equal(audio.diagnostics.continuousSources, 1);
     assert.deepEqual(errors, []);
   });
 });
@@ -177,6 +182,86 @@ test('pen lift reaches scheduled exact zero without repeated frames postponing s
     assert.equal(zero[0], 'set');
     assert.equal(zero[1], 0);
     assert.ok(zero[2] - ctx.currentTime <= 0.025);
+  });
+});
+
+test('pen-only idle has no looping sources and lifts stop the actual contact source', async () => {
+  await withAudio(async (audio) => {
+    audio.configure({ ...DEFAULT_SETTINGS, masterVolume: 0.41, writingVolume: 1, ambienceVolume: 0, musicVolume: 0 });
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    assert.equal(audio.diagnostics.continuousSources, 0);
+    assert.equal(audio.diagnostics.contactSources, 0);
+    assert.equal(audio.diagnostics.weatherSources, 0);
+    audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
+    assert.equal(audio.diagnostics.contactSources, 1);
+    const source = audio.contactVoice.source;
+    assert.notEqual(source.buffer, audio.noise);
+    for (let i = 0; i < 12; i++) audio.updateContact({ contact: true, speed: 140 + i, pressure: 0.7 });
+    assert.equal(audio.contactVoice.source, source);
+    audio.updateContact({ contact: false, speed: 0, pressure: 0 });
+    assert.equal(audio.diagnostics.contactSources, 0);
+    assert.ok(source.stopTime - ctx.currentTime <= 0.013);
+    ctx.advance(0.02);
+    assert.equal(audio.diagnostics.continuousSources, 0);
+    assert.equal(source.connected, false);
+  });
+});
+
+test('muted weather is disconnected and cannot reappear when unrelated settings change', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    assert.equal(audio.diagnostics.weatherSources, 1);
+    for (const nib of ['fine', 'broad', 'flex']) {
+      audio.configure({ ...DEFAULT_SETTINGS, nib, ambienceVolume: 0 });
+      ctx.advance(0.03);
+      assert.equal(audio.diagnostics.weatherSources, 0);
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.rainGain, 0);
+      assert.equal(ctx.gains[2].gain.value, 0);
+    }
+    audio.configure(DEFAULT_SETTINGS);
+    assert.equal(audio.diagnostics.weatherSources, 1);
+  });
+});
+
+test('live holder changes crossfade to a different texture and rapid transitions stay bounded', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    const sample = { contact: true, speed: 150, pressure: 0.65 };
+    audio.updateContact(sample);
+    const fountain = audio.contactVoice.source.buffer;
+    audio.configure({ ...DEFAULT_SETTINGS, pen: 'dip' });
+    audio.updateContact(sample);
+    assert.notEqual(audio.contactVoice.source.buffer, fountain);
+    assert.equal(audio.diagnostics.contactSources, 1);
+    for (let i = 0; i < 50; i++) {
+      audio.configure({ ...DEFAULT_SETTINGS, ambienceVolume: i % 2 ? 0 : 0.48, pen: i % 2 ? 'dip' : 'fountain' });
+      audio.updateContact({ ...sample, contact: i % 3 !== 0 });
+      assert.ok(audio.diagnostics.continuousSources <= 4);
+    }
+    audio.configure({ ...DEFAULT_SETTINGS, writingVolume: 0, ambienceVolume: 0 });
+    ctx.advance(0.02);
+    assert.equal(audio.diagnostics.writingGain, 0);
+    assert.equal(audio.diagnostics.continuousSources, 0);
+  });
+});
+
+test('zero music or master volume stops the music timer and restores it only when audible again', async () => {
+  await withAudio(async (audio) => {
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt', musicVolume: 0 });
+    await audio.enable();
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+    assert.equal(audio.diagnostics.activeMusicVoices, 0);
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt', musicVolume: 0.2 });
+    assert.equal(audio.diagnostics.musicTimerActive, true);
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt', masterVolume: 0 });
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+    assert.equal(audio.diagnostics.activeMusicVoices, 0);
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt' });
+    assert.equal(audio.diagnostics.musicTimerActive, true);
   });
 });
 

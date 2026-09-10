@@ -4,6 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { makeLabelTexture, makeLeatherTexture, makeWoodTexture, randomSource } from './textures.ts';
 import { configureCameraDrag, createCameraControls, panCameraWithKey } from './camera-controls.ts';
+import { OutdoorView } from './outdoors.ts';
 import type { CameraDragMode } from './camera-controls.ts';
 import type { PaperSurface } from './textures.ts';
 import { INKS, PAGE, PAPER_COLORS } from './types.ts';
@@ -17,19 +18,19 @@ const CAP_REVERSE = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,
 
 const PALETTES: Record<Mood, {
   wood: string; wall: string; trim: string; leather: string; pen: string;
-  ceramic: string; book: string; foliage: string; sky: string;
+  ceramic: string; book: string; foliage: string;
 }> = {
   study: {
     wood: '#745039', wall: '#686c5b', trim: '#443d2f', leather: '#733e40',
-    pen: '#253a36', ceramic: '#b5ae8d', book: '#7a493d', foliage: '#56684c', sky: '#b9bbab',
+    pen: '#253a36', ceramic: '#b5ae8d', book: '#7a493d', foliage: '#56684c',
   },
   atelier: {
     wood: '#ded1ae', wall: '#e7e3d5', trim: '#c6b898', leather: '#af7954',
-    pen: '#b8c5b6', ceramic: '#ddd9c4', book: '#9ba7a1', foliage: '#708068', sky: '#c8dbe2',
+    pen: '#b8c5b6', ceramic: '#ddd9c4', book: '#9ba7a1', foliage: '#708068',
   },
   storybook: {
     wood: '#bfa082', wall: '#aaaabc', trim: '#73677b', leather: '#997781',
-    pen: '#795d82', ceramic: '#dcb183', book: '#718d91', foliage: '#859a77', sky: '#d9c8df',
+    pen: '#795d82', ceramic: '#dcb183', book: '#718d91', foliage: '#859a77',
   },
 };
 
@@ -99,12 +100,7 @@ export class DeskScene {
   private readonly pageEdgeMaterial = material('#ece3d0', 0.95);
   private readonly shadeMaterial = material('#ead7ae', 0.78);
   private readonly lampBulbMaterial = new THREE.MeshStandardMaterial({ color: '#ffe2a4', emissive: '#ffbe64', emissiveIntensity: 1.5 });
-  private readonly skyMaterial = new THREE.ShaderMaterial({
-    uniforms: { top: { value: new THREE.Color('#919da6') }, bottom: { value: new THREE.Color('#d9cfac') } },
-    vertexShader: 'varying vec2 vUv; void main(){vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader: 'varying vec2 vUv; uniform vec3 top; uniform vec3 bottom; void main(){gl_FragColor=vec4(mix(bottom,top,smoothstep(0.0,1.0,vUv.y)),1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
-    depthWrite: false,
-  });
+  private readonly outdoors = new OutdoorView();
   private readonly sun = new THREE.DirectionalLight('#ffdfab', 2.4);
   private readonly hemisphere = new THREE.HemisphereLight('#e9dcc9', '#675540', 1.6);
   private readonly lampLight = new THREE.SpotLight('#ffcf85', 18, 12, Math.PI / 3.6, 0.8, 1.4);
@@ -115,14 +111,8 @@ export class DeskScene {
   private readonly roll = new THREE.Group();
   private readonly rollOpenGroup = new THREE.Group();
   private readonly rollClosedGroup = new THREE.Group();
-  private readonly rain: THREE.LineSegments;
-  private readonly rainMaterial = new THREE.LineBasicMaterial({ color: '#d8e2e4', transparent: true, opacity: 0.33, depthWrite: false });
-  private readonly rainPositions = new Float32Array(260 * 6);
-  private readonly rainSeeds = Array.from({ length: 260 }, (_, i) => randomSource(i * 199 + 48)());
   private readonly dust: THREE.Points;
   private readonly storyStars = new THREE.Group();
-  private readonly skySun: THREE.Mesh;
-  private readonly hills: Standard[] = [];
   private readonly allTextures = new Set<THREE.Texture>();
   private readonly raycaster = new THREE.Raycaster();
   private readonly mouse = new THREE.Vector2();
@@ -176,6 +166,7 @@ export class DeskScene {
     const leatherTexture = makeLeatherTexture();
     this.allTextures.add(woodTexture);
     this.allTextures.add(leatherTexture);
+    for (const texture of this.outdoors.textures) this.allTextures.add(texture);
     this.tableMaterial.map = woodTexture;
     this.tableMaterial.bumpMap = woodTexture;
     this.tableMaterial.bumpScale = 0.018;
@@ -211,11 +202,6 @@ export class DeskScene {
     this.lampLight.shadow.mapSize.set(1024, 1024);
     this.lampLight.shadow.normalBias = 0.018;
     this.flashLight.position.set(-1, 4, -4.8);
-    const rainGeometry = new THREE.BufferGeometry();
-    rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3));
-    this.rain = new THREE.LineSegments(rainGeometry, this.rainMaterial);
-    this.rain.frustumCulled = false;
-    this.scene.add(this.rain);
     const random = randomSource(921);
     const dustPositions = new Float32Array(38 * 3);
     for (let i = 0; i < dustPositions.length; i += 3) {
@@ -229,9 +215,6 @@ export class DeskScene {
       color: '#ffdfa5', size: 0.019, transparent: true, opacity: 0.35, depthWrite: false,
     }));
     this.scene.add(this.dust);
-    this.skySun = mesh(new THREE.SphereGeometry(0.32, 24, 16),
-      new THREE.MeshBasicMaterial({ color: '#fff0cd' }), this.scene, -1, 5.6, -5.75);
-    this.skySun.castShadow = false;
     this.controls = createCameraControls(this.camera, canvas);
     this.controls.addEventListener('start', () => { this.movingCamera = false; this.followNib = false; });
     canvas.addEventListener('pointerdown', this.pointerDown, { capture: true });
@@ -250,26 +233,10 @@ export class DeskScene {
     box(16, 2.2, 0.22, this.wallMaterial, this.scene, 0, 7.3, -5.5);
     box(4.7, 4.55, 0.22, this.wallMaterial, this.scene, -5.65, 3.92, -5.5);
     box(4.7, 4.55, 0.22, this.wallMaterial, this.scene, 5.65, 3.92, -5.5);
-    mesh(new THREE.PlaneGeometry(6.6, 4.55), this.skyMaterial, this.scene, 0, 3.93, -6.05);
+    this.scene.add(this.outdoors.root);
     for (const x of [-3.27, 0, 3.27]) box(x === 0 ? 0.12 : 0.19, 4.65, 0.21, this.trimMaterial, this.scene, x, 3.95, -5.38);
     for (const y of [1.65, 3.94, 6.24]) box(6.7, 0.14, 0.24, this.trimMaterial, this.scene, 0, y, -5.38);
     box(7.08, 0.17, 0.7, this.trimMaterial, this.scene, 0, 1.6, -5.22);
-    const mist = material('#71817a', 1);
-    this.hills.push(mist);
-    for (let i = 0; i < 7; i++) {
-      const hill = mesh(new THREE.SphereGeometry(1.2, 24, 12), mist, this.scene, -3 + i * 1.05, 1.75 + Math.sin(i * 1.7) * 0.32, -5.86);
-      hill.scale.set(1.7, 0.9, 0.065);
-      hill.castShadow = false;
-    }
-    const distant = material('#87948c', 1);
-    this.hills.push(distant);
-    for (let i = 0; i < 11; i++) {
-      const x = -3.1 + i * 0.59;
-      const height = 0.75 + Math.sin(i * 8.13) * 0.3;
-      const tree = mesh(new THREE.ConeGeometry(0.25, height, 8), distant, this.scene, x, 2.2 + height / 2, -5.82);
-      tree.scale.z = 0.17;
-      tree.castShadow = false;
-    }
     this.scene.add(this.storyStars);
     const starMaterial = new THREE.MeshStandardMaterial({ color: '#e1c587', emissive: '#c39c60', emissiveIntensity: 0.2, metalness: 0.3 });
     for (let i = 0; i < 5; i++) {
@@ -349,6 +316,7 @@ export class DeskScene {
   }
 
   private buildRoll(): void {
+    this.roll.name = 'leather-roll';
     this.roll.position.set(-3.18, 0.07, 0.03);
     this.roll.rotation.y = -0.16;
     this.roll.userData.interaction = 'roll';
@@ -388,6 +356,7 @@ export class DeskScene {
 
   private buildProps(): void {
     const books = new THREE.Group();
+    books.name = 'desk-books';
     books.position.set(-3.05, 0.03, -3.42);
     books.rotation.y = -0.11;
     this.scene.add(books);
@@ -401,7 +370,8 @@ export class DeskScene {
       for (const z of [-0.54, 0.5]) box(0.01, 0.33, 0.05, this.brassMaterial, books, -w / 2 - 0.047, y, z, 0.002);
     }
     const cup = new THREE.Group();
-    cup.position.set(-3.47, 0.04, -1.59);
+    cup.name = 'coffee-cup';
+    cup.position.set(-0.55, 0.04, -3.5);
     this.scene.add(cup);
     cylinder(0.58, 0.55, 0.05, this.ceramicMaterial, cup, 0, 0.035);
     const profile = [new THREE.Vector2(0.21, 0.08), new THREE.Vector2(0.3, 0.11),
@@ -410,7 +380,7 @@ export class DeskScene {
       new THREE.Vector2(0.26, 0.15)];
     mesh(new THREE.LatheGeometry(profile, 48), this.ceramicMaterial, cup);
     cylinder(0.341, 0.341, 0.012, material('#573b27', 0.2), cup, 0, 0.535);
-    const handle = mesh(new THREE.TorusGeometry(0.21, 0.053, 12, 40), this.ceramicMaterial, cup, -0.41, 0.37);
+    const handle = mesh(new THREE.TorusGeometry(0.21, 0.053, 12, 40), this.ceramicMaterial, cup, -0.6, 0.37);
     handle.scale.set(0.88, 1.13, 1);
     const plant = new THREE.Group();
     plant.position.set(4.97, 0, -3.83);
@@ -520,15 +490,8 @@ export class DeskScene {
     const daylight = Math.max(0, Math.sin((settings.time - 6) / 12 * Math.PI));
     const overcast = settings.weather === 'clear' ? 1 : settings.weather === 'rain' ? 0.59 : 0.39;
     const warmth = Math.max(0, 1 - Math.abs(settings.time - 17) / 3.5);
-    const nightColor = new THREE.Color(settings.mood === 'storybook' ? '#414b73' : '#34495d');
-    const skyColor = new THREE.Color(palette.sky);
-    this.skyMaterial.uniforms.top.value.copy(nightColor).lerp(skyColor, daylight);
-    this.skyMaterial.uniforms.bottom.value.copy(new THREE.Color('#778597'))
-      .lerp(new THREE.Color(settings.weather === 'clear' ? '#edcf9e' : '#c1c4b6'), daylight);
-    this.skySun.visible = settings.weather === 'clear';
-    this.skySun.position.set(-2.4 + ((settings.time + 18) % 24) / 24 * 4.7, 2.75 + daylight * 2.8, -5.78);
-    (this.skySun.material as THREE.MeshBasicMaterial).color.set(daylight > 0.05 ? '#fff2d0' : '#cbd7e5');
-    this.skySun.scale.setScalar(daylight > 0.05 ? 1 : 0.65);
+    this.outdoors.configure(settings, daylight, warmth);
+    this.scene.fog?.color.copy(this.outdoors.hazeColor);
     this.sun.position.set(Math.cos((settings.time - 6) / 12 * Math.PI) * 6.5, 2.8 + daylight * 7, -4);
     this.sun.color.set(new THREE.Color('#fff0d3').lerp(new THREE.Color('#ffc88b'), warmth));
     this.sun.intensity = 0.18 + daylight * 2.45 * overcast;
@@ -538,10 +501,6 @@ export class DeskScene {
     this.lampBulbMaterial.emissiveIntensity = 0.3 + (1 - daylight) * 1.5;
     this.shadeMaterial.emissive.set('#d9a559');
     this.shadeMaterial.emissiveIntensity = (1 - daylight) * 0.1;
-    this.rain.visible = settings.weather !== 'clear';
-    this.rainMaterial.opacity = settings.weather === 'storm' ? 0.47 : 0.33;
-    this.hills[0]?.color.set(settings.mood === 'storybook' ? '#859891' : '#71817a').multiplyScalar(0.5 + daylight * 0.5);
-    this.hills[1]?.color.set(settings.mood === 'storybook' ? '#9baa9b' : '#87948c').multiplyScalar(0.5 + daylight * 0.5);
     this.scene.background = new THREE.Color(palette.wall).multiplyScalar(0.8);
     if (weatherChanged) {
       this.thunderAt = null;
@@ -676,23 +635,7 @@ export class DeskScene {
       this.controls.cursor.copy(this.movingCamera ? this.controls.target : this.targetLook);
     }
     this.controls.update();
-    if (this.rain.visible) {
-      const speed = this.settings.weather === 'storm' ? 4.8 : 3.1;
-      for (let i = 0; i < 260; i++) {
-        const seed = this.rainSeeds[i] ?? 0;
-        const x = -3.14 + seed * 6.28;
-        const y = 1.78 + ((seed * 73.4 - elapsed * speed) % 4.3 + 4.3) % 4.3;
-        const length = 0.07 + seed * 0.13;
-        const offset = i * 6;
-        this.rainPositions[offset] = x;
-        this.rainPositions[offset + 1] = y;
-        this.rainPositions[offset + 2] = -5.62;
-        this.rainPositions[offset + 3] = x + 0.018;
-        this.rainPositions[offset + 4] = Math.min(6.08, y + length);
-        this.rainPositions[offset + 5] = -5.62;
-      }
-      this.rain.geometry.attributes.position.needsUpdate = true;
-    }
+    this.outdoors.update(elapsed, this.reducedMotion);
     if (this.settings.weather === 'storm' && elapsed > this.nextLightning) {
       this.nextLightning = elapsed + 24 + Math.random() * 25;
       this.lightningRemaining = this.reducedMotion ? 0 : 0.7;
@@ -716,7 +659,7 @@ export class DeskScene {
   get diagnostics(): Record<string, unknown> {
     return {
       mood: this.settings.mood, time: this.settings.time, weather: this.settings.weather,
-      rainVisible: this.rain.visible, rainCount: 260, sunIntensity: this.sun.intensity,
+      ...this.outdoors.diagnostics, sunIntensity: this.sun.intensity,
       lampIntensity: this.lampLight.intensity, sunPosition: this.sun.position.toArray(),
       tableColor: this.tableMaterial.color.getHexString(), pen: this.settings.pen, nib: this.settings.nib,
       rollOpen: this.rollOpen, capped: this.capped, camera: this.currentPreset,

@@ -13,12 +13,4 @@ export default defineConfig({
       }
     },
   }],
-  build: {
-    rollupOptions: {
-      input: {
-        ritual: 'index.html',
-        designs: 'designs.html',
-      },
-    },
-  },
 });
