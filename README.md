@@ -1,0 +1,193 @@
+# Ink & Hour
+
+A local-first, ASMR-first 3D writing ritual. This is a playable first edition, not
+a productivity tool or a manufacturer-accurate pen simulator.
+
+## Run
+
+Use Node.js 22.18+ (or 24 LTS) and npm.
+
+```sh
+npm install
+npm run dev
+```
+
+Vite binds to `127.0.0.1` and prints the available localhost URL. To choose a port:
+
+```sh
+npm run dev -- --port 4173 --strictPort
+```
+
+```sh
+npm test        # Node's built-in test runner; no browser test dependencies
+npm run build  # Strict TypeScript checking, then a production bundle in dist/
+npm run preview
+```
+
+The runtime requires WebGL 2 and a modern browser. Everything is bundled locally;
+there is no backend, account, analytics, paid key, runtime CDN, or remote asset
+request. Preferences are stored in validated, versioned local storage. Sound
+defaults to on for each visit, but browser autoplay rules are honored: the
+AudioContext starts with the first click, tap, or meaningful keypress.
+
+## Hosting
+
+This is a static Vite site. `vercel.json` selects the Vite framework, installs
+from the lockfile, runs `npm run build`, and publishes `dist/`. No database,
+server process, environment variables, or paid add-ons are needed.
+
+For a linked Vercel project, `vercel --prod` publishes the current version.
+When the GitHub integration is connected, pushes to `main` deploy automatically.
+The production build includes both HTML entrypoints, all local fonts and
+textures, the attribution notes, and the full Three.js license.
+
+Local preview servers should run in the app's normal Terminal panel, rather
+than an agent background task. A server intentionally remains running; keeping
+it in a terminal separates its lifetime from the agent's completed work.
+
+## Settle in
+
+- Write an English note, choose **Correspondence** or **Everyday print**, and
+  select **Begin writing**. Pause/resume preserves the exact writing position.
+  The editable text uses the selected handwriting's matching local font.
+  **Write it again** replays a completed note. **Fresh sheet** clears the ink but
+  keeps the words. **Keep this page** exports the completed sheet as a 1560 x 2080 PNG.
+- The editor starts at a compact 18px for Correspondence and 16px for print.
+  Pinch over the textbox with a trackpad or two fingers to resize its text, or
+  use the keyboard-accessible **A- / A+** buttons. Display zoom is bounded to
+  75-200%, carries across handwriting choices, and resets on reload. It does
+  not change the written page, camera, or browser zoom. The textbox remains
+  scrollable and resizable while its words are read-only during a run.
+- Drag to rotate, or turn on **Move** and hold-drag to pan a little across the
+  desk. **Shift-drag** and **right-drag** also pan without switching modes.
+  On touchscreens, use one finger in Move mode or two fingers in either mode.
+  Scroll/pinch still zooms. Panning stays on the desk plane within a small radius
+  of the current preset, so the room cannot get lost.
+- **Desk**, **Nib close-up** (which follows the nib until you adjust the view),
+  **Overhead**, and the reset button offer accessible camera presets. With the
+  canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan,
+  plus/minus zoom, and Home restores the desk framing. Presets recenter panning.
+- **Tools** offers a lacquer fountain pen and a wooden dip holder, three nib
+  characters (fine, broad edge, soft flex), three paper surfaces, and four inks.
+  Nib, ink, paper, and pace can change during writing. Existing ink keeps its
+  color; new strokes use the new color. Text and style are locked during a run.
+- In rotation mode, click the pen/cap, glass bottle, or tied leather roll in the scene. The same
+  cap and roll actions have labeled buttons. The roll unfolds into four pen
+  pockets. The dip holder has no cap.
+- **Room** changes the actual 3D materials and palette between Rainy Study,
+  Sunlit Atelier, and Storybook Nook. Time controls the sun, sky, and lamp.
+  Clear/rain/storm is independent of mood and time. Rain is confined to the
+  window. Storms have isolated, gentle light pulses with delayed thunder, not
+  repeated rapid flashes.
+- Sound is on by default and starts at the first browser-allowed interaction;
+  no separate enable click is needed. Click **Sound is on** to mute, even before
+  the first interaction. A chosen mute remains in force for the current visit.
+  Writing/materials, ambience, music, and overall volume have independent controls. Music starts
+  **Off**; **Felt notes** and **Glass garden** are original synthesized beds.
+  Rain has its own restrained mix level beneath the other layers; the ambience
+  slider still controls rain and thunder together. No recording or copyrighted
+  composition is bundled.
+- Leaving the tab pauses writing, silences friction, and suspends audio. On
+  return, audio can resume if previously enabled, but writing waits for Resume.
+  Reduced-motion preferences remove storm flashes and floating dust, and make
+  camera/case/cap transitions immediate.
+
+## Five design studies
+
+Open [the comparison gallery](http://127.0.0.1:5173/designs.html) while the dev
+server is running, or use **Explore 5 design studies** in the original site's
+footer. The gallery uses locally captured previews, not five simultaneous
+WebGL scenes. Each preview opens a complete, playable presentation:
+
+| Direction | Presentation | Route |
+| --- | --- | --- |
+| Nocturne | Cinematic night room, literary type, floating console | `/?design=nocturne` |
+| The Airmail Club | Cream paper, vermilion postal marks, postcard editor | `/?design=airmail` |
+| Atelier 04 | Graphic sans-serif, acid-yellow accents, horizontal workbench | `/?design=atelier` |
+| Daydream Department | Powder blue, grape and apricot, rounded storybook diorama | `/?design=daydream` |
+| The Listening Room | Walnut and analog equipment, sound-first console | `/?design=listening` |
+
+These are alternative visual directions, not a chosen replacement for `/`.
+Their initial room/material settings are isolated from saved preferences, and
+changes made inside a design study are not saved. Writing, camera navigation,
+material choices, audio, and export use the same real implementation in every
+direction. The Listening Room's illustrated meter faces are decorative, not
+live audio meters. Both the gallery and all five routes work in the production
+build; the preview images and fonts are bundled locally.
+
+## How the writing works
+
+`src/writing/fonts.json` contains only the public-domain original Hershey
+**Script 1-stroke** and **Sans 1-stroke** datasets. Each `M` defines a pen lift;
+`L` sequences define writing centerlines, not glyph outlines. The engine rounds
+the polylines gently without replacing their stroke order, lays out finite
+pages, then advances along their arc lengths. The same live point drives both
+new ink segments and the 3D nib tip.
+
+The editor's two local OpenType font faces are generated from those same
+public-domain centerlines, so selecting a style changes the actual editable
+letterforms, not just an italic CSS treatment. These static outline fonts are
+only for the text editor; the pen still uses stroke-order playback. Regenerate
+the checked-in font assets with `npm run fonts`.
+
+Pointed flex width is pressure/downstroke-sensitive; broad-edge width depends
+on the relationship between a fixed edge angle and stroke direction. Fine is
+restrained. The two holders have different flex/audio responses. A layered 2D
+paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
+
+The audio graph uses long procedural noise with continuously changing filter
+and gain targets based on contact, speed, pressure, paper, and nib. Pen-up
+friction fades to an explicitly scheduled zero within 21 ms. Cap, paper,
+leather, and bottle events are
+separate short voices. One reusable AudioContext has writing, ambience, and
+music buses behind a bounded master/compressor. Clear weather removes rain;
+changing away from storm also stops a pending thunder voice. Enable, mute, and
+tab-visibility transitions are serialized so a delayed resume cannot override
+a newer mute request.
+
+## Honest prototype limits
+
+- English ASCII letters, digits, spaces, newlines, and standard punctuation
+  only. Unsupported characters get a visible error; they are never discarded.
+  There is a 420-character input ceiling and a stricter physical sheet-capacity
+  check. Words and long unbroken text wrap; there is no automatic second page.
+- The two curated stroke styles are not arbitrary font imports. Historical
+  engraving centerlines are an expressive starting point, not a recording of a
+  calligrapher's motor motion. Some print letters use several lifts; script
+  letters are not continuously connected across every character boundary.
+- No hand model, fluid simulation, ink depletion, automatic dipping, nib alloy
+  simulation, or manufacturer-specific measurements. "Fine", "broad edge", and
+  "soft flex" are generic expressive profiles, not claims of real interchangeable
+  nib hardware. Broad and flex behavior are deliberately different.
+- Friction/weather/music are synthesized rather than recorded ASMR. Quiet
+  headphones are recommended; output character depends on the device.
+- A page is kept only for the current browser session unless exported. Material,
+  room, time, pace, and volume preferences persist, but text and ink do not.
+- WebGL rendering and dynamic ink textures can be demanding on older phones.
+  Camera travel is constrained to avoid looking through the room walls.
+
+## Source map
+
+`src/main.ts` integrates the ritual and lifecycle; `src/ui.ts` and `src/style.css`
+are the responsive, keyboard-labeled interface; `src/scene.ts` builds the room;
+`src/textures.ts` makes procedural materials and ink; `src/writing/` owns layout
+and stroke playback; `src/audio.ts` owns Web Audio; `src/settings.ts` validates
+saved preferences. `tests/` exercises those pure/stateful boundaries.
+
+`src/designs.ts` defines the five isolated design studies; `src/design-theme.css`
+styles their presentations. `designs.html` and `src/design-gallery.*` provide
+the comparison gallery, with original screenshots in `public/design-previews/`.
+`src/fonts.css` shares the locally generated editor faces.
+
+During `npm run dev`, `window.__inkAndHour` is a read-only snapshot getter for
+writing contact/progress, audio gain targets/lifecycle, and scene settings.
+It provides no mutation methods and is omitted from production builds.
+
+See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for the separately tracked
+software and lettering provenance.
+
+The distinction between soft/pointed flex and stub/music broad-edge behavior
+was informed by [Pilot's nib guide](https://www.pilot-custom.jp/en/feature/nib.html);
+no manufacturer force curves or hardware compatibility are claimed. Gesture
+gating and AudioParam scheduling follow
+[MDN's Web Audio best practices](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices).

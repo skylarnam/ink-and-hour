@@ -1,0 +1,14 @@
+@font-face {
+  font-family: "Ink Correspondence";
+  src: url("/fonts/ink-correspondence.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ink Everyday";
+  src: url("/fonts/ink-everyday.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
