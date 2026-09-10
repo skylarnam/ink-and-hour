@@ -3,6 +3,9 @@
 A local-first, ASMR-first 3D writing ritual. This is a playable first edition, not
 a productivity tool or a manufacturer-accurate pen simulator.
 
+[Open the live site](https://ink-and-hour.vercel.app/) |
+[Private GitHub repository](https://github.com/skylarnam/ink-and-hour)
+
 ## Run
 
 Use Node.js 22.18+ (or 24 LTS) and npm.
@@ -36,8 +39,10 @@ This is a static Vite site. `vercel.json` selects the Vite framework, installs
 from the lockfile, runs `npm run build`, and publishes `dist/`. No database,
 server process, environment variables, or paid add-ons are needed.
 
-For a linked Vercel project, `vercel --prod` publishes the current version.
-When the GitHub integration is connected, pushes to `main` deploy automatically.
+The private GitHub repository is connected to Vercel: pushes to `main` deploy
+automatically to the production site on the Hobby plan. For a one-off CLI
+deployment, use `npx vercel@latest --prod`; this uses a current uploader without
+replacing a globally installed CLI.
 The production build includes both HTML entrypoints, all local fonts and
 textures, the attribution notes, and the full Three.js license.
 
