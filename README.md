@@ -83,8 +83,9 @@ it in a terminal separates its lifetime from the agent's completed work.
   Sunlit Atelier, and Storybook Nook. Time controls the sun, sky, and lamp.
   Outside, branching trees and leafy crowns sit on rolling terrain, with
   distance haze and slowly changing clouds. Clear/rain/storm is independent
-  of mood and time. Varied-depth rain falls outside the window, with small
-  beads and trailing drops on the glass. Clear removes all rain layers.
+  of mood and time. Varied-depth rain falls outside the window, with brighter
+  near-window streaks that remain visible in the default desktop and phone
+  views, plus beads and trailing drops on the glass. Clear removes all rain layers.
   Storms have isolated, gentle light pulses with delayed thunder, not repeated
   rapid flashes. The coffee cup sits behind the paper, clear of both roll states.
 - Sound is on by default and starts at the first browser-allowed interaction;
@@ -122,13 +123,12 @@ on the relationship between a fixed edge angle and stroke direction. Fine is
 restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 
-Writing uses original, granular contact textures rather than the weather's
-continuous noise bed. Short, uneven fiber contacts and damped resonances give
-the fountain pen a rounder texture and the dip nib a drier, brighter one.
-Playback rate, filtering, and gain follow speed, pressure, paper, and nib.
-The contact source exists only during moving contact: it fades to exact zero
-within 7 ms of a lift and stops within 12 ms. Live holder changes crossfade
-between textures, while nib and paper changes reshape the current stroke.
+Writing uses the original soft, filtered friction sound, with a stronger mix
+but no pitched grains, resonant chirps, or playback-rate changes. Filtering
+and gain follow speed, pressure, paper, nib, and holder. The contact source
+exists only during moving contact: it fades to exact zero within 7 ms of a
+lift and stops within 12 ms. Material changes reshape the current stroke
+without restarting its sound.
 
 Cap, paper, leather, and bottle events are separate short voices. One reusable
 AudioContext has writing, ambience, and music buses behind a bounded
@@ -168,9 +168,8 @@ a newer mute request.
 are the responsive, keyboard-labeled interface; `src/scene.ts` builds the room;
 `src/outdoors.ts` builds its layered landscape and weather; `src/textures.ts`
 makes procedural materials and ink; `src/writing/` owns layout and stroke
-playback; `src/audio.ts` owns Web Audio, with contact synthesis in
-`src/nib-sound.ts`; `src/settings.ts` validates saved preferences. `tests/`
-exercises those pure/stateful boundaries.
+playback; `src/audio.ts` owns Web Audio; `src/settings.ts` validates saved
+preferences. `tests/` exercises those pure/stateful boundaries.
 
 `src/fonts.css` shares the locally generated editor faces.
 

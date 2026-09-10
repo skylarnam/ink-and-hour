@@ -68,8 +68,8 @@ test('rain stays beyond the wall at every time and storm increases its fall spee
       rainPositions(elapsed, weather, buffer);
       assert.ok(buffer.every(Number.isFinite));
       for (let i = 0; i < buffer.length; i += 3) {
-        assert.ok(buffer[i + 2] <= -6.19);
-        assert.ok(buffer[i + 1] >= -1 && buffer[i + 1] < 8.3);
+        assert.ok(buffer[i + 2] <= -5.75);
+        assert.ok(buffer[i + 1] >= -1 && buffer[i + 1] < 8.5);
       }
     }
   }
@@ -81,4 +81,19 @@ test('rain stays beyond the wall at every time and storm increases its fall spee
   rainPositions(0.001, 'storm', storm);
   assert.ok(initial[1] - storm[1] > initial[1] - rain[1]);
   assert.throws(() => rainPositions(0, 'rain', new Float32Array(3)), RangeError);
+});
+
+test('most rain is in front of the trees with readable near-window streak dimensions', () => {
+  const positions = new Float32Array(RAIN_COUNT * 12);
+  rainPositions(5, 'rain', positions);
+  let foreground = 0;
+  for (let i = 0; i < RAIN_COUNT; i++) {
+    const offset = i * 12;
+    if (positions[offset + 2] > -6.51) {
+      foreground++;
+      assert.ok(positions[offset + 3] - positions[offset] >= 0.0179);
+      assert.ok(positions[offset + 7] - positions[offset + 1] >= 0.1399);
+    }
+  }
+  assert.equal(foreground, RAIN_COUNT * 2 / 3);
 });

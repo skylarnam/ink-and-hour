@@ -1,24 +1,21 @@
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings.ts';
-import { synthesizeNibTexture } from './nib-sound.ts';
-import type { AudioContact, InteractionCue, PenKind, Settings } from './types.ts';
+import type { AudioContact, InteractionCue, Settings } from './types.ts';
 
 const clamp = (value: number, max = 1): number => Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : 0;
 
 export function frictionParameters(sample: AudioContact, settings: Settings): {
-  gain: number; frequency: number; lowpass: number; playbackRate: number;
+  gain: number; frequency: number; lowpass: number;
 } {
   const roughness = { smooth: 0.22, parchment: 0.57, cotton: 0.92 }[settings.paper];
-  const nib = { fine: 0.84, broad: 1.08, flex: 0.98 }[settings.nib];
+  const nib = { fine: 0.78, broad: 1.13, flex: 0.94 }[settings.nib];
   const speed = clamp(sample.speed / 200, 2);
   const pressure = clamp(sample.pressure);
   return {
     gain: !sample.contact || speed <= 0 ? 0
-      : Math.min(0.32, (0.18 + roughness * 0.075) * Math.sqrt(speed) * (0.6 + pressure * 0.7)
-        * nib * (settings.pen === 'dip' ? 1.12 : 1)),
-    frequency: 700 + speed * 550 + roughness * 550 + (settings.nib === 'fine' ? 300 : 0)
-      + (settings.pen === 'dip' ? 250 : 0),
-    lowpass: 2700 + roughness * 1900 + speed * 550 + (settings.pen === 'dip' ? 350 : 0),
-    playbackRate: 0.65 + speed * 0.45 + roughness * 0.1,
+      : Math.min(0.32, (0.021 + roughness * 0.029) * 8 * Math.sqrt(speed) * (0.6 + pressure * 0.7)
+        * nib * (settings.pen === 'dip' ? 1.1 : 1)),
+    frequency: 1100 + speed * 1500 + roughness * 1600 + (settings.nib === 'fine' ? 650 : 0),
+    lowpass: 3200 + roughness * 3100 + speed * 700,
   };
 }
 
@@ -67,7 +64,6 @@ export class RitualAudio {
   private rain: GainNode | null = null;
   private rainFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
-  private readonly nibTextures = new Map<PenKind, AudioBuffer>();
   private readonly loops = new Set<LoopVoice>();
   private contactVoice: LoopVoice | null = null;
   private rainVoice: LoopVoice | null = null;
@@ -190,12 +186,6 @@ export class RitualAudio {
       pink = pink * 0.96 + white * 0.04;
       samples[i] = white * 0.68 + pink * 2.6;
     }
-    for (const pen of ['fountain', 'dip'] as const) {
-      const data = synthesizeNibTexture(ctx.sampleRate, pen);
-      const texture = ctx.createBuffer(1, data.length, ctx.sampleRate);
-      texture.getChannelData(0).set(data);
-      this.nibTextures.set(pen, texture);
-    }
     this.frictionBand = ctx.createBiquadFilter();
     this.frictionBand.type = 'bandpass';
     this.frictionBand.Q.value = 0.65;
@@ -297,20 +287,15 @@ export class RitualAudio {
     this.writingTarget = parameters.gain;
     const ctx = this.context;
     if (!ctx || !this.friction || !this.frictionBand || !this.frictionLowpass || (previousGain === 0 && parameters.gain === 0)) return;
-    target(this.friction.gain, parameters.gain, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
+    const modulation = 0.86 + 0.11 * Math.sin(ctx.currentTime * 42) + 0.04 * Math.sin(ctx.currentTime * 117);
+    target(this.friction.gain, parameters.gain * modulation, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
     if (parameters.gain === 0) {
       if (this.contactVoice) this.stopLoop(this.contactVoice);
       this.contactVoice = null;
       return;
     }
-    const texture = this.nibTextures.get(this.settings.pen);
-    if (!texture) throw new Error('The selected nib sound is not initialized.');
-    if (this.contactVoice && this.contactVoice.source.buffer !== texture) {
-      this.stopLoop(this.contactVoice);
-      this.contactVoice = null;
-    }
-    if (!this.contactVoice) this.contactVoice = this.startLoop('contact', texture, this.frictionBand);
-    target(this.contactVoice.source.playbackRate, parameters.playbackRate, ctx.currentTime, 0.018);
+    if (!this.noise) throw new Error('The friction sound is not initialized.');
+    if (!this.contactVoice) this.contactVoice = this.startLoop('contact', this.noise, this.frictionBand);
     target(this.frictionBand.frequency, parameters.frequency, ctx.currentTime, 0.018);
     target(this.frictionLowpass.frequency, parameters.lowpass, ctx.currentTime, 0.018);
   }
@@ -463,7 +448,6 @@ export class RitualAudio {
     this.userEnabled = false;
     this.revision++;
     this.silence();
-    this.nibTextures.clear();
     if (this.context && this.context.state !== 'closed') {
       void this.context.close().catch((error: unknown) => {
         this.onError(`Audio could not close. ${error instanceof Error ? error.message : ''}`);

@@ -24,6 +24,14 @@ test('speed, paper, pressure, nib and holder affect friction, with a bounded cei
   }
 });
 
+test('the original friction filter profile is restored without pitched-grain playback', () => {
+  const sample = { contact: true, speed: 100, pressure: 0.6 };
+  const parameters = frictionParameters(sample, DEFAULT_SETTINGS);
+  assert.equal(parameters.frequency, 1100 + 0.5 * 1500 + 0.22 * 1600);
+  assert.equal(parameters.lowpass, 3200 + 0.22 * 3100 + 0.5 * 700);
+  assert.equal('playbackRate' in parameters, false);
+});
+
 test('clear weather really has no rain signal', () => {
   assert.equal(weatherGain({ ...DEFAULT_SETTINGS, weather: 'clear' }), 0);
   assert.ok(weatherGain({ ...DEFAULT_SETTINGS, weather: 'storm' }) > weatherGain(DEFAULT_SETTINGS));
@@ -196,7 +204,19 @@ test('pen-only idle has no looping sources and lifts stop the actual contact sou
     audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
     assert.equal(audio.diagnostics.contactSources, 1);
     const source = audio.contactVoice.source;
-    assert.notEqual(source.buffer, audio.noise);
+    assert.equal(source.buffer, audio.noise);
+    assert.equal(source.playbackRate.value, 1);
+    assert.equal(source.buffer.duration, 9);
+    let seed = 91721;
+    let pink = 0;
+    const original = new Float32Array(128);
+    for (let i = 0; i < original.length; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const white = seed / 2147483648 - 1;
+      pink = pink * 0.96 + white * 0.04;
+      original[i] = white * 0.68 + pink * 2.6;
+    }
+    assert.deepEqual(source.buffer.getChannelData(0).slice(0, 128), original);
     for (let i = 0; i < 12; i++) audio.updateContact({ contact: true, speed: 140 + i, pressure: 0.7 });
     assert.equal(audio.contactVoice.source, source);
     audio.updateContact({ contact: false, speed: 0, pressure: 0 });
@@ -328,16 +348,19 @@ test('muted weather is disconnected and cannot reappear when unrelated settings 
   });
 });
 
-test('live holder changes crossfade to a different texture and rapid transitions stay bounded', async () => {
+test('live holder changes reshape the original friction without pitch changes or source restarts', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const ctx = FakeContext.instances[0];
     const sample = { contact: true, speed: 150, pressure: 0.65 };
     audio.updateContact(sample);
-    const fountain = audio.contactVoice.source.buffer;
+    const source = audio.contactVoice.source;
+    const gain = audio.diagnostics.writingGain;
     audio.configure({ ...DEFAULT_SETTINGS, pen: 'dip' });
     audio.updateContact(sample);
-    assert.notEqual(audio.contactVoice.source.buffer, fountain);
+    assert.equal(audio.contactVoice.source, source);
+    assert.equal(source.playbackRate.value, 1);
+    assert.notEqual(audio.diagnostics.writingGain, gain);
     assert.equal(audio.diagnostics.contactSources, 1);
     for (let i = 0; i < 50; i++) {
       audio.configure({ ...DEFAULT_SETTINGS, ambienceVolume: i % 2 ? 0 : 0.48, pen: i % 2 ? 'dip' : 'fountain' });

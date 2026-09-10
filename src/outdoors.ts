@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { canvas2D, randomSource } from './textures.ts';
 import type { Settings, Weather } from './types.ts';
 
-export const RAIN_COUNT = 420;
+export const RAIN_COUNT = 600;
 export const GLASS_DROP_COUNT = 92;
 const GLASS_Z = -5.63;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -31,13 +31,15 @@ export function rainPositions(elapsed: number, weather: Weather, target: Float32
   const random = randomSource(817);
   const storm = weather === 'storm';
   for (let i = 0; i < RAIN_COUNT; i++) {
-    const startX = random() * 13.8 - 6.9;
-    const phase = random() * 9;
-    const z = -6.2 - random() * 4.4;
+    const near = i % 3 !== 0;
+    const span = near ? 5.6 : 9;
+    const startX = (random() - 0.5) * (near ? 8.4 : 13.8);
+    const phase = random() * span;
+    const z = near ? -5.76 - random() * 0.74 : -6.7 - random() * 3.9;
     const speed = (storm ? 5.7 : 3.9) * (0.65 + random() * 0.8);
-    const length = (0.05 + random() * 0.14) * (storm ? 1.3 : 1);
-    const width = 0.003 + random() * 0.005;
-    const y = -1 + ((phase - elapsed * speed) % 9 + 9) % 9;
+    const length = (0.14 + random() * 0.24) * (storm ? 1.3 : 1);
+    const width = (near ? 0.009 : 0.005) + random() * (near ? 0.008 : 0.005);
+    const y = (near ? 1.3 : -1) + ((phase - elapsed * speed) % span + span) % span;
     const wind = (storm ? 0.32 : 0.11) + Math.sin(elapsed * 0.19) * 0.035;
     const x = startX + Math.sin(elapsed * 0.23 + phase) * 0.12;
     const lean = length * wind;
@@ -185,14 +187,14 @@ export class OutdoorView {
     const indices = [];
     const random = randomSource(619);
     for (let i = 0; i < RAIN_COUNT; i++) {
-      const alpha = 0.2 + random() * 0.5;
-      colors.set([1, 1, 1, alpha, 1, 1, 1, alpha, 1, 1, 1, 0, 1, 1, 1, 0], i * 16);
+      const alpha = 0.6 + random() * 0.3;
+      colors.set([1, 1, 1, alpha, 1, 1, 1, alpha, 1, 1, 1, 0.05, 1, 1, 1, 0.05], i * 16);
       indices.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 1, i * 4 + 3, i * 4 + 2);
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
     geometry.setIndex(indices);
     this.falling = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-      color: '#d3e1e6', vertexColors: true, transparent: true, opacity: 0.48, depthWrite: false, side: THREE.DoubleSide,
+      color: '#e8f0ee', vertexColors: true, transparent: true, opacity: 0.68, depthWrite: false, side: THREE.DoubleSide,
     }));
     this.falling.frustumCulled = false;
     this.beads = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
@@ -323,8 +325,8 @@ export class OutdoorView {
     this.sun.position.set(Math.cos(phase) * (isDay ? 3.6 : -3.6), 2.8 + altitude * 2.2, -12.25);
     this.sun.material.color.set(daylight > 0.05 ? '#fff0ca' : '#c4d3e4');
     this.sun.scale.setScalar(daylight > 0.05 ? 1 : 0.65);
-    this.falling.material.opacity = (settings.weather === 'storm' ? 0.62 : 0.44) * (0.55 + daylight * 0.45);
-    this.beads.material.opacity = 0.33 + daylight * 0.3;
+    this.falling.material.opacity = (settings.weather === 'storm' ? 0.82 : 0.68) * (0.75 + daylight * 0.25);
+    this.beads.material.opacity = 0.45 + daylight * 0.3;
     this.trails.material.opacity = 0.08 + daylight * 0.09;
   }
 
@@ -345,7 +347,7 @@ export class OutdoorView {
       const x = random() * 6.1 - 3.05;
       const phase = random() * 4.07;
       const speed = i < 18 ? 0.035 + random() * 0.045 : 0;
-      const size = 0.025 + random() * 0.039;
+      const size = 0.035 + random() * 0.05;
       const y = 1.9 + ((phase - elapsed * speed) % 4.07 + 4.07) % 4.07;
       const drift = i < 18 ? Math.sin(elapsed * 0.45 + i) * 0.009 : 0;
       position.set(x + drift, y, GLASS_Z);
