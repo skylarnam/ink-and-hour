@@ -46,7 +46,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sound-toggle { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border: 1px solid #d4d4c4; border-radius: 6px; font-size: 11px; }
 .sound-toggle .icon { width: 16px; height: 16px; }
 .sound-dot { width: 5px; height: 5px; margin-left: 3px; background: #bdbdad; border-radius: 50%; }
-.sound-toggle[aria-pressed="true"] .sound-dot { background: #7c9472; box-shadow: 0 0 0 3px #7c947216; }
+.sound-toggle[data-sound-state="running"] .sound-dot { background: #7c9472; box-shadow: 0 0 0 3px #7c947216; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 332px; height: calc(100dvh - 129px); min-height: 560px; }
 .stage { position: relative; min-width: 0; overflow: hidden; background: #888775; }
 #desk-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
@@ -90,6 +90,8 @@ legend span { float: right; font-size: 9px; letter-spacing: 0; color: #888675; t
 .choice[aria-pressed="true"] { background: #e9ecdf; border-color: #929f7e; color: #384d32; box-shadow: 0 0 0 1px #a9b59b0a; }
 .choice small { display: block; font-size: 8px; margin-top: 5px; color: #848572; font-weight: 400; }
 .compact .choice { padding: 9px 5px; white-space: nowrap; }
+.writing-sound-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.writing-sound-choices .choice { min-height: 36px; padding: 9px 5px; }
 .pen-choices .choice { padding: 12px 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .pen-illustration { position: relative; display: block; width: 72px; height: 7px; margin: 5px 0 3px; transform: rotate(-10deg); border-radius: 5px 2px 2px 5px; background: linear-gradient(#687163 0%, #2e433a 35%, #27372e 65%, #4e5a47 100%); box-shadow: 0 2px 3px #49493020; }
 .pen-illustration:after { position: absolute; content: ""; width: 16px; height: 7px; right: -14px; top: 0; background: linear-gradient(#d2bc82, #a18b51, #d9c88b); clip-path: polygon(0 4%, 62% 7%, 100% 50%, 62% 93%, 0 96%); }

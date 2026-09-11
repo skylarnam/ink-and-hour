@@ -1,5 +1,6 @@
 import './style.css';
 import { RitualAudio } from './audio.ts';
+import { createSoundStartup, soundPresentation } from './sound-startup.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { DeskScene } from './scene.ts';
 import { inkColor, inkLabel, isInkColor } from './ink.ts';
@@ -9,8 +10,9 @@ import { handwritingStyle, isHandwritingId } from './handwriting.ts';
 import { loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
 import { PaperSurface } from './textures.ts';
 import { icon, renderUI } from './ui.ts';
+import { writingSoundDescriptor } from './writing-sounds.ts';
 import { PAGE } from './types.ts';
-import type { CameraPreset, LayoutOptions, PenSample, Settings, WritingStatus } from './types.ts';
+import type { CameraPreset, InteractionCue, LayoutOptions, PenSample, Settings, WritingStatus } from './types.ts';
 import { layoutText, restyleRemainingText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
 
 function element<T extends Element>(selector: string): T {
@@ -61,7 +63,6 @@ let disposed = false;
 let lastTimestamp = 0;
 let elapsed = 0;
 let animationId = 0;
-let soundActivation: Promise<boolean> | null = null;
 
 function letteringOptions(next = settings): LayoutOptions {
   return { ...PAGE, style: next.style, textScale: next.textScale, textAlignment: next.textAlignment };
@@ -71,6 +72,10 @@ function currentPen(): PenSample {
   return engine?.peek() ?? {
     x: 0, y: 0, contact: false, lift: 0.42, pressure: 0, speed: 0, angle: 0, progress: 0, status: 'idle',
   };
+}
+
+function playMaterialCue(cue: InteractionCue): void {
+  soundStartup.afterActivation(() => audio.cue(cue));
 }
 
 const rooms = {
@@ -92,7 +97,7 @@ function updateMusicUI(): void {
   const detail = !requested ? synth ? 'Original soundscape / paused' : `${state.track.artist} / paused`
     : !audio.enabled ? 'Paused with sound'
     : settings.musicVolume === 0 || settings.masterVolume === 0 ? 'Music volume is zero'
-    : audio.diagnostics.contextState === 'not-created' ? 'Ready for your first interaction'
+    : audio.diagnostics.contextState !== 'running' ? 'Ready for your first interaction'
     : state.loading && !synth ? 'Loading record...'
     : document.hidden ? 'Paused in the background'
     : synth ? 'Original soundscape' : state.track.artist;
@@ -144,32 +149,17 @@ function skipMusic(direction: -1 | 1): void {
 
 function updateAudioButtons(): void {
   const enabled = audio.enabled;
+  const presentation = soundPresentation(enabled, audio.diagnostics.contextState === 'running');
   const top = element<HTMLButtonElement>('#enable-sound');
   top.setAttribute('aria-pressed', String(enabled));
-  top.title = enabled ? 'Mute sound' : 'Turn sound on';
-  element<HTMLSpanElement>('#enable-sound span').textContent = enabled ? 'Sound is on' : 'Enable sound';
-  element<HTMLSpanElement>('#panel-enable-sound span').textContent = enabled ? 'Sound is on - tap to mute' : 'Enable sound to settle in';
+  top.dataset.soundState = presentation.state;
+  top.title = presentation.action;
+  top.setAttribute('aria-label', `${presentation.label}. ${presentation.action}.`);
+  element<HTMLSpanElement>('#enable-sound span').textContent = presentation.label;
+  element<HTMLSpanElement>('#panel-enable-sound span').textContent = presentation.panelLabel;
   element<HTMLButtonElement>('#panel-enable-sound').setAttribute('aria-pressed', String(enabled));
-  element<HTMLParagraphElement>('#sound-note').textContent = enabled
-    ? audio.diagnostics.contextState === 'not-created'
-      ? 'Sound is ready. Your first click, tap, or keypress starts it.'
-      : 'Friction follows each stroke and falls quiet whenever the nib lifts.'
-    : 'Sound is muted. Turn it on whenever you like.';
+  element<HTMLParagraphElement>('#sound-note').textContent = presentation.note;
   syncMusicAvailability();
-}
-
-function activateDefaultSound(event: PointerEvent | KeyboardEvent): void {
-  if (!event.isTrusted || document.hidden || !audio.enabled || soundActivation
-    || audio.diagnostics.contextState === 'running') return;
-  if (event.target instanceof Element
-    && (event.target.closest('#enable-sound, #panel-enable-sound')
-      || event.target.closest('#music-play') && musicRequested())) return;
-  if (event instanceof KeyboardEvent && ['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
-  soundActivation = audio.enable();
-  void soundActivation.finally(() => {
-    soundActivation = null;
-    if (!disposed) updateAudioButtons();
-  });
 }
 
 async function toggleSound(): Promise<void> {
@@ -186,6 +176,8 @@ async function toggleSound(): Promise<void> {
 }
 
 function syncSettings(): void {
+  const sound = writingSoundDescriptor(settings.writingSound);
+  element<HTMLElement>('#writing-sound-description').textContent = sound.description;
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting]')) {
     const key = button.dataset.setting as keyof Settings;
     button.setAttribute('aria-pressed', String(settings[key] === button.dataset.value));
@@ -236,11 +228,11 @@ function updateSettings(next: unknown): void {
   if (previous.pen !== settings.pen) {
     capped = settings.pen === 'fountain' && (engine?.status ?? 'idle') === 'idle';
     scene?.setCapped(capped);
-    audio.cue('cap');
+    playMaterialCue('cap');
   }
-  if (previous.paper !== settings.paper) { paper.setPaper(settings.paper); audio.cue('paper'); }
-  if (previous.ink !== settings.ink) audio.cue('ink');
-  if (previous.nib !== settings.nib) audio.cue('cap');
+  if (previous.paper !== settings.paper) { paper.setPaper(settings.paper); playMaterialCue('paper'); }
+  if (previous.ink !== settings.ink) playMaterialCue('ink');
+  if (previous.nib !== settings.nib) playMaterialCue('cap');
   scene?.configure(settings);
   audio.configure(settings);
   engine?.updateOptions(settings);
@@ -280,7 +272,7 @@ function syncWriting(): void {
   lastStatus = status;
 }
 
-function newSheet(announce = true): void {
+function newSheet({ announce = true, sound = true }: { announce?: boolean; sound?: boolean } = {}): void {
   audio.updateContact({ contact: false, speed: 0, pressure: 0 });
   engine?.reset();
   paper.clear();
@@ -288,7 +280,7 @@ function newSheet(announce = true): void {
   validateDraft();
   capped = settings.pen === 'fountain';
   scene?.setCapped(capped);
-  audio.cue('paper');
+  if (sound) playMaterialCue('paper');
   syncSettings();
   syncWriting();
   if (announce) notify('A fresh sheet. The words are still here if you want them.');
@@ -298,7 +290,7 @@ function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
   if (action === 'roll') {
     rollOpen = !rollOpen;
     scene?.setRoll(rollOpen);
-    audio.cue('leather');
+    playMaterialCue('leather');
     element<HTMLButtonElement>('#toggle-roll').setAttribute('aria-pressed', String(rollOpen));
     element<HTMLSpanElement>('#toggle-roll span').textContent = rollOpen ? 'Tie leather roll' : 'Untie leather roll';
   } else if (action === 'cap' && settings.pen === 'fountain') {
@@ -308,10 +300,10 @@ function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
     }
     capped = !capped;
     scene?.setCapped(capped);
-    audio.cue('cap');
+    playMaterialCue('cap');
     syncSettings();
   } else if (action === 'ink') {
-    audio.cue('ink');
+    playMaterialCue('ink');
     notify(`${inkLabel(settings)}. A little glass, a little ink.`);
   }
 }
@@ -338,15 +330,15 @@ beginButton.addEventListener('click', () => {
     engine.pause();
     audio.updateContact(engine.peek());
   } else if (engine?.status === 'paused') {
-    if (capped) { capped = false; scene?.setCapped(false); audio.cue('cap'); }
+    if (capped) { capped = false; scene?.setCapped(false); playMaterialCue('cap'); }
     engine.resume();
   } else {
     validateDraft();
     if (!layout.ok) return;
     if (engine?.status === 'complete' || dirtyDraft) paper.clear();
     engine = new WritingEngine(layout, settings);
-    if (capped) { capped = false; scene?.setCapped(false); audio.cue('cap'); }
-    if (settings.pen === 'dip') audio.cue('ink');
+    if (capped) { capped = false; scene?.setCapped(false); playMaterialCue('cap'); }
+    if (settings.pen === 'dip') playMaterialCue('ink');
     engine.start();
     dirtyDraft = false;
   }
@@ -394,7 +386,7 @@ function updateLettering(change: Partial<Pick<Settings, 'style' | 'textScale' | 
     return true;
   }
   updateSettings(next);
-  newSheet(false);
+  newSheet({ announce: false, sound: false });
   return true;
 }
 
@@ -489,8 +481,13 @@ element<HTMLButtonElement>('#panel-enable-sound').addEventListener('click', () =
 element<HTMLButtonElement>('#music-play').addEventListener('click', () => { void toggleMusic(); });
 element<HTMLButtonElement>('#music-previous').addEventListener('click', () => skipMusic(-1));
 element<HTMLButtonElement>('#music-next').addEventListener('click', () => skipMusic(1));
-document.addEventListener('pointerdown', activateDefaultSound, { capture: true });
-document.addEventListener('keydown', activateDefaultSound, { capture: true });
+const soundStartup = createSoundStartup(document, {
+  enabled: () => audio.enabled,
+  running: () => audio.diagnostics.contextState === 'running',
+  musicRequested,
+  enable: () => audio.enable(),
+  onSettled: updateAudioButtons,
+});
 element<HTMLButtonElement>('#dismiss-notice').addEventListener('click', () => { element<HTMLDivElement>('#notice').hidden = true; });
 const dialog = element<HTMLDialogElement>('#about-dialog');
 element<HTMLButtonElement>('#about-button').addEventListener('click', () => { dialog.showModal(); dialog.scrollTop = 0; });
@@ -560,8 +557,7 @@ function dispose(): void {
   disposed = true;
   cancelAnimationFrame(animationId);
   clearTimeout(noticeTimer);
-  document.removeEventListener('pointerdown', activateDefaultSound, { capture: true });
-  document.removeEventListener('keydown', activateDefaultSound, { capture: true });
+  soundStartup.dispose();
   document.removeEventListener('visibilitychange', visibilityChanged);
   editorZoom.dispose();
   recordedMusic.dispose();

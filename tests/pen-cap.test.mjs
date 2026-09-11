@@ -1,19 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { DeskScene } from '../src/scene.ts';
+import { DeskScene, writingPenOrientation } from '../src/scene.ts';
 import { DEFAULT_SETTINGS } from '../src/settings.ts';
 
 const sample = { x: 200, y: 160, contact: false, lift: 0, pressure: 0.7, speed: 0, angle: 0.4, status: 'idle', progress: 0 };
 
-function penRig(t, nib = 'flex') {
+function penRig(t, nib = 'flex', pen = 'fountain') {
   // Exercise the real geometry and pose methods without creating a WebGL renderer.
   const scene = Object.assign(Object.create(DeskScene.prototype), {
-    settings: { ...DEFAULT_SETTINGS, pen: 'fountain', nib },
+    settings: { ...DEFAULT_SETTINGS, pen, nib },
     pen: new THREE.Group(), nib: new THREE.Group(), cap: new THREE.Group(),
     penMaterial: new THREE.MeshStandardMaterial(), brassMaterial: new THREE.MeshStandardMaterial(),
     steelMaterial: new THREE.MeshStandardMaterial(), tableMaterial: new THREE.MeshStandardMaterial(),
-    penOrientation: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.51, 0.86, 0.31).normalize()),
+    penOrientation: writingPenOrientation(),
     capped: true, capAmount: 1, reducedMotion: true, followNib: false,
   });
   scene.buildPen();
@@ -88,6 +88,25 @@ test('capped pens clear the paper while paused and the desk after returning home
   close(scene.pen.position.x, (sample.x / 780 - 0.5) * 3.8);
   close(scene.pen.position.z, (sample.y / 1040 - 0.5) * (3.8 * 1040 / 780));
   close(scene.pen.position.y, 0.068);
+});
+
+test('writing leans to 42 degrees while the real nib point stays at the ink coordinates', (t) => {
+  for (const [pen, nib] of ['fountain', 'dip'].flatMap((pen) => ['fine', 'broad', 'flex'].map((nib) => [pen, nib]))) {
+    const scene = penRig(t, nib, pen);
+    scene.setCapped(false);
+    for (const angle of [-Math.PI, -Math.PI / 2, 0, Math.PI / 2, Math.PI]) {
+      const point = { ...sample, status: 'writing', contact: true, angle };
+      scene.updatePen(point);
+      scene.pen.updateMatrixWorld(true);
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(scene.pen.quaternion);
+      close(THREE.MathUtils.radToDeg(Math.asin(axis.y)), 42);
+      const tip = scene.pen.localToWorld(new THREE.Vector3(0, 0, 0));
+      close(tip.x, (sample.x / 780 - 0.5) * 3.8);
+      close(tip.z, (sample.y / 1040 - 0.5) * (3.8 * 1040 / 780));
+      close(tip.y, 0.068);
+      assert.ok(new THREE.Box3().setFromObject(scene.pen, true).min.y > 0.054, 'lowering the pen must not bury it in the page');
+    }
+  }
 });
 
 test('a finished pen lifts before traveling home and stays there without changing writing coordinates', (t) => {

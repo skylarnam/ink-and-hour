@@ -5,6 +5,11 @@ import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { HANDWRITING_IDS, HANDWRITING_STYLES } from '../src/handwriting.ts';
 import { parseStrokePath } from '../src/writing/paths.ts';
+import {
+  buildGraph, connectedComponents, contractMicroJunctions, decode, decodeSegment, decomposeIntoTrails,
+  extractSegments, key, neighbors, nodeOrder, pruneSegments,
+  type Point,
+} from './stroke-routing.ts';
 
 const PRINTABLE_ASCII = Array.from({ length: 94 }, (_, index) => String.fromCharCode(index + 33));
 const TARGET_X_HEIGHT = 10.5;
@@ -14,16 +19,17 @@ const RASTER_X_HEIGHT = 144;
 const { values: args } = parseArgs({
   options: {
     preview: { type: 'boolean' }, regenerate: { type: 'string', multiple: true },
-    'inspect-glyph': { type: 'string' },
+    'inspect-glyph': { type: 'string' }, 'audit-stroke-flow': { type: 'string' },
   },
 });
 const regenerate = new Set(args.regenerate ?? []);
 const approximations: ComponentApproximation[] = [];
-
-interface Point {
-  x: number;
-  y: number;
-}
+// One entry per connected glyph component that reaches extractTrails, win or lose.
+// inkLength is the unique skeleton length (the graph's own segment lengths, each
+// counted once); penLength is what the produced trails actually draw. A fixed
+// traversal keeps penLength == inkLength (no backtracking); trailCount is the
+// number of separate pen-down strokes (lifts) used to cover it.
+const strokeFlowAudit: Array<{ inkLength: number; penLength: number; trailCount: number }> = [];
 
 interface StrokeGlyph {
   d: string;
@@ -73,14 +79,6 @@ function measureReferenceHeight(font: opentype.Font): number {
 
 function round(value: number, digits = 2): number {
   return Number(value.toFixed(digits));
-}
-
-function key(x: number, y: number): number {
-  return (y << 16) | x;
-}
-
-function decode(value: number): Point {
-  return { x: value & 0xffff, y: value >> 16 };
 }
 
 function buildBitmap(
@@ -134,20 +132,6 @@ function transitions(pixels: Uint8Array, width: number, x: number, y: number): n
   return count;
 }
 
-function neighbors(pixels: Uint8Array, width: number, x: number, y: number): number[] {
-  const result: number[] = [];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dy === 0) continue;
-      const nx = x + dx;
-      const ny = y + dy;
-      if (dx !== 0 && dy !== 0 && pixels[y * width + nx] && pixels[ny * width + x]) continue;
-      if (pixels[ny * width + nx]) result.push(key(nx, ny));
-    }
-  }
-  return result;
-}
-
 function thin(bitmap: Uint8Array, width: number, height: number): Uint8Array {
   const pixels = bitmap.slice();
   let changed = true;
@@ -186,39 +170,6 @@ function thin(bitmap: Uint8Array, width: number, height: number): Uint8Array {
     }
   }
   return pixels;
-}
-
-function connectedComponents(bitmap: Uint8Array, width: number, height: number): number[][] {
-  const seen = new Uint8Array(bitmap.length);
-  const components: number[][] = [];
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const start = y * width + x;
-      if (!bitmap[start] || seen[start]) continue;
-      const queue = [start];
-      const component: number[] = [];
-      seen[start] = 1;
-      while (queue.length) {
-        const index = queue.pop()!;
-        component.push(index);
-        const px = index % width;
-        const py = Math.floor(index / width);
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const nx = px + dx;
-            const ny = py + dy;
-            const next = ny * width + nx;
-            if (!bitmap[next] || seen[next]) continue;
-            seen[next] = 1;
-            queue.push(next);
-          }
-        }
-      }
-      components.push(component);
-    }
-  }
-  return components;
 }
 
 function prune(bitmap: Uint8Array, width: number, height: number, spurLimit: number): Uint8Array {
@@ -265,10 +216,6 @@ function prune(bitmap: Uint8Array, width: number, height: number, spurLimit: num
   return pixels;
 }
 
-function edgeKey(a: number, b: number): string {
-  return a < b ? `${a}:${b}` : `${b}:${a}`;
-}
-
 function pointKey(point: Point): string {
   return `${point.x},${point.y}`;
 }
@@ -307,151 +254,6 @@ function simplify(points: Point[], tolerance: number): Point[] {
   return points.filter((_, index) => keep[index]).map((point) => ({ ...point }));
 }
 
-interface Segment {
-  start: number;
-  end: number;
-  points: number[];
-  length: number;
-}
-
-function nodeOrder(a: number, b: number): number {
-  const left = decode(a);
-  const right = decode(b);
-  return left.y - right.y || left.x - right.x;
-}
-
-function pathLength(points: number[]): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index++) {
-    const a = decode(points[index - 1]);
-    const b = decode(points[index]);
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
-}
-
-function buildGraph(bitmap: Uint8Array, width: number, height: number): Map<number, number[]> {
-  const graph = new Map<number, number[]>();
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      if (!bitmap[y * width + x]) continue;
-      graph.set(key(x, y), neighbors(bitmap, width, x, y));
-    }
-  }
-  return graph;
-}
-
-function extractSegments(nodes: number[], graph: Map<number, number[]>): Segment[] {
-  const nodeSet = new Set(nodes);
-  const keys = new Set(nodes.filter((node) => (graph.get(node) ?? []).length !== 2));
-  const visited = new Set<string>();
-  const segments: Segment[] = [];
-  const outgoing = (node: number) => (graph.get(node) ?? []).filter((neighbor) => nodeSet.has(neighbor));
-
-  const walk = (start: number, first: number): Segment => {
-    const points = [start, first];
-    visited.add(edgeKey(start, first));
-    let previous = start;
-    let current = first;
-    while (!keys.has(current)) {
-      const options = outgoing(current).filter((neighbor) => neighbor !== previous && !visited.has(edgeKey(current, neighbor)));
-      if (!options.length) break;
-      const next = options[0];
-      points.push(next);
-      visited.add(edgeKey(current, next));
-      previous = current;
-      current = next;
-    }
-    return { start, end: current, points, length: pathLength(points) };
-  };
-
-  for (const start of [...keys].sort(nodeOrder)) {
-    for (const neighbor of outgoing(start).sort(nodeOrder)) {
-      if (visited.has(edgeKey(start, neighbor))) continue;
-      segments.push(walk(start, neighbor));
-    }
-  }
-
-  for (const start of nodes.sort(nodeOrder)) {
-    for (const neighbor of outgoing(start).sort(nodeOrder)) {
-      if (visited.has(edgeKey(start, neighbor))) continue;
-      const points = [start, neighbor];
-      visited.add(edgeKey(start, neighbor));
-      let previous = start;
-      let current = neighbor;
-      while (current !== start) {
-        const options = outgoing(current).filter((candidate) => candidate !== previous && !visited.has(edgeKey(current, candidate)));
-        if (!options.length) break;
-        const next = options.sort(nodeOrder)[0];
-        points.push(next);
-        visited.add(edgeKey(current, next));
-        previous = current;
-        current = next;
-      }
-      if (points[points.length - 1] !== start) points.push(start);
-      segments.push({ start, end: start, points, length: pathLength(points) });
-    }
-  }
-
-  return segments;
-}
-
-function pruneSegments(segments: Segment[]): Segment[] {
-  let current = segments;
-  while (true) {
-    const degree = new Map<number, number>();
-    for (const segment of current) {
-      degree.set(segment.start, (degree.get(segment.start) ?? 0) + 1);
-      degree.set(segment.end, (degree.get(segment.end) ?? 0) + 1);
-    }
-    const next = current.filter((segment) => {
-      if (segment.length >= 7) return true;
-      const startDegree = degree.get(segment.start) ?? 0;
-      const endDegree = degree.get(segment.end) ?? 0;
-      return !((startDegree > 2 && endDegree <= 1) || (endDegree > 2 && startDegree <= 1));
-    });
-    if (next.length === current.length) return current;
-    current = next;
-  }
-}
-
-function edgeDirection(points: Point[], reverse = false): Point {
-  if (points.length < 2) return { x: 1, y: 0 };
-  const ordered = reverse ? points.slice().reverse() : points;
-  for (let index = 1; index < ordered.length; index++) {
-    const dx = ordered[index].x - ordered[index - 1].x;
-    const dy = ordered[index].y - ordered[index - 1].y;
-    if (Math.hypot(dx, dy) > 1e-9) return { x: dx, y: dy };
-  }
-  return { x: 1, y: 0 };
-}
-
-function turnScore(previous: Point | null, next: Point): number {
-  if (!previous) return 0;
-  const dot = previous.x * next.x + previous.y * next.y;
-  const length = (Math.hypot(previous.x, previous.y) || 1) * (Math.hypot(next.x, next.y) || 1);
-  return Math.acos(Math.max(-1, Math.min(1, dot / length)));
-}
-
-function chooseSegment(
-  previous: Point | null,
-  candidates: Array<{ index: number; reverse: boolean; points: Point[] }>,
-): { index: number; reverse: boolean; points: Point[] } {
-  return candidates.sort((left, right) => {
-    const score = ({ reverse, points }: { reverse: boolean; points: Point[] }): [number, number, number] => {
-      const direction = edgeDirection(points, reverse);
-      const start = reverse ? points[points.length - 1] : points[0];
-      return [turnScore(previous, direction), start.y, start.x];
-    };
-    const a = score(left);
-    const b = score(right);
-    for (let index = 0; index < a.length; index++) {
-      if (a[index] !== b[index]) return a[index] - b[index];
-    }
-    return left.index - right.index;
-  })[0];
-}
-
 function extractTrails(bitmap: Uint8Array, width: number, height: number): Point[][] {
   const graph = buildGraph(bitmap, width, height);
   const components = connectedComponents(bitmap, width, height).map((component) =>
@@ -465,52 +267,24 @@ function extractTrails(bitmap: Uint8Array, width: number, height: number): Point
       // A dot has no traversable graph edge. Its source component is handled separately.
       continue;
     }
-    const segments = pruneSegments(extractSegments(component, graph))
+    // A moderately thick diagonal stroke often thins to a short false-branch cluster
+    // rather than a clean 1px medial axis; contracting it first keeps segment
+    // extraction (and therefore trail decomposition) working from the one real joint.
+    const { nodes: contractedNodes, graph: contractedGraph } = contractMicroJunctions(component, graph);
+    const segments = pruneSegments(extractSegments(contractedNodes, contractedGraph))
       .filter((segment) => segment.length >= 1 || segment.points.length <= 2)
-      .map((segment) => ({
-        ...segment,
-        points: segment.points.map((node) => decode(node)),
-      }));
-    const incident = new Map<number, number[]>();
-    segments.forEach((segment, index) => {
-      incident.set(segment.start, [...(incident.get(segment.start) ?? []), index]);
-      incident.set(segment.end, [...(incident.get(segment.end) ?? []), index]);
+      .map(decodeSegment);
+    // decomposeIntoTrails covers every segment exactly once, splitting a fork or
+    // crossing into separate pen-down strokes instead of drawing one stroke that
+    // backtracks over ink it already laid down (see scripts/stroke-routing.ts).
+    const componentTrails = decomposeIntoTrails(segments);
+    strokeFlowAudit.push({
+      inkLength: segments.reduce((sum, segment) => sum + segment.length, 0),
+      penLength: componentTrails.reduce((sum, trail) => sum + trail.slice(1)
+        .reduce((s, point, index) => s + Math.hypot(point.x - trail[index].x, point.y - trail[index].y), 0), 0),
+      trailCount: componentTrails.length,
     });
-    const used = new Set<number>();
-    while (used.size < segments.length) {
-      const remainingNodes = [...incident.keys()].filter((node) =>
-        (incident.get(node) ?? []).some((index) => !used.has(index)));
-      const odd = remainingNodes.filter((node) =>
-        (incident.get(node) ?? []).filter((index) => !used.has(index)).length % 2 === 1);
-      const start = (odd.length ? odd : remainingNodes).sort(nodeOrder)[0];
-      const path: Point[] = [decode(start)];
-      const walk = (current: number, previous: Point | null): void => {
-        while (true) {
-          const candidates = (incident.get(current) ?? [])
-            .filter((index) => !used.has(index))
-            .map((index) => {
-              const segment = segments[index];
-              return {
-                index,
-                reverse: segment.end === current,
-                points: segment.points,
-              };
-            });
-          if (!candidates.length) return;
-          const next = chooseSegment(previous, candidates);
-          used.add(next.index);
-          const points = next.reverse ? next.points.slice().reverse() : next.points;
-          path.push(...points.slice(1));
-          const other = next.reverse ? segments[next.index].start : segments[next.index].end;
-          const outgoing = edgeDirection(points, true);
-          walk(other, { x: -outgoing.x, y: -outgoing.y });
-          if (used.size === segments.length) return;
-          path.push(...points.slice(0, -1).reverse());
-        }
-      };
-      walk(start, null);
-      trails.push(path);
-    }
+    trails.push(...componentTrails);
   }
   return trails;
 }
@@ -740,6 +514,39 @@ if (args['inspect-glyph']) {
   console.log(JSON.stringify({ id, character, ...glyph, approximations }, null, 2));
   process.exit(0);
 }
+if (args['audit-stroke-flow']) {
+  // Measures, straight from the source outlines (no committed data involved), how far
+  // trail decomposition draws relative to the unique ink for every printable glyph of
+  // one style: penLength/inkLength close to 1 means no backtracking. This raw check
+  // runs in raster pixel space, before the Douglas-Peucker simplify() and font-unit
+  // normalization that also run on --regenerate. It also prints a font-unit finalPenLength
+  // and finalTrailCount per character, directly comparable to the same fields printed
+  // by an unfixed checkout of this script (e.g. via `git show <old-rev>:scripts/generate-handwriting-data.ts`
+  // run the same way), for a true before/after total-drawing-distance comparison.
+  const id = args['audit-stroke-flow'];
+  const style = HANDWRITING_STYLES.find((style) => style.id === id);
+  if (!style || style.id === 'correspondence') throw new Error('Audit an inferred style with --audit-stroke-flow id.');
+  const font = parseFont(new URL(`../public${style.publicFontPath}`, import.meta.url).pathname);
+  const referenceHeight = measureReferenceHeight(font);
+  for (const character of PRINTABLE_ASCII) {
+    strokeFlowAudit.length = 0;
+    const glyph = centerline(font, character, referenceHeight, style.id);
+    let finalPenLength = 0;
+    for (const stroke of glyph.strokes) {
+      for (let index = 1; index < stroke.length; index++) {
+        finalPenLength += Math.hypot(stroke[index].x - stroke[index - 1].x, stroke[index].y - stroke[index - 1].y);
+      }
+    }
+    const inkLength = strokeFlowAudit.reduce((sum, component) => sum + component.inkLength, 0);
+    const penLength = strokeFlowAudit.reduce((sum, component) => sum + component.penLength, 0);
+    const retrace = inkLength > 0 ? penLength / inkLength - 1 : 0;
+    console.log(JSON.stringify({
+      id, character, inkLength: round(inkLength), penLength: round(penLength), retrace: round(retrace, 4),
+      finalPenLength: round(finalPenLength), finalTrailCount: glyph.strokes.length,
+    }));
+  }
+  process.exit(0);
+}
 const snapshot = JSON.parse(readFileSync(new URL('../font-review/applied-selection.json', import.meta.url), 'utf8'));
 if (JSON.stringify(snapshot.selected) !== JSON.stringify(HANDWRITING_IDS)) {
   throw new Error('Active styles must match the explicitly applied snapshot, not the live review checkboxes.');
@@ -799,7 +606,7 @@ writeFileSync(
 writeFileSync(new URL('../public/data/HANDWRITING-ATTRIBUTION.json', import.meta.url), `${JSON.stringify({
   version: 2,
   method: 'Unmodified source fonts; offline inferred centerlines with separately named stroke studies.',
-  modified: 'Stroke order is heuristic, not recovered human ductus. Short shared branches can be retraced; no glyph outlines or typeset reveals are drawn.',
+  modified: 'Stroke order is heuristic, not recovered human ductus. A branch or crossing is drawn as separate pen-lift strokes instead of retracing ink already drawn; no glyph outlines or typeset reveals are drawn.',
   sourceSelection: { file: 'font-review/applied-selection.json', revision: snapshot.sourceRevision, sha256: snapshot.sourceSha256 },
   generation: {
     method: 'Rasterized original outlines, Zhang-Suen medial-axis thinning, source-component preservation, graph traversal and polyline simplification.',

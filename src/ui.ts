@@ -1,5 +1,7 @@
 import { LOFI_TRACKS } from './music-library.ts';
 import { HANDWRITING_STYLES } from './handwriting.ts';
+import { soundPresentation } from './sound-startup.ts';
+import { WRITING_SOUNDS } from './writing-sounds.ts';
 
 export const icons = {
   nib: '<path d="m12 2-7 13 7 7 7-7-7-13Z"/><path d="M12 3v11"/><circle cx="12" cy="15" r="1.7"/>',
@@ -40,6 +42,7 @@ function volume(key: string, label: string, hint: string): string {
 }
 
 export function renderUI(): string {
+  const sound = soundPresentation(true, false);
   return `
     <header class="site-header">
       <a class="brand" href="./" aria-label="Ink and Hour home">
@@ -49,14 +52,14 @@ export function renderUI(): string {
       <p class="header-thought">For the pleasure of putting pen to paper.</p>
       <div class="header-audio">
         <div class="music-player" role="group" aria-label="Lo-fi mini music player">
-          <button class="music-info" id="music-credits" type="button" aria-label="Music details and credits" title="Music details and credits"><span id="music-title">First Snow</span><small id="music-detail">Lo-fi / tap play</small></button>
+          <button class="music-info" id="music-credits" type="button" aria-label="Music details and credits" title="Music details and credits"><span id="music-title">First Snow</span><small id="music-detail">Lo-fi / ready</small></button>
           <div class="music-transport">
             <button id="music-previous" type="button" aria-label="Previous lo-fi track" title="Previous lo-fi track">${icon('previous')}</button>
             <button id="music-play" type="button" aria-label="Play music" title="Play music" aria-pressed="false">${icon('play')}</button>
             <button id="music-next" type="button" aria-label="Next lo-fi track" title="Next lo-fi track">${icon('next')}</button>
           </div>
         </div>
-        <button class="sound-toggle" id="enable-sound" type="button" aria-pressed="true" title="Mute sound">${icon('sound')}<span>Sound is on</span><span class="sound-dot"></span></button>
+        <button class="sound-toggle" id="enable-sound" type="button" aria-pressed="true" data-sound-state="${sound.state}" aria-label="${sound.label}. ${sound.action}." title="${sound.action}">${icon('sound')}<span>${sound.label}</span><span class="sound-dot"></span></button>
       </div>
     </header>
     <main class="workspace">
@@ -122,10 +125,10 @@ export function renderUI(): string {
           </section>
           <section id="panel-sound" role="tabpanel" aria-labelledby="tab-sound" class="settings-panel" hidden>
             <div class="panel-intro"><h2>Listen a little closer.</h2><p>Headphones welcome. Music entirely optional.</p></div>
-            <button type="button" id="panel-enable-sound" class="audio-gate" aria-pressed="true">${icon('sound')}<span>Sound is on - tap to mute</span></button>
-            <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices compact">
-              ${choice('writingSound', 'textured', 'Textured <small>New</small>')}${choice('writingSound', 'original', 'Original')}
-            </div><p class="small-note" id="writing-sound-note">Compare while writing. Original restores the previous pen sound. Your choice is saved.</p></fieldset>
+            <button type="button" id="panel-enable-sound" class="audio-gate" aria-pressed="true">${icon('sound')}<span>${sound.panelLabel}</span></button>
+            <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices writing-sound-choices">
+              ${WRITING_SOUNDS.map((sound) => choice('writingSound', sound.id, sound.label)).join('')}
+            </div><p class="small-note" id="writing-sound-note"><span id="writing-sound-description">${WRITING_SOUNDS[0].description}</span> Compare while writing. Original restores the previous pen sound. Your choice is saved.</p></fieldset>
             <div class="volume-controls">
               ${volume('masterVolume', 'Overall volume', 'Keep it gentle.')}
               ${volume('writingVolume', 'Pen & materials', 'Nib friction, paper, cap and leather.')}
@@ -135,7 +138,7 @@ export function renderUI(): string {
             <fieldset><legend>A LITTLE BACKGROUND</legend><div class="choices compact">
               ${choice('musicTrack', 'off', 'Off')}${choice('musicTrack', 'lofi', 'Lo-fi')}${choice('musicTrack', 'felt', 'Felt notes')}${choice('musicTrack', 'glass', 'Glass garden')}
             </div></fieldset>
-            <p class="small-note" id="sound-note">Sound is ready. Your first click, tap, or keypress starts it.</p>
+            <p class="small-note" id="sound-note">${sound.note}</p>
           </section>
         </div>
         <section class="writing-editor" aria-labelledby="editor-heading">
@@ -175,7 +178,7 @@ Stay a little while.</textarea>
       <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
       <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page when it finishes.</p>
       <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: started letters keep their shape, and lines with ink keep their place. Choices that would overflow the remaining page are rejected. A fresh sheet applies your choices to the whole note. Lettering preferences are saved, but your words stay private to this visit.</p>
-      <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of commercially licensed Google Fonts. The editor shows each original font; the pen follows inferred centerlines, not its outline. Some connected stems are retraced, and the inferred order is not a recording of a calligrapher's hand.</p>
+      <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of Google Fonts licensed for commercial use. The editor shows each original font; the pen follows inferred centerlines, not its outline. Branches use pen lifts instead of drawing back over completed strokes. The inferred order is not a recording of a calligrapher's hand.</p>
       <p>Nib pressure and material sounds are expressive interpretations, not a fluid-dynamics or manufacturer-specific simulation. There is no hand model, arbitrary font import, or physical ink depletion.</p>
       <details class="font-credits">
         <summary>${HANDWRITING_STYLES.length} handwriting sources &amp; licenses</summary>

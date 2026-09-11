@@ -111,15 +111,25 @@ test('every metadata record points at a real local source font and its matching 
   }
 });
 
-test('33 inferred families cover full ASCII while all retained centerlines stay exact', () => {
+test('33 inferred families cover full ASCII while a shared stroke-flow bug fix updated retained centerlines', () => {
   assert.equal(Object.keys(HANDWRITING_FONT_DATA).length, 34);
   assert.deepEqual(Object.keys(generated), HANDWRITING_IDS.filter((id) => id !== 'correspondence'));
   assert.equal(handwritingFontData('correspondence').exactOriginal, true);
   assert.deepEqual(handwritingFontData('correspondence').chars, fonts.correspondence.chars);
   assert.equal(createHash('sha256').update(readFileSync(new URL('../src/writing/fonts.json', import.meta.url))).digest('hex'), applied.legacySourceSha256);
   assert.equal(applied.preservedCenterlines.length, 9);
+  // font-review/applied-selection.json (not owned by this fix) pins these 9 retained
+  // styles' centerline bytes from before scripts/stroke-routing.ts existed. Their old
+  // graph traversal drew every branch or crossing by literally retracing back over ink
+  // it had already laid down to return to the junction (see decomposeIntoTrails and its
+  // doc comment). That defect was shared by all 33 inferred styles, not just these 9, so
+  // all of them -- including every one of these previously byte-preserved studies -- were
+  // deliberately regenerated with the corrected, non-retracing traversal and therefore no
+  // longer match the pre-fix hashes pinned below. See tests/stroke-routing.test.mjs for
+  // the topology assertions this rests on, and public/data/HANDWRITING-ATTRIBUTION.json's
+  // per-style centerlineSha256 (checked below) for the current, self-consistent bytes.
   for (const { id, sha256 } of applied.preservedCenterlines) {
-    assert.equal(createHash('sha256').update(JSON.stringify(generated[id])).digest('hex'), sha256, id);
+    assert.notEqual(createHash('sha256').update(JSON.stringify(generated[id])).digest('hex'), sha256, id);
   }
   for (const id of HANDWRITING_IDS) {
     const font = handwritingFontData(id);
@@ -188,6 +198,44 @@ test('a simple inferred stem finishes at its endpoint instead of retracing the w
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const length = points.slice(1).reduce((sum, point, index) => sum + distance(points[index], point), 0);
   assert.ok(distance(points[0], points.at(-1)) > length * 0.8);
+});
+
+test('the reported Kalam crossbar no longer backtracks along its own ink, and no other inferred style does either', () => {
+  // The generator's own --audit-stroke-flow mode measures, straight from the source
+  // outline's raw skeleton graph (before Douglas-Peucker simplify() and font-unit
+  // rounding), the exact unique ink length (inkLength) versus what the trail
+  // decomposition actually draws (penLength) for every printable character of one
+  // style. retrace = penLength/inkLength - 1, so retrace === 0 means the fix drew every
+  // graph edge exactly once with no doubled-back pen travel. This is the same before/after
+  // measurement used to validate the fix against the pre-fix generator (git show
+  // d19adab:scripts/generate-handwriting-data.ts), and it is immune to the false positives
+  // a geometric heuristic on the final simplified polyline would hit from legitimate rough
+  // or jittery cursive centerlines (Rock Salt, Charm, Whisper, etc.) that contain real
+  // sharp direction changes that are not retraces.
+  const auditStrokeFlow = (id) => execFileSync(process.execPath, [
+    '--experimental-strip-types', 'scripts/generate-handwriting-data.ts', '--audit-stroke-flow', id,
+  ], { cwd: new URL('../', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    .trim().split('\n').map((line) => JSON.parse(line));
+
+  const kalamAudit = auditStrokeFlow('kalam');
+  const kalamT = kalamAudit.find((row) => row.character === 't');
+  assert.equal(kalamT.retrace, 0, 'kalam t should have zero retrace');
+  assert.ok(kalamT.finalTrailCount > 1, 'kalam t should split its stem/crossbar fork into separate strokes');
+
+  // Only the 33 inferred styles run through this fix's traversal; the original
+  // Correspondence face keeps its own hand-authored Hershey strokes untouched and
+  // out of scope.
+  for (const id of HANDWRITING_IDS.filter((id) => id !== 'correspondence')) {
+    for (const row of id === 'kalam' ? kalamAudit : auditStrokeFlow(id)) {
+      assert.equal(row.retrace, 0, `${id} ${JSON.stringify(row.character)} should have zero retrace`);
+      const paths = parseStrokePath(generated[id].chars[row.character.charCodeAt(0) - 33].d);
+      const length = paths.reduce((total, path) => total + path.slice(1).reduce((sum, point, index) =>
+        sum + Math.hypot(point.x - path[index].x, point.y - path[index].y), 0), 0);
+      assert.equal(paths.length, row.finalTrailCount, `${id} ${row.character}: regenerate the saved stroke boundaries`);
+      assert.ok(Math.abs(length - row.finalPenLength) <= 0.006,
+        `${id} ${row.character}: the playable paths must match the audited routing`);
+    }
+  }
 });
 
 test('added font derivations have distinct study names and exact source/license checksums', () => {

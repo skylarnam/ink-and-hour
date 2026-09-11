@@ -1,6 +1,7 @@
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings.ts';
 import { contactTextureParameters, createContactTextures } from './contact-texture.ts';
 import type { AudioContact, InteractionCue, Settings } from './types.ts';
+import type { ContactSoundId } from './writing-sounds.ts';
 
 const clamp = (value: number, max = 1): number => Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : 0;
 
@@ -74,6 +75,8 @@ export class RitualAudio {
   private frictionBand: BiquadFilterNode | null = null;
   private frictionLowpass: BiquadFilterNode | null = null;
   private texturedLayers: { body: ContactLayer; grain: ContactLayer } | null = null;
+  private readonly contactBuffers = new Map<ContactSoundId, { body: AudioBuffer; grain: AudioBuffer }>();
+  private preparedContactSound: ContactSoundId | null = null;
   private rain: GainNode | null = null;
   private rainFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
@@ -256,15 +259,28 @@ export class RitualAudio {
     return voice;
   }
 
-  private prepareTexturedLayers(): { body: ContactLayer; grain: ContactLayer } {
-    if (this.texturedLayers) return this.texturedLayers;
+  private prepareTexturedLayers(profile: ContactSoundId): { body: ContactLayer; grain: ContactLayer } {
+    if (this.texturedLayers && this.preparedContactSound === profile) return this.texturedLayers;
     const ctx = this.context;
     const writing = this.writing;
     if (!ctx || !writing) throw new Error('The writing sound is not initialized.');
-    const textures = createContactTextures(ctx.sampleRate);
-    const layer = (samples: Float32Array, highpassFrequency: number): ContactLayer => {
-      const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
-      buffer.getChannelData(0).set(samples);
+    let buffers = this.contactBuffers.get(profile);
+    if (!buffers) {
+      const textures = createContactTextures(ctx.sampleRate, profile);
+      const buffer = (samples: Float32Array): AudioBuffer => {
+        const result = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+        result.getChannelData(0).set(samples);
+        return result;
+      };
+      buffers = { body: buffer(textures.body), grain: buffer(textures.grain) };
+    }
+    this.contactBuffers.delete(profile);
+    this.contactBuffers.set(profile, buffers);
+    if (this.contactBuffers.size > 3) {
+      const oldest = this.contactBuffers.keys().next().value;
+      if (oldest !== undefined) this.contactBuffers.delete(oldest);
+    }
+    const layer = (buffer: AudioBuffer, highpassFrequency: number): ContactLayer => {
       const highpass = ctx.createBiquadFilter();
       highpass.type = 'highpass';
       highpass.frequency.value = Math.min(highpassFrequency, ctx.sampleRate * 0.45);
@@ -277,7 +293,13 @@ export class RitualAudio {
       highpass.connect(lowpass).connect(gain).connect(writing);
       return { buffer, lowpass, gain, voice: null, input: highpass };
     };
-    this.texturedLayers = { body: layer(textures.body, 160), grain: layer(textures.grain, 850) };
+    if (this.texturedLayers) {
+      this.texturedLayers.body.buffer = buffers.body;
+      this.texturedLayers.grain.buffer = buffers.grain;
+    } else {
+      this.texturedLayers = { body: layer(buffers.body, 160), grain: layer(buffers.grain, 850) };
+    }
+    this.preparedContactSound = profile;
     return this.texturedLayers;
   }
 
@@ -347,17 +369,20 @@ export class RitualAudio {
   updateContact(sample: AudioContact): void {
     const audible = this.ready() && this.settings.writingVolume > 0 && this.settings.masterVolume > 0;
     const input = audible ? sample : { contact: false, speed: 0, pressure: 0 };
-    const parameters = this.settings.writingSound === 'textured'
-      ? contactTextureParameters(input, this.settings) : frictionParameters(input, this.settings);
+    const sound = this.settings.writingSound;
+    const model = sound === 'original'
+      ? { kind: 'original' as const, parameters: frictionParameters(input, this.settings) }
+      : { kind: 'contact' as const, profile: sound, parameters: contactTextureParameters(input, this.settings, sound) };
     const previousGain = this.writingTarget;
-    this.contact = parameters.gain > 0;
-    this.writingTarget = parameters.gain;
+    this.contact = model.parameters.gain > 0;
+    this.writingTarget = model.parameters.gain;
     const ctx = this.context;
-    if (!ctx || (previousGain === 0 && parameters.gain === 0)) return;
-    if ('bodyMix' in parameters) {
-      this.updateTexturedContact(parameters);
+    if (!ctx || (previousGain === 0 && model.parameters.gain === 0)) return;
+    if (model.kind === 'contact') {
+      this.updateTexturedContact(model.parameters, model.profile);
       return;
     }
+    const parameters = model.parameters;
     if (!this.friction || !this.frictionBand || !this.frictionLowpass) return;
     const modulation = 0.86 + 0.11 * Math.sin(ctx.currentTime * 42) + 0.04 * Math.sin(ctx.currentTime * 117);
     target(this.friction.gain, parameters.gain * modulation, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
@@ -372,10 +397,10 @@ export class RitualAudio {
     target(this.frictionLowpass.frequency, parameters.lowpass, ctx.currentTime, 0.018);
   }
 
-  private updateTexturedContact(parameters: ReturnType<typeof contactTextureParameters>): void {
+  private updateTexturedContact(parameters: ReturnType<typeof contactTextureParameters>, profile: ContactSoundId): void {
     const ctx = this.context;
     if (!ctx) return;
-    const layers = parameters.gain > 0 ? this.prepareTexturedLayers() : this.texturedLayers;
+    const layers = parameters.gain > 0 ? this.prepareTexturedLayers(profile) : this.texturedLayers;
     if (!layers) return;
     for (const kind of ['body', 'grain'] as const) {
       const layer = layers[kind];
@@ -539,6 +564,7 @@ export class RitualAudio {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
       contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
       writingSound: this.settings.writingSound,
+      contactBufferPairs: this.contactBuffers.size, preparedContactSound: this.preparedContactSound,
       rainGain: this.rainTarget, musicTrack: this.settings.musicTrack,
       musicPaused: this.musicPaused, recordingConnected: this.recordingSource !== null,
       activeMusicVoices: [...this.voices].filter((voice) => voice.kind === 'music' && !voice.releasing).length,
@@ -560,6 +586,16 @@ export class RitualAudio {
     this.userEnabled = false;
     this.revision++;
     this.silence();
+    this.contactBuffers.clear();
+    if (this.texturedLayers) {
+      for (const layer of Object.values(this.texturedLayers)) {
+        layer.input.disconnect();
+        layer.lowpass.disconnect();
+        layer.gain.disconnect();
+      }
+      this.texturedLayers = null;
+    }
+    this.preparedContactSound = null;
     this.recordingSource?.disconnect();
     this.recordingGain?.disconnect();
     if (this.context && this.context.state !== 'closed') {

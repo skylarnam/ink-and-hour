@@ -599,16 +599,60 @@ test('live sound comparison restores the exact original source and modulation wi
   }, TEXTURED_SETTINGS);
 });
 
-test('rapid profile comparison and pen lifts keep active and retiring sources bounded', async () => {
+test('all seven sound palettes use their own contact model and reuse a bounded three-palette cache', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const sample = { contact: true, speed: 132, pressure: 0.65, angle: Math.PI / 3 };
+    const sounds = ['textured', 'original', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib'];
+    for (const writingSound of sounds) audio.configure({ ...TEXTURED_SETTINGS, writingSound });
+    assert.equal(audio.diagnostics.contactBufferPairs, 0, 'choosing a sound at rest should not generate contact audio');
+    let graph;
+    const bodyBuffers = new Set();
+    for (const writingSound of sounds) {
+      const settings = { ...TEXTURED_SETTINGS, writingSound };
+      audio.configure(settings);
+      assert.equal(audio.diagnostics.contactSources, 0);
+      audio.updateContact(sample);
+      const parameters = writingSound === 'original'
+        ? frictionParameters(sample, settings) : contactTextureParameters(sample, settings, writingSound);
+      assert.equal(audio.diagnostics.writingGain, parameters.gain);
+      assert.equal(audio.diagnostics.contactSources, writingSound === 'original' ? 1 : 2);
+      assert.ok(audio.diagnostics.contactBufferPairs <= 3);
+      if (writingSound !== 'original') {
+        graph ??= audio.texturedLayers;
+        assert.equal(audio.texturedLayers, graph, 'changing palettes must reuse the two-layer graph');
+        assert.equal(audio.diagnostics.preparedContactSound, writingSound);
+        assert.equal(graph.body.gain.gain.value, parameters.gain * parameters.bodyMix);
+        assert.equal(graph.grain.gain.gain.value, parameters.gain * parameters.grainMix);
+        assert.equal(graph.body.voice.source.buffer, graph.body.buffer);
+        assert.equal(graph.grain.voice.source.buffer, graph.grain.buffer);
+        bodyBuffers.add(graph.body.buffer);
+      }
+    }
+    assert.equal(bodyBuffers.size, 6, 'the six contact palettes must not share one placeholder buffer');
+    const cached = audio.texturedLayers.body.buffer;
+    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'warm-paper' });
+    audio.updateContact(sample);
+    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'crisp-nib' });
+    audio.updateContact(sample);
+    assert.equal(audio.texturedLayers.body.buffer, cached);
+    audio.dispose();
+    assert.equal(audio.diagnostics.contactBufferPairs, 0);
+    assert.equal(audio.diagnostics.contactSources, 0);
+  }, TEXTURED_SETTINGS);
+});
+
+test('rapid seven-way comparison and pen lifts keep active and retiring sources bounded', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const ctx = FakeContext.instances[0];
     for (let step = 0; step < 160; step++) {
-      const writingSound = step % 2 ? 'textured' : 'original';
+      const writingSound = ['textured', 'original', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib'][step % 7];
       audio.configure({ ...TEXTURED_SETTINGS, writingSound });
       audio.updateContact({ contact: step % 3 !== 0, speed: 132, pressure: 0.7, angle: step * 0.2 });
       assert.ok(audio.diagnostics.contactSources <= (writingSound === 'original' ? 1 : 2));
       assert.ok(audio.diagnostics.continuousSources <= 6);
+      assert.ok(audio.diagnostics.contactBufferPairs <= 3);
     }
     audio.updateContact({ contact: false, speed: 0, pressure: 0 });
     ctx.advance(0.02);
@@ -689,8 +733,8 @@ test('profile changes cannot resurrect stale contact after mute, hidden state or
   }
 });
 
-test('both profiles follow actual engine lifts, pause, resume, completion and reset', async () => {
-  for (const writingSound of ['original', 'textured']) {
+test('all seven sounds follow actual engine lifts, pause, resume, completion and reset', async () => {
+  for (const writingSound of ['original', 'textured', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib']) {
     const settings = { ...TEXTURED_SETTINGS, writingSound };
     await withAudio(async (audio) => {
       await audio.enable();

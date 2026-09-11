@@ -20,6 +20,16 @@ const PEN_REST_POSITION = new THREE.Vector3(2.08, 0.16, 1.4);
 const PEN_REST_ROTATION = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.35, 0.07, -0.95).normalize());
 const PEN_RETURN_DURATION = 1.8;
 
+export function writingPenOrientation(): THREE.Quaternion {
+  const elevation = THREE.MathUtils.degToRad(42);
+  const direction = new THREE.Vector3(0.51, 0, 0.31).normalize().multiplyScalar(Math.cos(elevation));
+  direction.y = Math.sin(elevation);
+  // Keep the cross-edge level and the nib face upward as the barrel leans.
+  const across = new THREE.Vector3(-direction.z, 0, direction.x).normalize();
+  const face = across.clone().cross(direction).normalize();
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, direction, face));
+}
+
 const PALETTES: Record<Mood, {
   wood: string; wall: string; trim: string; leather: string; pen: string;
   ceramic: string; book: string; foliage: string;
@@ -187,7 +197,7 @@ export class DeskScene {
     this.buildProps();
     this.buildPen();
     this.scene.add(this.pen, this.cap);
-    this.penOrientation.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.51, 0.86, 0.31).normalize());
+    this.penOrientation.copy(writingPenOrientation());
     this.pen.quaternion.copy(this.penOrientation);
     this.scene.add(this.hemisphere, this.sun, this.lampLight, this.flashLight);
     this.sun.castShadow = true;

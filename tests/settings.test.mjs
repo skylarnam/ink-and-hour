@@ -108,13 +108,13 @@ test('the new writing texture is default without overwriting legacy mixer or mus
   }
 });
 
-test('the original writing sound is a persisted, reversible choice', () => {
+test('all seven writing sounds persist without changing saved mixer or music choices', () => {
   const stored = new Map();
   withStorage({
     getItem: (key) => stored.get(key) ?? null,
     setItem: (key, value) => stored.set(key, value),
   }, () => {
-    for (const writingSound of ['original', 'textured', 'original']) {
+    for (const writingSound of ['original', 'textured', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib', 'original']) {
       const settings = { ...DEFAULT_SETTINGS, writingSound, musicTrack: 'off', musicVolume: 0 };
       saveSettings(settings, assert.fail);
       assert.deepEqual(loadSettings(assert.fail), settings);

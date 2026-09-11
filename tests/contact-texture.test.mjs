@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { contactTextureParameters, createContactTextures } from '../src/contact-texture.ts';
+import { WRITING_SOUND_IDS } from '../src/writing-sounds.ts';
 
 const SETTINGS = { paper: 'smooth', nib: 'fine', pen: 'fountain' };
 const SAMPLE = { contact: true, speed: 140, pressure: 0.6, angle: 0.4 };
 const SAMPLE_RATES = [8000, 44100, 48000, 96000];
+const CONTACT_PROFILES = WRITING_SOUND_IDS.filter((id) => id !== 'original');
 const cache = new Map();
 
-function textures(sampleRate) {
-  if (!cache.has(sampleRate)) cache.set(sampleRate, createContactTextures(sampleRate));
-  return cache.get(sampleRate);
+function textures(sampleRate, profile = 'textured') {
+  const key = `${sampleRate}:${profile}`;
+  if (!cache.has(key)) cache.set(key, createContactTextures(sampleRate, profile));
+  return cache.get(key);
 }
 
 function statistics(data) {
@@ -313,5 +316,207 @@ test('loop seams have zero endpoints and smoothly faded neighboring energy at ev
 test('invalid or unbounded sample rates reject before allocating buffers', () => {
   for (const rate of [0, -1, 7999, 48000.5, 192001, 1e100, NaN, Infinity, -Infinity]) {
     assert.throws(() => createContactTextures(rate), RangeError);
+  }
+  for (const profile of CONTACT_PROFILES) {
+    for (const rate of [0, -1, 7999, 192001, NaN]) assert.throws(() => createContactTextures(rate, profile), RangeError);
+  }
+});
+
+test('the profile argument defaults to textured and is the only thing that can change its output', () => {
+  assert.deepEqual(createContactTextures(44100), createContactTextures(44100, 'textured'));
+  assert.deepEqual(contactTextureParameters(SAMPLE, SETTINGS), contactTextureParameters(SAMPLE, SETTINGS, 'textured'));
+  assert.equal(CONTACT_PROFILES.length, 6, 'textured plus the five new palettes');
+  assert.deepEqual(CONTACT_PROFILES, ['textured', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib']);
+});
+
+// Generic invariants for any profile: finite, bounded gain, power-balanced mixes and a positive,
+// ordered lowpass pair. Absolute Hz ranges are not asserted here (only textured's are contractual);
+// the parent clamps any profile's cutoffs to native Nyquist.
+function assertGenericParameters(params) {
+  assert.deepEqual(Object.keys(params).sort(), ['bodyLowpass', 'bodyMix', 'gain', 'grainLowpass', 'grainMix']);
+  for (const value of Object.values(params)) assert.ok(Number.isFinite(value));
+  assert.ok(params.gain >= 0 && params.gain <= 0.32);
+  assert.ok(params.bodyMix >= 0 && params.bodyMix <= 1);
+  assert.ok(params.grainMix >= 0 && params.grainMix <= 1);
+  assert.ok(Math.abs(params.bodyMix ** 2 + params.grainMix ** 2 - 1) < 1e-12);
+  assert.ok(params.bodyLowpass > 0 && params.bodyLowpass < 20000);
+  assert.ok(params.grainLowpass > params.bodyLowpass && params.grainLowpass < 20000);
+}
+
+test('every contact profile stays finite, bounded and power balanced across the full parameter matrix', () => {
+  for (const profile of CONTACT_PROFILES) {
+    for (const paper of ['smooth', 'parchment', 'cotton']) {
+      for (const nib of ['fine', 'broad', 'flex']) {
+        for (const pen of ['fountain', 'dip']) {
+          for (const speed of [0, 30, 150, 280, NaN, Infinity]) {
+            for (const pressure of [0, 0.5, 1, NaN, Infinity]) {
+              for (const angle of [undefined, 0, Math.PI / 4, Math.PI, -Math.PI, NaN]) {
+                const params = contactTextureParameters({ contact: true, speed, pressure, angle }, { paper, nib, pen }, profile);
+                if (profile === 'textured') assertParameters(params);
+                else assertGenericParameters(params);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+test('every contact profile is exactly silent on lifts, stops and invalid or backwards speed', () => {
+  for (const profile of CONTACT_PROFILES) {
+    for (const speed of [0, -0, -0.01, -100, NaN, Infinity, -Infinity]) {
+      assert.equal(contactTextureParameters({ ...SAMPLE, speed }, SETTINGS, profile).gain, 0);
+    }
+    assert.equal(contactTextureParameters({ ...SAMPLE, contact: false }, SETTINGS, profile).gain, 0);
+  }
+});
+
+test('every contact profile keeps the same pressure, direction, paper and holder response as textured', () => {
+  for (const profile of CONTACT_PROFILES) {
+    const settings = SETTINGS;
+    const light = contactTextureParameters({ ...SAMPLE, pressure: 0.05 }, settings, profile);
+    const loaded = contactTextureParameters({ ...SAMPLE, pressure: 0.95 }, settings, profile);
+    assert.ok(loaded.gain > light.gain, `${profile}: pressure must still increase gain`);
+    assert.ok(loaded.grainLowpass > light.grainLowpass, `${profile}: pressure must still open the detail band`);
+
+    const broad = { ...settings, nib: 'broad' };
+    const edgeAngle = Math.PI / 4;
+    const narrow = contactTextureParameters({ ...SAMPLE, angle: edgeAngle }, broad, profile);
+    const wide = contactTextureParameters({ ...SAMPLE, angle: edgeAngle + Math.PI / 2 }, broad, profile);
+    assert.ok(wide.gain > narrow.gain * 1.1, `${profile}: broad edge must still depend on angle`);
+    const left = contactTextureParameters({ ...SAMPLE, angle: edgeAngle - 0.1 }, broad, profile);
+    const right = contactTextureParameters({ ...SAMPLE, angle: edgeAngle + 0.1 }, broad, profile);
+    for (const key of Object.keys(left)) {
+      assert.ok(Math.abs(left[key] - right[key]) < 1e-9, `${profile}: broad response must stay symmetric around 45 degrees`);
+    }
+
+    const [smooth, parchment, cotton] = ['smooth', 'parchment', 'cotton']
+      .map((paper) => contactTextureParameters(SAMPLE, { ...settings, paper }, profile));
+    assert.equal(smooth.gain, parchment.gain, `${profile}: paper must not change gain`);
+    assert.equal(smooth.gain, cotton.gain, `${profile}: paper must not change gain`);
+    assert.ok(smooth.grainMix < parchment.grainMix && parchment.grainMix < cotton.grainMix,
+      `${profile}: rougher paper must still open more grain`);
+
+    const fountain = contactTextureParameters(SAMPLE, { ...settings, pen: 'fountain' }, profile);
+    const dip = contactTextureParameters(SAMPLE, { ...settings, pen: 'dip' }, profile);
+    assert.equal(fountain.gain, dip.gain, `${profile}: holder must not change gain`);
+    assert.ok(dip.bodyMix > fountain.bodyMix, `${profile}: dip must still trade toward body`);
+  }
+});
+
+test('the five new palettes differ from textured and each other in mix balance and spectral targeting', () => {
+  const params = Object.fromEntries(
+    CONTACT_PROFILES.map((profile) => [profile, contactTextureParameters(SAMPLE, SETTINGS, profile)]),
+  );
+  // Restrained fibers: soft-glide keeps noticeably less grain than textured.
+  assert.ok(params['soft-glide'].grainMix < params.textured.grainMix - 0.05);
+  // Warm paper is the darkest and most body-dominant of all six.
+  for (const profile of CONTACT_PROFILES) {
+    if (profile === 'warm-paper') continue;
+    assert.ok(params['warm-paper'].bodyLowpass < params[profile].bodyLowpass);
+    assert.ok(params['warm-paper'].grainLowpass < params[profile].grainLowpass);
+    assert.ok(params['warm-paper'].grainMix < params[profile].grainMix);
+  }
+  // Crisp nib is the brightest and most grain-forward of all six.
+  for (const profile of CONTACT_PROFILES) {
+    if (profile === 'crisp-nib') continue;
+    assert.ok(params['crisp-nib'].grainLowpass > params[profile].grainLowpass);
+    assert.ok(params['crisp-nib'].grainMix > params[profile].grainMix);
+  }
+  // No two profiles are simple volume rescales of each other: mixes and cutoffs are distinct.
+  for (let i = 0; i < CONTACT_PROFILES.length; i++) {
+    for (let j = i + 1; j < CONTACT_PROFILES.length; j++) {
+      const a = params[CONTACT_PROFILES[i]];
+      const b = params[CONTACT_PROFILES[j]];
+      assert.equal(a.gain, b.gain, 'gain must stay driven only by pressure/speed, never by palette choice');
+      assert.notEqual(a.bodyLowpass, b.bodyLowpass);
+      assert.notEqual(a.grainLowpass, b.grainLowpass);
+      assert.notEqual(a.grainMix, b.grainMix);
+    }
+  }
+});
+
+test('every contact profile generates finite, low-DC, comparably leveled and independently allocated buffers', () => {
+  for (const profile of CONTACT_PROFILES) {
+    const { body, grain } = textures(44100, profile);
+    assert.ok(body instanceof Float32Array && grain instanceof Float32Array);
+    assert.equal(body.length, 44100 * 11);
+    assert.equal(grain.length, 44100 * 13);
+    for (const [name, data] of Object.entries({ body, grain })) {
+      const stats = statistics(data);
+      assert.ok(Math.abs(stats.mean) < 1e-7, `${profile} ${name} DC: ${stats.mean}`);
+      assert.ok(stats.peak > 0 && stats.peak <= 0.95, `${profile} ${name} peak: ${stats.peak}`);
+      // Comparable typical level across every palette, so louder is never the only difference.
+      assert.ok(stats.rms >= 0.18 && stats.rms <= 0.28, `${profile} ${name} RMS: ${stats.rms}`);
+      assert.ok(stats.peak / stats.rms >= 2 && stats.peak / stats.rms <= 5.3, `${profile} ${name} crest factor`);
+    }
+    assert.ok(Math.abs(correlation(body, grain)) < 0.05, `${profile}: body and grain must stay independent`);
+  }
+  const textured = textures(44100, 'textured');
+  for (const profile of CONTACT_PROFILES) {
+    if (profile === 'textured') continue;
+    const other = textures(44100, profile);
+    assert.notDeepEqual(other.body, textured.body, `${profile} body must not equal textured`);
+    assert.notDeepEqual(other.grain, textured.grain, `${profile} grain must not equal textured`);
+    for (const rival of CONTACT_PROFILES) {
+      if (rival === profile) continue;
+      assert.notDeepEqual(other.body, textures(44100, rival).body, `${profile} and ${rival} must not share a body buffer`);
+      assert.notDeepEqual(other.grain, textures(44100, rival).grain, `${profile} and ${rival} must not share a grain buffer`);
+    }
+  }
+});
+
+test('every contact profile keeps zero, smoothly faded loop seams at the default rate', () => {
+  for (const profile of CONTACT_PROFILES) {
+    for (const data of Object.values(textures(44100, profile))) {
+      assert.equal(Math.abs(data[0]), 0);
+      assert.equal(Math.abs(data[data.length - 1]), 0);
+      const edgeLength = Math.round(44100 * 0.001);
+      for (const edge of [data.subarray(0, edgeLength), data.subarray(data.length - edgeLength)]) {
+        assert.ok(statistics(edge).rms < 0.003, `${profile}: the seam must not introduce an amplitude step`);
+      }
+    }
+  }
+});
+
+test('the five new palettes have distinct envelope granularity and intermittency, not just volume or seed', () => {
+  const rate = 44100;
+  const windowSize = Math.round(rate * 0.020);
+  const summaries = {};
+  for (const profile of CONTACT_PROFILES) {
+    const { body, grain } = textures(rate, profile);
+    const bodyEnergy = windowRms(body, windowSize);
+    const grainEnergy = windowRms(grain, windowSize);
+    summaries[profile] = {
+      bodyVariation: variation(bodyEnergy),
+      grainVariation: variation(grainEnergy),
+      quietGrainFraction: grainEnergy.filter((energy) => energy < 0.025).length / grainEnergy.length,
+      bodyRoughness: statistics(body).roughness,
+      grainRoughness: statistics(grain).roughness,
+    };
+    // Grain must remain noticeably more irregular than its own body layer for every palette.
+    assert.ok(summaries[profile].grainVariation > summaries[profile].bodyVariation * 1.5, profile);
+    assert.ok(summaries[profile].grainRoughness > summaries[profile].bodyRoughness * 1.4, profile);
+  }
+  // Restrained, softer glide: noticeably more silence between fiber patches than textured.
+  assert.ok(summaries['soft-glide'].quietGrainFraction > summaries.textured.quietGrainFraction + 0.08);
+  // Finer, denser pencil-like feedback: noticeably less silence than textured.
+  assert.ok(summaries['fine-feedback'].quietGrainFraction < summaries.textured.quietGrainFraction - 0.08);
+  // Coarser, clearly separated drag: the most silence between grain patches of all six.
+  for (const profile of CONTACT_PROFILES) {
+    if (profile !== 'dry-fibers') assert.ok(summaries['dry-fibers'].quietGrainFraction >= summaries[profile].quietGrainFraction);
+  }
+  // Compact, dense fine-nib detail: the least silence between grain patches of all six.
+  for (const profile of CONTACT_PROFILES) {
+    if (profile !== 'crisp-nib') assert.ok(summaries['crisp-nib'].quietGrainFraction <= summaries[profile].quietGrainFraction);
+  }
+  // No two palettes share the same envelope statistics.
+  for (let i = 0; i < CONTACT_PROFILES.length; i++) {
+    for (let j = i + 1; j < CONTACT_PROFILES.length; j++) {
+      const a = summaries[CONTACT_PROFILES[i]];
+      const b = summaries[CONTACT_PROFILES[j]];
+      assert.notEqual(a.quietGrainFraction, b.quietGrainFraction, `${CONTACT_PROFILES[i]} vs ${CONTACT_PROFILES[j]}`);
+    }
   }
 });

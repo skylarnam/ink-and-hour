@@ -3,6 +3,7 @@ import { MIN_TEXT_SCALE, MAX_TEXT_SCALE } from './types.ts';
 import { isInkColor } from './ink.ts';
 import { LOFI_TRACK_IDS } from './music-library.ts';
 import { HANDWRITING_IDS } from './handwriting.ts';
+import { WRITING_SOUND_IDS } from './writing-sounds.ts';
 
 export const STORAGE_KEY = 'ink-and-hour:preferences:v1';
 
@@ -55,7 +56,7 @@ export function sanitizeSettings(value: unknown): Settings {
     speed: number(data.speed, 0.5, 2, DEFAULT_SETTINGS.speed),
     masterVolume: number(data.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume),
     writingVolume: number(data.writingVolume, 0, 1, DEFAULT_SETTINGS.writingVolume),
-    writingSound: choice(data.writingSound, ['original', 'textured'], DEFAULT_SETTINGS.writingSound),
+    writingSound: choice(data.writingSound, WRITING_SOUND_IDS, DEFAULT_SETTINGS.writingSound),
     ambienceVolume: number(data.ambienceVolume, 0, 1, DEFAULT_SETTINGS.ambienceVolume),
     musicVolume: number(data.musicVolume, 0, 1, DEFAULT_SETTINGS.musicVolume),
     musicTrack: choice(data.musicTrack, ['off', 'felt', 'glass', 'lofi'], DEFAULT_SETTINGS.musicTrack),

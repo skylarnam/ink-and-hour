@@ -4,6 +4,7 @@ import { LOFI_TRACKS } from '../src/music-library.ts';
 import { HANDWRITING_STYLES } from '../src/handwriting.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { renderUI } from '../src/ui.ts';
+import { WRITING_SOUNDS } from '../src/writing-sounds.ts';
 
 test('the footer no longer duplicates the completed scene caption or retired gallery', () => {
   const html = renderUI();
@@ -42,14 +43,23 @@ test('the mini-player is before the sound switch and includes transport labels a
 test('the sound panel offers an accessible live comparison and an explicit original-sound rollback', () => {
   const html = renderUI();
   const panel = html.match(/<section id="panel-sound"[\s\S]*?<\/section>/)[0];
-  assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 2);
-  for (const value of ['textured', 'original']) {
-    assert.ok(panel.includes(`data-setting="writingSound" data-value="${value}" aria-pressed="false"`));
+  assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 7);
+  for (const { id, label } of WRITING_SOUNDS) {
+    assert.ok(panel.includes(`data-setting="writingSound" data-value="${id}" aria-pressed="false">${label}</button>`));
   }
+  assert.ok(panel.includes('id="writing-sound-description"'));
   assert.match(panel, /<fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND<\/legend>/);
   assert.ok(panel.includes('Original restores the previous pen sound'));
   assert.ok(panel.includes('Compare while writing'));
   assert.ok(panel.includes('Your choice is saved'));
+});
+
+test('initial sound UI says ready, not playing, before the browser has a user gesture', () => {
+  const html = renderUI();
+  assert.ok(html.includes('data-sound-state="ready"'));
+  assert.ok(html.includes('Sound ready'));
+  assert.equal(html.includes('Sound is on'), false);
+  assert.ok(html.includes('Your browser waits for a first click, tap, or keypress'));
 });
 
 test('all 34 approved handwriting choices expose their source licenses and the inferred-order limitation', () => {

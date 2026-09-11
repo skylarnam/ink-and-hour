@@ -108,9 +108,12 @@ it in a terminal separates its lifetime from the agent's completed work.
   Storms have isolated, gentle light pulses with delayed thunder, not repeated
   rapid flashes. The coffee cup has a joined, open-D ceramic handle and sits
   behind the paper, clear of both roll states. Books angle away from the roll.
-- Sound is on by default and starts at the first browser-allowed interaction;
-  no separate enable click is needed. Click **Sound is on** to mute, even before
-  the first interaction. A chosen mute remains in force for the current visit.
+- Sound is armed by default, with **Sound ready** shown until the browser allows
+  playback. An ordinary click, tap, or typing key starts it; opening the Sound
+  tab is not required. Touch activation uses release/click gestures rather than
+  an early pointerdown. A first tap on a desk material waits for the context to
+  be ready before its cue. Click **Sound ready** to keep it muted before starting,
+  or **Sound is on** to mute afterward. A chosen mute remains in force for the current visit.
   Writing/materials, ambience, music, and overall volume have independent controls.
   Fresh settings use **70% overall, 30% Pen & materials, 20% Outside the window,
   and 20% Background music**. **Lo-fi** is selected by default and starts with
@@ -123,8 +126,9 @@ it in a terminal separates its lifetime from the agent's completed work.
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
   Previously saved volume and music choices, including **Off**, are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
-  **Sound > Writing sound** offers **Textured** (the new default) and **Original**
-  (the previous writing sound, unchanged). Switch during a stroke to compare;
+  **Sound > Writing sound** offers **Textured** (still the default), **Original**
+  (the previous writing sound, unchanged), **Soft glide**, **Fine feedback**,
+  **Dry fibers**, **Warm paper**, and **Crisp nib**. Switch during a stroke to compare;
   it does not restart the pen or change the page. The choice persists across
   visits. Choose **Original** to revert instantly, without a reinstall or
   deployment. This choice affects only writing friction, not the mixer levels,
@@ -194,8 +198,10 @@ shown in the editor. Actual pen playback draws these generated centerlines,
 not outlines, a typeset reveal, or a motion unrelated to the ink.
 
 Stroke order in an ordinary font is **inferred**, not recorded by its designer.
-Some shared branches are retraced; completed trails are not gratuitously traced
-back to their start. Tiny-glyph interpretations are recorded in the attribution
+The graph traversal covers each retained segment once, lifting to reach a new
+branch rather than drawing back over completed ink. Compact raster junctions
+are merged with bounded endpoint movement to avoid tiny false branches.
+Tiny-glyph interpretations are recorded in the attribution
 data. Italianno's original font has a blank underscore: its editor face excludes
 that character so the system-serif fallback keeps it visible, while the pen
 uses a documented reconstruction from that font's own underline metrics.
@@ -211,7 +217,8 @@ node --experimental-strip-types scripts/render-handwriting-contact-sheet.ts /tmp
 ```
 
 Existing selected centerlines are preserved by default. Use `--regenerate ID`
-to deliberately retrace an approved face. Changed source bytes require a
+to deliberately regenerate an approved face. `--audit-stroke-flow ID` reports
+unique retained graph length versus drawn trail length for that face. Changed source bytes require a
 refreshed catalog and explicit approval snapshot before generation will proceed.
 `scripts/apply-font-selection.ts` requires both the approved `--revision` and
 `--sha256`; it never follows a changing checklist implicitly.
@@ -228,19 +235,29 @@ restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 Paper relief has its own cached height texture; ink changes do not rebuild it.
 
-Writing has two independently selectable sound profiles. **Original** retains
+Writing has seven independently selectable sound profiles. **Original** retains
 the previous soft, filtered friction buffer, modulation, and parameter mapping.
 **Textured** blends original, procedurally generated rubbing and irregular
 paper-fiber detail through broad, non-resonant filters. Its balance follows
 speed, pressure, paper, nib, and holder; broad-edge contact also follows stroke
 direction. It uses no pitched grains, control oscillators, or playback-rate
-changes. A downstroke is not automatically treated as a hard contact.
-Both profiles exist only during moving contact: their friction fades to exact
+changes. **Soft glide**, **Fine feedback**, **Dry fibers**, **Warm paper**, and
+**Crisp nib** retain that contact model, with distinct rubbing drift, fiber-patch
+lengths/gaps, spectral bands, and layer balances. They are synthesis palettes,
+not recordings of particular pen models. Original and Textured remain unchanged.
+A downstroke is not automatically treated as a hard contact.
+All profiles exist only during moving contact: their friction fades to exact
 zero within 7 ms of a lift and their sources stop within 12 ms. Material
 changes reshape the current stroke without restarting its sound; switching
 profiles briefly crossfades the sources without restarting writing.
+Two contact filter/gain layers are reused, with at most three lazily generated
+buffer pairs cached for comparisons.
 
-Cap, paper, leather, and bottle events are separate short voices. One reusable
+Cap, paper, leather, and bottle events are separate short voices. Textbox pinch,
+A-/A+, and other typography-driven page resets are silent; the explicit Fresh
+sheet action still has its paper sound. The pen writes at a lower 42-degree
+inclination, with its cross-edge level and its live nib point anchored to the ink.
+One reusable
 AudioContext has writing, ambience, and music buses behind a bounded
 master/compressor. Mixer mutes reach exact zero within 21 ms, not an asymptotic
 noise floor. Clear weather or zero ambience volume stops the rain source;
@@ -262,7 +279,7 @@ fallbacks; playback intent is not stored.
 - These are 34 user-selected styles, not arbitrary font imports. Correspondence
   uses historical ordered centerlines; the other 33 approximate font shapes and
   infer their writing order. They are not recordings of a calligrapher's motion.
-  Some letters use several lifts or shared-stem retracing, and script letters
+  Some letters use several lifts, and script letters
   are not continuously connected across every character boundary.
 - No hand model, fluid simulation, ink depletion, automatic dipping, nib alloy
   simulation, or manufacturer-specific measurements. "Fine", "broad edge", and
@@ -270,7 +287,7 @@ fallbacks; playback intent is not stored.
   nib hardware. Broad and flex behavior are deliberately different.
 - Friction/weather/material sounds and the two original beds are synthesized,
   not recorded ASMR. The new lo-fi playlist is genuine recorded music.
-  The Textured writing profile is an experimental interpretation of contact
+  The six contact-texture profiles are experimental interpretations of contact
   mechanics, not a calibrated physical model or a reproduction of reference
   recordings. No YouTube audio was sampled or bundled; reference study used
   visual/signal analysis and specialist sources, not direct audio audition.
