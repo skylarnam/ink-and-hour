@@ -45,7 +45,7 @@ function playerRig(t) {
   return { player, media, errors, connections: () => connections };
 }
 
-test('the playlist is lazy and stays silent until both explicit play and the sound gate allow it', async (t) => {
+test('the playlist is lazy and stays silent until both play intent and the sound gate allow it', async (t) => {
   const { player, media, connections } = playerRig(t);
   assert.equal(media.src, '');
   assert.equal(media.plays, 0);
@@ -60,6 +60,21 @@ test('the playlist is lazy and stays silent until both explicit play and the sou
   assert.equal(media.src, tracks[0].file);
   assert.equal(connections(), 1);
   assert.equal(media.preload, 'none');
+});
+
+test('queued default music can be paused before the first interaction without loading audio', async (t) => {
+  const { player, media, connections } = playerRig(t);
+  player.play();
+  assert.equal(player.state.requested, true);
+  assert.equal(player.state.playing, false);
+  assert.equal(connections(), 0);
+  assert.equal(media.loads, 0);
+  player.pause();
+  player.setAvailable(true);
+  await flush();
+  assert.equal(player.state.requested, false);
+  assert.equal(media.plays, 0);
+  assert.equal(connections(), 0);
 });
 
 test('previous and next wrap around, and changing a paused record does not start or load it', (t) => {

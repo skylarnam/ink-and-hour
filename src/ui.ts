@@ -172,7 +172,7 @@ Stay a little while.</textarea>
       </details>
       <section id="music-attribution" aria-labelledby="music-attribution-title">
         <h3 id="music-attribution-title">Records for a quiet corner.</h3>
-        <p>Three locally bundled lo-fi recordings, shared by their creators under CC0. No streaming account or outside playback service. Music starts only when you choose it.</p>
+        <p>Three locally bundled lo-fi recordings, shared by their creators under CC0. No streaming account or outside playback service. Lo-fi is on by default and starts with your first interaction. Use the mini-player to pause, or choose Off in Sound.</p>
         <ul class="music-attribution">${LOFI_TRACKS.map((track) => `<li><a href="${track.source}" target="_blank" rel="noopener noreferrer">${track.title}</a><span>${track.artist} / <a href="${track.license}" target="_blank" rel="noopener noreferrer">CC0 1.0</a></span></li>`).join('')}</ul>
         <p class="small-note"><a href="/audio/lofi/CREDITS.txt" target="_blank" rel="noopener">Recording sources and credits</a>. Felt notes and Glass garden are the original synthesized soundscapes.</p>
       </section>

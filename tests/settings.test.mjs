@@ -2,6 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS, STORAGE_KEY, loadSettings, sanitizeSettings, saveSettings } from '../src/settings.ts';
 
+test('fresh preferences use the 70/30/20/20 mix with lo-fi selected', () => {
+  assert.equal(DEFAULT_SETTINGS.masterVolume, 0.7);
+  assert.equal(DEFAULT_SETTINGS.writingVolume, 0.3);
+  assert.equal(DEFAULT_SETTINGS.ambienceVolume, 0.2);
+  assert.equal(DEFAULT_SETTINGS.musicVolume, 0.2);
+  assert.equal(DEFAULT_SETTINGS.musicTrack, 'lofi');
+  assert.equal(DEFAULT_SETTINGS.lofiTrack, 'first-snow');
+  withStorage({ getItem: () => null }, () => {
+    assert.deepEqual(loadSettings(assert.fail), DEFAULT_SETTINGS);
+  });
+});
+
 test('preferences restore safe defaults from invalid shapes', () => {
   for (const value of [null, undefined, [], true, 5, 'study']) {
     assert.deepEqual(sanitizeSettings(value), DEFAULT_SETTINGS);
@@ -54,6 +66,16 @@ test('saved preferences round-trip without persisting text or sound consent', ()
     assert.equal('enabled' in saved, false);
     assert.equal('message' in saved, false);
     assert.deepEqual(errors, []);
+  });
+});
+
+test('new audio defaults do not overwrite saved levels or Music Off', () => {
+  const saved = {
+    ...DEFAULT_SETTINGS, masterVolume: 0.43, writingVolume: 0.61,
+    ambienceVolume: 0.09, musicVolume: 0, musicTrack: 'off',
+  };
+  withStorage({ getItem: () => JSON.stringify(saved) }, () => {
+    assert.deepEqual(loadSettings(assert.fail), saved);
   });
 });
 

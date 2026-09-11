@@ -80,6 +80,7 @@ function updateMusicUI(): void {
   const detail = !requested ? synth ? 'Original soundscape / paused' : `${state.track.artist} / paused`
     : !audio.enabled ? 'Paused with sound'
     : settings.musicVolume === 0 || settings.masterVolume === 0 ? 'Music volume is zero'
+    : audio.diagnostics.contextState === 'not-created' ? 'Ready for your first interaction'
     : state.loading && !synth ? 'Loading record...'
     : document.hidden ? 'Paused in the background'
     : synth ? 'Original soundscape' : state.track.artist;
@@ -148,7 +149,9 @@ function updateAudioButtons(): void {
 function activateDefaultSound(event: PointerEvent | KeyboardEvent): void {
   if (!event.isTrusted || document.hidden || !audio.enabled || soundActivation
     || audio.diagnostics.contextState === 'running') return;
-  if (event.target instanceof Element && event.target.closest('#enable-sound, #panel-enable-sound')) return;
+  if (event.target instanceof Element
+    && (event.target.closest('#enable-sound, #panel-enable-sound')
+      || event.target.closest('#music-play') && musicRequested())) return;
   if (event instanceof KeyboardEvent && ['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
   soundActivation = audio.enable();
   void soundActivation.finally(() => {
@@ -467,6 +470,7 @@ function frame(timestamp: number): void {
   animationId = requestAnimationFrame(frame);
 }
 
+if (settings.musicTrack === 'lofi') recordedMusic.play();
 syncSettings();
 validateDraft();
 syncWriting();

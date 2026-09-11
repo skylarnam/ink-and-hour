@@ -99,15 +99,17 @@ it in a terminal separates its lifetime from the agent's completed work.
 - Sound is on by default and starts at the first browser-allowed interaction;
   no separate enable click is needed. Click **Sound is on** to mute, even before
   the first interaction. A chosen mute remains in force for the current visit.
-  Writing/materials, ambience, music, and overall volume have independent controls. Music starts
-  **Off**. The mini-player immediately left of the sound switch offers previous,
+  Writing/materials, ambience, music, and overall volume have independent controls.
+  Fresh settings use **70% overall, 30% Pen & materials, 20% Outside the window,
+  and 20% Background music**. **Lo-fi** is selected by default and starts with
+  that first interaction, never before it. The mini-player immediately left of the sound switch offers previous,
   play/pause, and next for three real **CC0 lo-fi recordings**. Click its title
-  for artist/source/license credits. The selected track persists, but recordings
-  never auto-resume on a new visit. Tracks load only when needed and advance
+  for artist/source/license credits. The selected track persists; a new visit
+  with lo-fi selected queues it behind the first-interaction sound gate.
+  Tracks load only when needed and advance
   when they end. **Felt notes** and **Glass garden** remain optional original
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
-  Pen sound is balanced ahead of default rain. New visits start Pen & materials
-  at 90%; previously saved volume choices are preserved. Muting ambience stops
+  Previously saved volume and music choices, including **Off**, are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
   The ambience slider controls rain and thunder together. Recordings share
   the music/master mixer and pause when muted, hidden, or set to zero volume.

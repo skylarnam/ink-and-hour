@@ -16,11 +16,11 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   customInk: '#6752a0',
   style: 'correspondence',
   speed: 1,
-  masterVolume: 0.68,
-  writingVolume: 0.9,
-  ambienceVolume: 0.48,
-  musicVolume: 0.22,
-  musicTrack: 'off',
+  masterVolume: 0.7,
+  writingVolume: 0.3,
+  ambienceVolume: 0.2,
+  musicVolume: 0.2,
+  musicTrack: 'lofi',
   lofiTrack: 'first-snow',
 };
 
