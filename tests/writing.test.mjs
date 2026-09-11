@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { layoutText, parseStrokePath, nibWidth, WritingEngine, MAX_CHARACTERS } from '../src/writing/index.ts';
 import { smoothStroke } from '../src/writing/paths.ts';
 import fonts from '../src/writing/fonts.json' with { type: 'json' };
+import { handwritingFontData } from '../src/writing/font-data.ts';
 
 const options = { width: 780, height: 1040, style: 'correspondence' };
 const tool = { pen: 'fountain', nib: 'flex', speed: 1 };
@@ -12,7 +13,7 @@ const near = (actual, expected, tolerance = 1e-8) =>
 const fixture = (strokes) => ({ ok: true, error: null, strokes, lineCount: 1, characterCount: 1 });
 const line = (length = 200) => fixture([[{ x: 40, y: 60 }, { x: 40 + length, y: 60 }]]);
 const moves = (style, text) => [...text].reduce((sum, character) =>
-  sum + (fonts[style].chars[character.charCodeAt(0) - 33]?.d.match(/M/g)?.length ?? 0), 0);
+  sum + (handwritingFontData(style).chars[character.charCodeAt(0) - 33]?.d.match(/M/g)?.length ?? 0), 0);
 
 test('M starts true strokes; repeated coordinate pairs are retained', () => {
   assert.deepEqual(parseStrokePath('M1,2 L3,4 5,6 M7,8 L9,10'), [
@@ -21,8 +22,8 @@ test('M starts true strokes; repeated coordinate pairs are retained', () => {
   ]);
 });
 
-test('every printable English glyph is defined in both styles and stays on paper', () => {
-  for (const style of ['correspondence', 'print']) {
+test('every printable English glyph is defined in selected script and print hands and stays on paper', () => {
+  for (const style of ['correspondence', 'pangolin']) {
     for (let code = 33; code <= 126; code++) {
       const result = layoutText(String.fromCharCode(code), { ...options, style });
       assert.equal(result.ok, true, `${style}: ${code}`);
@@ -47,7 +48,7 @@ test('input validation is visible rather than silently dropping characters', () 
 });
 
 test('word wrapping, long words and explicit page capacity are bounded', () => {
-  for (const style of ['correspondence', 'print']) {
+  for (const style of ['correspondence', 'pangolin']) {
     const result = layoutText('A quiet moment is sometimes all we need. '.repeat(3), { ...options, style });
     assert.equal(result.ok, true);
     assert.ok(result.lineCount > 1);
@@ -167,7 +168,7 @@ test('gentle smoothing preserves endpoints, sharp print corners and source bound
 
 test('all printable ASCII can coexist without lost letters or merged moves', () => {
   const text = Array.from({ length: 94 }, (_, index) => String.fromCharCode(index + 33)).join('');
-  for (const style of ['correspondence', 'print']) {
+  for (const style of ['correspondence', 'pangolin']) {
     const layout = layoutText(text, { ...options, style });
     assert.equal(layout.ok, true, layout.error);
     assert.equal(layout.characterCount, 94);
@@ -186,7 +187,7 @@ test('newlines normalize consistently and explicit blank lines consume capacity'
 
 test('length limit and physical capacity are separate atomic validations', () => {
   assert.equal(MAX_CHARACTERS, 420);
-  for (const style of ['correspondence', 'print']) {
+  for (const style of ['correspondence', 'pangolin']) {
     const narrow = layoutText('i'.repeat(420), { ...options, style });
     assert.equal(narrow.ok, true, narrow.error);
     assert.equal(narrow.characterCount, 420);
@@ -226,17 +227,17 @@ test('invalid and undersized pages fail without emitting partial geometry', () =
 });
 
 test('word wrap keeps a fitting word whole and splits every glyph of a long word', () => {
-  const page = { ...options, style: 'print', width: 260 };
+  const page = { ...options, style: 'pangolin', width: 160 };
   const wrapped = layoutText('AAAA BBBB', page);
   const standalone = layoutText('BBBB', page);
   assert.equal(wrapped.ok, true);
   assert.equal(wrapped.lineCount, 2);
-  const secondWord = wrapped.strokes.slice(moves('print', 'AAAA'));
+  const secondWord = wrapped.strokes.slice(moves(page.style, 'AAAA'));
   assert.equal(secondWord.length, standalone.strokes.length);
   for (let index = 0; index < secondWord.length; index++) {
     for (let vertex = 0; vertex < secondWord[index].length; vertex++) {
       near(secondWord[index][vertex].x, standalone.strokes[index][vertex].x);
-      near(secondWord[index][vertex].y, standalone.strokes[index][vertex].y + 58);
+      near(secondWord[index][vertex].y, standalone.strokes[index][vertex].y + handwritingFontData(page.style).lineHeight);
     }
   }
   const long = layoutText('W'.repeat(65), options);
@@ -246,7 +247,7 @@ test('word wrap keeps a fitting word whole and splits every glyph of a long word
 });
 
 test('scaled page dimensions and overhanging descenders remain inside finite margins', () => {
-  for (const style of ['correspondence', 'print']) {
+  for (const style of ['correspondence', 'pangolin']) {
     for (const width of [160, 320, 780]) {
       const layout = layoutText('jf Q _ ~ jp', { ...options, width, style });
       assert.equal(layout.ok, true, layout.error);

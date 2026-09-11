@@ -53,7 +53,7 @@ test('every available style can replace the unwritten text without changing inke
 test('changing one preview repeatedly does not move the anchor or accumulate extra wrapping', () => {
   const { layout, engine } = pausedSheet();
   let preview = layout;
-  for (const style of ['homemade-apple', 'print', 'la-belle-aurore', 'caveat', 'correspondence']) {
+  for (const style of ['homemade-apple', 'pangolin', 'la-belle-aurore', 'caveat', 'correspondence']) {
     const changed = restyleRemainingText(text, preview, { ...page, style }, engine.startedStrokeCount);
     const direct = restyleRemainingText(text, layout, { ...page, style }, engine.startedStrokeCount);
     assert.deepEqual(changed, direct);
@@ -69,7 +69,7 @@ test('changing one preview repeatedly does not move the anchor or accumulate ext
 });
 
 test('a new style preserves progress, lifts during travel, follows its ink and completes exactly', () => {
-  const { layout, engine } = pausedSheet('Hi there.', { ...page, style: 'print' }, 0.3);
+  const { layout, engine } = pausedSheet('Hi there.', { ...page, style: 'pangolin' }, 0.3);
   const changed = restyleRemainingText('Hi there.', layout, { ...page, style: 'caveat' }, engine.startedStrokeCount);
   engine.replaceUnwrittenStrokes(changed.fromStroke, changed.layout.strokes.slice(changed.fromStroke));
   let progress = engine.progress;
@@ -98,9 +98,9 @@ test('a paused pen that has not touched the sheet can change the entire layout w
   const { layout, engine } = pausedSheet('Hi.', page, 0.08);
   const before = engine.peek();
   assert.equal(engine.startedStrokeCount, 0);
-  const changed = restyleRemainingText('Hi.', layout, { ...page, style: 'print' }, 0);
+  const changed = restyleRemainingText('Hi.', layout, { ...page, style: 'pangolin' }, 0);
   assert.equal(changed.fromStroke, 0);
-  assert.deepEqual(changed.layout, layoutText('Hi.', { ...page, style: 'print' }));
+  assert.deepEqual(changed.layout, layoutText('Hi.', { ...page, style: 'pangolin' }));
   engine.replaceUnwrittenStrokes(0, changed.layout.strokes);
   assert.deepEqual(engine.peek(), before);
   engine.resume();
@@ -110,7 +110,7 @@ test('a paused pen that has not touched the sheet can change the entire layout w
 
 test('an already started last letter is retained in full rather than overwritten or discarded', () => {
   const { layout, engine } = pausedSheet('A');
-  const changed = restyleRemainingText('A', layout, { ...page, style: 'print' }, engine.startedStrokeCount);
+  const changed = restyleRemainingText('A', layout, { ...page, style: 'pangolin' }, engine.startedStrokeCount);
   assert.equal(changed.fromStroke, layout.strokes.length);
   assert.equal(changed.layout, layout);
 });
@@ -130,7 +130,7 @@ test('capacity failures are atomic and illegal replacements cannot erase an acti
 
 test('mixed-style whitespace and explicit line breaks remain bounded without losing text indexes', () => {
   const source = 'Hi\r\n\r\n  New words, gently.';
-  const { layout, engine } = pausedSheet(source, { ...page, style: 'print' }, 0.5);
+  const { layout, engine } = pausedSheet(source, { ...page, style: 'pangolin' }, 0.5);
   const changed = restyleRemainingText(source, layout, { ...page, style: 'correspondence' }, engine.startedStrokeCount);
   assert.equal(changed.layout.ok, true, changed.layout.error);
   const normalized = source.replace(/\r\n/g, '\n');

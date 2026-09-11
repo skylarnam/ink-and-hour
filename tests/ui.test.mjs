@@ -39,16 +39,27 @@ test('the mini-player is before the sound switch and includes transport labels a
   }
 });
 
-test('all 22 handwriting choices expose their source licenses and the inferred-order limitation', () => {
+test('all 34 approved handwriting choices expose their source licenses and the inferred-order limitation', () => {
   const html = renderUI();
   const selector = html.match(/<select id="style"[\s\S]*?<\/select>/)[0];
-  assert.equal((selector.match(/<option /g) ?? []).length, 22);
+  assert.equal((selector.match(/<option /g) ?? []).length, 34);
   for (const style of HANDWRITING_STYLES) {
     assert.ok(selector.includes(`value="${style.id}"`));
     assert.ok(html.includes(`href="${style.publicLicensePath}"`));
   }
   assert.ok(html.includes('id="handwriting-note"'));
   assert.ok(html.includes('inferred centerlines, not its outline'));
+});
+
+test('lettering controls describe their paper effect and expose left and center alignment', () => {
+  const html = renderUI();
+  assert.match(html, /role="group" aria-label="Lettering alignment"/);
+  assert.equal((html.match(/data-setting="textAlignment"/g) ?? []).length, 2);
+  for (const value of ['left', 'center']) assert.ok(html.includes(`data-setting="textAlignment" data-value="${value}"`));
+  for (const label of ['Smaller lettering', 'Larger lettering']) assert.ok(html.includes(`aria-label="${label}"`));
+  assert.match(html, /aria-controls="message desk-canvas"/);
+  assert.ok(html.includes('Pause to change handwriting, size or alignment'));
+  assert.ok(html.includes('Editor &amp; paper size'));
 });
 
 test('retired design pages and preview assets are removed, while shared editor fonts remain', () => {

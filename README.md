@@ -52,24 +52,30 @@ it in a terminal separates its lifetime from the agent's completed work.
 
 ## Settle in
 
-- Write an English note, choose one of **22 handwritings**, and
+- Write an English note, choose one of **34 handpicked handwritings**, and
   select **Begin writing**. Pause/resume preserves the exact writing position.
-  While paused, handwriting can change for the unwritten letters. A partially
-  written letter finishes in its original style; existing ink is never erased
+  While paused, handwriting and size can change for the unwritten letters. A partially
+  written letter finishes in its original style and size; existing ink is never erased
   or moved. The remaining text reflows within the page, and a choice that would
-  overflow is rejected without changing the sheet. Live style switching stays
+  overflow is rejected without changing the sheet or editor size. Lettering controls stay
   locked while the pen is moving.
-  Correspondence and Everyday print are joined by 20 locally bundled Google
+  Correspondence is joined by 33 locally bundled Google
   Fonts families. The editable text uses the selected handwriting's source font;
   the additional pen styles are interpreted centerline studies of those faces.
   **Write it again** replays a completed note. **Fresh sheet** clears the ink but
   keeps the words. **Keep this page** exports the completed sheet as a 1560 x 2080 PNG.
   When writing finishes, the pen lifts and settles beside the completed sheet.
-- The editor starts at a compact 18px for Correspondence and 16px for print.
-  Pinch over the textbox with a trackpad or two fingers to resize its text, or
-  use the keyboard-accessible **A- / A+** buttons. Display zoom is bounded to
-  75-200%, carries across handwriting choices, and resets on reload. It does
-  not change the written page, camera, or browser zoom. The textbox remains
+- The editor starts at a compact 18px for Correspondence, with calibrated
+  sizes for the other faces. Pinch over the textbox with a trackpad or two
+  fingers, or use **A- / A+**, to resize **both the editor and actual paper
+  lettering**. Size is bounded to 75-200% and scales letters, spaces and line
+  spacing, not the physical nib width. Larger lettering fits less on a sheet.
+  **Left** is the default alignment; **Center** centers each new line by its
+  actual ink bounds within the page margins. On a paused page, any line with
+  existing ink keeps its anchor; alignment applies to subsequent untouched lines.
+  A fresh sheet or replay applies the choices to the whole note.
+  Size and alignment carry across handwriting choices and are saved for the
+  next visit. They do not change camera or browser zoom. The textbox remains
   scrollable and resizable while its words are read-only during a run.
 - Drag to rotate, or turn on **Move** and hold-drag to pan a little across the
   desk. **Shift-drag** and **right-drag** also pan without switching modes.
@@ -85,7 +91,7 @@ it in a terminal separates its lifetime from the agent's completed work.
   and a **rainbow color picker** for a custom shade.
   Nib, ink, paper, and pace can change during writing. Existing ink keeps its
   color; new strokes use the new color. Text stays read-only during a run;
-  handwriting unlocks when paused.
+  handwriting, size and alignment unlock when paused.
   The custom shade persists. Cotton has warmer cellulose mottling, longer
   fibers, more matte relief, and slightly softer/wider absorbed ink; Smooth
   stays fine-grained and lightly finished.
@@ -129,9 +135,10 @@ it in a terminal separates its lifetime from the agent's completed work.
 ## Font shortlisting
 
 `font-review/index.html` is a self-contained, 100-row font comparison using
-"The quick brown fox jumps over the lazy dog." It includes the current 22
-styles and 78 additional licensed candidates. Every checkbox starts unchecked,
-including the current styles. Original font bytes, source links, checksums,
+"The quick brown fox jumps over the lazy dog." It retains all 100 candidates,
+including the original 22 and the 34 now applied to the website. Every checkbox
+originally started unchecked; the user's saved choices are preserved.
+Original font bytes, source links, checksums,
 and licenses are retained alongside `font-review/catalog.json`; the HTML also
 embeds the fonts and copyright/license notices.
 
@@ -141,7 +148,9 @@ Selections survive panel and app reloads, and the agent can read that file or
 the canvas's `read_selection` action after the user says they are done.
 Checking a font does **not** apply it to the website. The live collection stays
 unchanged until that confirmation, when only the checked candidates should be
-integrated.
+integrated. `font-review/applied-selection.json` records the approved 34 IDs
+and source revision used for the current collection. Later checkbox changes
+do not silently alter the app.
 
 The standalone HTML file also offers **Download selections**, since an ordinary
 browser tab cannot automatically write its sibling JSON file. Automatic saving
@@ -162,26 +171,30 @@ the polylines gently without replacing their stroke order, lays out finite
 pages, then advances along their arc lengths. The same live point drives both
 new ink segments and the 3D nib tip.
 
-The editor's two local OpenType font faces are generated from those same
-public-domain centerlines, so selecting a style changes the actual editable
-letterforms, not just an italic CSS treatment. These static outline fonts are
-only for the text editor; the pen still uses stroke-order playback. Regenerate
-the checked-in font assets with `npm run fonts`.
+The Correspondence editor face is generated from those same public-domain
+centerlines, not just an italic CSS treatment. The original Everyday print
+data and editor font remain available for review/provenance but are not an
+active writing choice. These static outline fonts are only for the text editor;
+the pen still uses stroke-order playback. Regenerate the original two editor
+font assets with `npm run fonts`.
 
-The 20 additional families come from Google's official `google/fonts`
+The 33 selected additional families come from Google's official `google/fonts`
 repository under OFL-1.1 or Apache-2.0; each unmodified TTF and its own license
 is bundled. An offline generator rasterizes glyphs, thins them to centerlines,
 prunes tiny spurs, infers connected writing trails, and simplifies the paths.
-The derived datasets are named **Ink Stroke Study 01-20**, distinct from the
+The derived datasets have separate **Ink Stroke Study** names, distinct from the
 original source-font names. Their selected family names identify the source
 shown in the editor. Actual pen playback draws these generated centerlines,
 not outlines, a typeset reveal, or a motion unrelated to the ink.
 
 Stroke order in an ordinary font is **inferred**, not recorded by its designer.
 Some shared branches are retraced; completed trails are not gratuitously traced
-back to their start. Tiny periods/colon in Coming Soon and a period in Schoolbell
-use explicit short punctuation strokes. No added family silently falls back to
-another font. The source versions, SHA-256 checksums, and individual license paths
+back to their start. Tiny-glyph interpretations are recorded in the attribution
+data. Italianno's original font has a blank underscore: its editor face excludes
+that character so the system-serif fallback keeps it visible, while the pen
+uses a documented reconstruction from that font's own underline metrics.
+The original font bytes remain unmodified; no whole handwriting is substituted.
+The source versions, SHA-256 checksums, and individual license paths
 are recorded in `public/data/HANDWRITING-ATTRIBUTION.json`.
 
 Offline regeneration (not part of the production build):
@@ -191,9 +204,17 @@ node --experimental-strip-types scripts/generate-handwriting-data.ts
 node --experimental-strip-types scripts/render-handwriting-contact-sheet.ts /tmp/ink-hour-font-studies
 ```
 
-`scripts/fetch-handwriting-fonts.ts` is an opt-in source update command; it
-downloads the upstream source fonts/licenses again and overwrites those named
-assets. Review changes and regenerate the stroke data after an intentional update.
+Existing selected centerlines are preserved by default. Use `--regenerate ID`
+to deliberately retrace an approved face. Changed source bytes require a
+refreshed catalog and explicit approval snapshot before generation will proceed.
+`scripts/apply-font-selection.ts` requires both the approved `--revision` and
+`--sha256`; it never follows a changing checklist implicitly.
+
+`scripts/fetch-handwriting-fonts.ts` is an opt-in upstream source update command;
+it uses the catalog's original filenames even when the local copy was renamed.
+Use `--dry-run` to list its URLs without network or file changes. Without that
+flag it overwrites those named assets; review source/license changes and update
+the approval metadata before intentionally regenerating the stroke data.
 
 Pointed flex width is pressure/downstroke-sensitive; broad-edge width depends
 on the relationship between a fixed edge angle and stroke direction. Fine is
@@ -227,8 +248,8 @@ fallbacks; playback intent is not stored.
   only. Unsupported characters get a visible error; they are never discarded.
   There is a 420-character input ceiling and a stricter physical sheet-capacity
   check. Words and long unbroken text wrap; there is no automatic second page.
-- These are 22 curated styles, not arbitrary font imports. The original two
-  use historical ordered centerlines; the added 20 approximate font shapes and
+- These are 34 user-selected styles, not arbitrary font imports. Correspondence
+  uses historical ordered centerlines; the other 33 approximate font shapes and
   infer their writing order. They are not recordings of a calligrapher's motion.
   Some letters use several lifts or shared-stem retracing, and script letters
   are not continuously connected across every character boundary.
@@ -242,7 +263,7 @@ fallbacks; playback intent is not stored.
 - The outdoor view is a lightweight, depth-compressed procedural landscape,
   not a scanned forest, volumetric sky, or physical rain/refraction simulation.
 - A page is kept only for the current browser session unless exported. Material,
-  room, time, pace, and volume preferences persist, but text and ink do not.
+  room, time, pace, lettering and volume preferences persist, but text and ink do not.
 - WebGL rendering and dynamic ink textures can be demanding on older phones.
   Camera travel is constrained to avoid looking through the room walls.
 

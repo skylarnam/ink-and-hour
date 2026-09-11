@@ -1,0 +1,155 @@
+import { createHash } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import opentype from 'opentype.js';
+import { HANDWRITING_STYLES } from '../src/handwriting.ts';
+import { projectFile, readCatalog, validateSelection } from '../font-review/store.mjs';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const { values } = parseArgs({
+  options: { revision: { type: 'string' }, sha256: { type: 'string' }, 'dry-run': { type: 'boolean' } },
+});
+if (!values.revision || !/^\d+$/.test(values.revision) || !/^[a-f0-9]{64}$/.test(values.sha256 ?? '')) {
+  throw new Error('Explicit approval required: --revision NUMBER --sha256 APPROVED_SELECTION_SHA256 [--dry-run].');
+}
+const hash = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const selectionPath = join(root, 'font-review/selection.json');
+const approvedBytes = readFileSync(selectionPath);
+if (hash(approvedBytes) !== values.sha256) throw new Error('The selection changed since approval; nothing was applied.');
+const catalog = await readCatalog(root);
+const selection = validateSelection(JSON.parse(approvedBytes.toString('utf8')), catalog);
+if (selection.revision !== Number(values.revision)) throw new Error('The approved selection revision does not match.');
+if (selection.selected[0] !== 'correspondence') throw new Error('Correspondence must remain the selected default.');
+
+const blockFaces = new Set(['delius-unicase', 'gochi-hand', 'nanum-pen-script', 'pangolin', 'rock-salt', 'walter-turncoat']);
+const scriptFaces = new Set([
+  'alex-brush', 'allura', 'charm', 'cookie', 'dancing-script', 'great-vibes', 'italianno',
+  'kaushan-script', 'meddon', 'meie-script', 'monsieur-la-doulaise', 'mr-dafoe',
+  'ms-madi', 'oooh-baby', 'ruthie', 'style-script', 'whisper', 'windsong',
+]);
+const existing = new Map<string, (typeof HANDWRITING_STYLES)[number]>(
+  HANDWRITING_STYLES.map((style) => [style.id, style]),
+);
+const candidates = selection.selected.map((id: string) => catalog.candidates.find((candidate) => candidate.id === id));
+const copies: Array<{ source: string; destination: string }> = [];
+const measurements: Array<{ id: string; sourceXHeight: number; editorSize: number; editorSizeReason: string }> = [];
+const weights = new Map<string, string>();
+const styles = candidates.map((candidate) => {
+  const bytes = readFileSync(projectFile(root, candidate.fontFile));
+  const license = readFileSync(projectFile(root, candidate.licenseFile));
+  if (hash(bytes) !== candidate.fontSha256 || hash(license) !== candidate.licenseSha256) {
+    throw new Error(`Source or license bytes changed for ${candidate.id}; nothing was applied.`);
+  }
+  const font = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  if (font.names.fontFamily.en !== candidate.family) throw new Error(`Original family mismatch for ${candidate.id}.`);
+  for (let code = 32; code <= 126; code++) {
+    if (!font.charToGlyphIndex(String.fromCharCode(code))) throw new Error(`${candidate.id} is missing ASCII ${code}.`);
+  }
+  const { yMin, yMax } = font.charToGlyph('x').getMetrics();
+  const sourceXHeight = (yMax - yMin) / font.unitsPerEm;
+  if (!Number.isFinite(sourceXHeight) || sourceXHeight <= 0) throw new Error(`Invalid x-height for ${candidate.id}.`);
+  const weight = font.tables.fvar?.axes.find((axis) => axis.tag === 'wght');
+  weights.set(candidate.id, weight ? `${weight.minValue} ${weight.maxValue}` : '400');
+  const retained = existing.get(candidate.id);
+  const editorSize = retained?.editorSize ?? Math.min(26, Math.max(16, Math.round(9 / sourceXHeight)));
+  measurements.push({
+    id: candidate.id, sourceXHeight, editorSize,
+    editorSizeReason: retained ? 'Existing selected editor size preserved.'
+      : 'Targets a 9px source x-height, rounded to whole pixels and clamped to 16–26px.',
+  });
+  if (retained) return retained;
+  if (!blockFaces.has(candidate.id) && !scriptFaces.has(candidate.id)) {
+    throw new Error(`Classify ${candidate.id} as script or hand print before applying it.`);
+  }
+  const publicFontPath = `/fonts/${candidate.id}/${basename(candidate.fontFile)}`;
+  const publicLicensePath = `/fonts/${candidate.id}/${basename(candidate.licenseFile)}`;
+  copies.push(
+    { source: candidate.fontFile, destination: `public${publicFontPath}` },
+    { source: candidate.licenseFile, destination: `public${publicLicensePath}` },
+  );
+  return {
+    id: candidate.id, label: candidate.label, family: candidate.family, editorSize,
+    script: scriptFaces.has(candidate.id), source: candidate.source, license: candidate.license,
+    publicFontPath, publicLicensePath,
+    notes: 'Centerline strokes are inferred offline from the original Google Fonts outlines; stroke order is heuristic.',
+  };
+});
+
+const registry = `// Generated by scripts/apply-font-selection.ts from an explicitly approved snapshot, not live checkboxes.
+export const HANDWRITING_STYLES = ${JSON.stringify(styles, null, 2)} as const;
+
+export type HandwritingId = typeof HANDWRITING_STYLES[number]['id'];
+
+export const HANDWRITING_IDS: readonly HandwritingId[] = HANDWRITING_STYLES.map((style) => style.id);
+
+const HANDWRITING_STYLE_LOOKUP = new Map<string, (typeof HANDWRITING_STYLES)[number]>(
+  HANDWRITING_STYLES.map((style) => [style.id, style]),
+);
+
+export function isHandwritingId(value: string): value is HandwritingId {
+  return HANDWRITING_STYLE_LOOKUP.has(value);
+}
+
+export function handwritingStyle(id: HandwritingId): (typeof HANDWRITING_STYLES)[number] {
+  const style = HANDWRITING_STYLE_LOOKUP.get(id);
+  if (!style) throw new Error(\`Unknown handwriting: \${id}\`);
+  return style;
+}
+`;
+// Italianno's mapped underscore has no outline. Let the editor's serif fallback render that character.
+const css = styles.map((style) => `@font-face {
+  font-family: ${JSON.stringify(style.family)};
+  src: url(${JSON.stringify(style.publicFontPath)}) format("${extname(style.publicFontPath) === '.otf' ? 'opentype' : 'truetype'}");
+  font-style: normal;
+  font-weight: ${weights.get(style.id)};
+  font-display: swap;${style.id === 'italianno' ? '\n  unicode-range: U+0000-005E, U+0060-10FFFF;' : ''}
+}
+`).join('\n');
+const selected = new Set(selection.selected);
+const updatedCatalog = {
+  ...catalog,
+  candidates: catalog.candidates.map((candidate) => ({ ...candidate, current: selected.has(candidate.id) })),
+};
+const snapshotPath = join(root, 'font-review/applied-selection.json');
+const previousSnapshot = existsSync(snapshotPath) ? JSON.parse(readFileSync(snapshotPath, 'utf8')) : null;
+const existingData = JSON.parse(readFileSync(join(root, 'src/writing/handwriting-fonts.json'), 'utf8'));
+const snapshot = previousSnapshot?.sourceSha256 === values.sha256 ? previousSnapshot : {
+  version: 1,
+  source: 'font-review/selection.json',
+  sourceRevision: selection.revision,
+  sourceSha256: values.sha256,
+  sourceUpdatedAt: selection.updatedAt,
+  appliedAt: new Date().toISOString(),
+  default: 'correspondence',
+  selected: selection.selected,
+  retained: styles.filter((style) => existing.has(style.id)).map((style) => style.id),
+  added: styles.filter((style) => !existing.has(style.id)).map((style) => style.id),
+  legacySourceSha256: hash(readFileSync(join(root, 'src/writing/fonts.json'))),
+  preservedCenterlines: styles.filter((style) => existingData[style.id]).map((style) => ({
+    id: style.id, sha256: hash(JSON.stringify(existingData[style.id])),
+  })),
+  fonts: styles.map((style, index) => ({
+    ...measurements[index], family: style.family, script: style.script,
+    fontFile: candidates[index].fontFile, fontSha256: candidates[index].fontSha256,
+    licenseFile: candidates[index].licenseFile, licenseSha256: candidates[index].licenseSha256,
+    publicFontPath: style.publicFontPath, publicLicensePath: style.publicLicensePath,
+  })),
+};
+if (!readFileSync(selectionPath).equals(approvedBytes)) throw new Error('The selection changed during validation; nothing was applied.');
+if (values['dry-run']) {
+  console.log(`Verified revision ${selection.revision}: ${styles.length} approved faces, ${copies.length / 2} new local font/license pairs.`);
+} else {
+  for (const { source, destination } of copies) {
+    const path = projectFile(root, destination);
+    mkdirSync(dirname(path), { recursive: true });
+    copyFileSync(projectFile(root, source), path);
+  }
+  writeFileSync(join(root, 'src/handwriting.ts'), registry);
+  writeFileSync(join(root, 'src/fonts.css'), css);
+  writeFileSync(join(root, 'font-review/catalog.json'), `${JSON.stringify(updatedCatalog, null, 2)}\n`);
+  writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+  if (!readFileSync(selectionPath).equals(approvedBytes)) throw new Error('The live checklist changed during application; the approved snapshot was applied, not the later changes.');
+  console.log(`Applied revision ${selection.revision}: ${styles.length} faces. Selection bytes were preserved. Generate centerlines and rebuild the font review next.`);
+}

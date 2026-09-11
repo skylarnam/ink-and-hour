@@ -1,10 +1,816 @@
 {
+  "version": 2,
   "method": "Unmodified source fonts; offline inferred centerlines with separately named stroke studies.",
-  "modified": "Stroke order is inferred. Short shared branches can be retraced; no glyph outlines are drawn.",
-  "tinyPunctuationFallbacks": [
-    "coming-soon:.",
-    "coming-soon::",
-    "schoolbell:."
+  "modified": "Stroke order is heuristic, not recovered human ductus. Short shared branches can be retraced; no glyph outlines or typeset reveals are drawn.",
+  "sourceSelection": {
+    "file": "font-review/applied-selection.json",
+    "revision": 34,
+    "sha256": "e85ec45ab27add6229642bf8a50fa1219be25c0f464b498339e55e6f1ca15658"
+  },
+  "generation": {
+    "method": "Rasterized original outlines, Zhang-Suen medial-axis thinning, source-component preservation, graph traversal and polyline simplification.",
+    "rasterXHeight": 144,
+    "adaptiveRasterXHeights": [
+      288,
+      576
+    ],
+    "legacyRasterXHeight": 72,
+    "printableNonSpaceAsciiGlyphs": 94,
+    "arbitraryMissingGlyphFallbacks": false,
+    "blankSourceOutlines": [
+      "italianno:_"
+    ],
+    "sourceMetricReconstruction": "Only Italianno underscore: its mapped source glyph is empty, so its own advance and post-table underline metrics provide an explicitly attributed centerline.",
+    "compactMarks": "Only compact filled source components without a traversable skeleton use an attributed short interior principal-axis stroke. Other failures abort generation.",
+    "newStudySizing": "Natural script/print scales are capped by all 94 glyphs’ vertical extents to leave at least eight writing-canvas units between lines. Existing selected study metrics remain exact."
+  },
+  "tinyPunctuationFallbacks": [],
+  "approximations": [
+    {
+      "id": "nothing-you-could-do",
+      "character": "!",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 8.8056,
+        "yMin": 1.4722,
+        "xMax": 66.8611,
+        "yMax": 82.75
+      },
+      "stroke": "M1.06,15.44 L1.13,15.44"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "character": "%",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 63.25,
+        "yMin": 472.1111,
+        "xMax": 115.5,
+        "yMax": 518.5556
+      },
+      "stroke": "M2.28,4.2 L2.35,4.2"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "character": "%",
+      "component": 2,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 225.8056,
+        "yMin": 106.3611,
+        "xMax": 278.0556,
+        "yMax": 152.8056
+      },
+      "stroke": "M6.36,13.39 L6.44,13.39"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "character": ":",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 26.8056,
+        "yMin": 284.1389,
+        "xMax": 84.8611,
+        "yMax": 348
+      },
+      "stroke": "M1.51,8.63 L1.58,8.63"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "character": ":",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 26.8056,
+        "yMin": -0.3333,
+        "xMax": 90.6667,
+        "yMax": 57.7222
+      },
+      "stroke": "M1.51,15.78 L1.58,15.78"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "character": ";",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 40.0556,
+        "yMin": 319.5556,
+        "xMax": 86.5,
+        "yMax": 366
+      },
+      "stroke": "M1.7,7.74 L1.77,7.74"
+    },
+    {
+      "id": "reenie-beanie",
+      "character": ".",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 38,
+        "yMin": 35,
+        "xMax": 100.3333,
+        "yMax": 103
+      },
+      "stroke": "M1.82,14.87 L1.89,14.87"
+    },
+    {
+      "id": "reenie-beanie",
+      "character": ":",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 60,
+        "yMin": 250,
+        "xMax": 122.3333,
+        "yMax": 318
+      },
+      "stroke": "M2.38,9.34 L2.46,9.34"
+    },
+    {
+      "id": "reenie-beanie",
+      "character": ";",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 55,
+        "yMin": 232,
+        "xMax": 117.3333,
+        "yMax": 300
+      },
+      "stroke": "M2.11,9.8 L2.18,9.8"
+    },
+    {
+      "id": "cedarville-cursive",
+      "character": "!",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 33.75,
+        "yMin": 2.3333,
+        "xMax": 98.8333,
+        "yMax": 55.5833
+      },
+      "stroke": "M1.67,15.86 L1.74,15.86"
+    },
+    {
+      "id": "cedarville-cursive",
+      "character": ":",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 88.6667,
+        "yMin": 68.1667,
+        "xMax": 218.8333,
+        "yMax": 210.1667
+      },
+      "stroke": "M3.75,13.22 L3.83,13.22"
+    },
+    {
+      "id": "cedarville-cursive",
+      "character": "j",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 53.9167,
+        "yMin": 331.8333,
+        "xMax": 113.0833,
+        "yMax": 391
+      },
+      "stroke": "M2.02,7.59 L2.09,7.59"
+    },
+    {
+      "id": "dawning-of-a-new-day",
+      "character": ":",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 32,
+        "yMin": 63.5556,
+        "xMax": 83.875,
+        "yMax": 109.6667
+      },
+      "stroke": "M1.5,14.31 L1.58,14.31"
+    },
+    {
+      "id": "dawning-of-a-new-day",
+      "character": ";",
+      "component": 0,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 85,
+        "yMin": 54.6528,
+        "xMax": 125.3472,
+        "yMax": 95
+      },
+      "stroke": "M2.7,14.68 L2.77,14.68"
+    },
+    {
+      "id": "give-you-glory",
+      "character": "!",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 36.125,
+        "yMin": 5.375,
+        "xMax": 117.375,
+        "yMax": 94.75
+      },
+      "stroke": "M1.34,15.53 L1.41,15.53"
+    },
+    {
+      "id": "give-you-glory",
+      "character": "?",
+      "component": 1,
+      "method": "preserved-v1-raster-singleton",
+      "reason": "Existing selected data is preserved exactly: the original generator represented this source skeleton pixel by a half-pixel mark.",
+      "rasterXHeight": 72,
+      "sourceBounds": {
+        "xMin": 258.5,
+        "yMin": -4.25,
+        "xMax": 339.75,
+        "yMax": 93.25
+      },
+      "stroke": "M5.48,15.7 L5.55,15.7"
+    },
+    {
+      "id": "alex-brush",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 77,
+        "yMin": 1.9444,
+        "xMax": 156.1389,
+        "yMax": 66.6944
+      },
+      "stroke": "M1.995,15.762 L2.712,15.832"
+    },
+    {
+      "id": "cookie",
+      "character": ".",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 28,
+        "yMin": -18.5417,
+        "xMax": 124.3542,
+        "yMax": 70
+      },
+      "stroke": "M1.583,16.031 L2.74,15.536"
+    },
+    {
+      "id": "cookie",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 69,
+        "yMin": 266.4583,
+        "xMax": 165.3542,
+        "yMax": 355
+      },
+      "stroke": "M2.731,8.051 L3.888,7.556"
+    },
+    {
+      "id": "delius-unicase",
+      "character": ":",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 81,
+        "yMin": -7.9444,
+        "xMax": 194.1667,
+        "yMax": 116
+      },
+      "stroke": "M1.753,16.14 L1.938,15.384"
+    },
+    {
+      "id": "delius-unicase",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 166.3889,
+        "yMin": -15.3889,
+        "xMax": 274.1667,
+        "yMax": 113.9444
+      },
+      "stroke": "M2.944,16.224 L3.071,15.448"
+    },
+    {
+      "id": "great-vibes",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 79,
+        "yMin": -13.375,
+        "xMax": 163.1736,
+        "yMax": 68.0833
+      },
+      "stroke": "M2.833,16.081 L3.673,15.469"
+    },
+    {
+      "id": "great-vibes",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 181.3264,
+        "yMin": 209.8264,
+        "xMax": 265.5,
+        "yMax": 294
+      },
+      "stroke": "M5.596,10.105 L6.362,9.349"
+    },
+    {
+      "id": "great-vibes",
+      "character": ";",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 182.0486,
+        "yMin": 209.8264,
+        "xMax": 266.2222,
+        "yMax": 294
+      },
+      "stroke": "M5.616,10.106 L6.387,9.352"
+    },
+    {
+      "id": "great-vibes",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 131.7153,
+        "yMin": -14.2431,
+        "xMax": 215.8889,
+        "yMax": 67.2153
+      },
+      "stroke": "M4.225,16.135 L5.038,15.42"
+    },
+    {
+      "id": "italianno",
+      "character": "_",
+      "component": 0,
+      "method": "source-underline-metrics",
+      "reason": "The unmodified Italianno source maps underscore to an empty outline. This one centerline is reconstructed from that glyph’s original advance and the font’s own post-table underline position and thickness, not from an unrelated glyph or arbitrary coordinates.",
+      "rasterXHeight": null,
+      "sourceBounds": {
+        "xMin": 0,
+        "xMax": 846,
+        "yMin": -109.5,
+        "yMax": -94.5
+      },
+      "sourceMetrics": {
+        "underlinePosition": -102,
+        "underlineThickness": 15,
+        "advanceWidth": 846
+      },
+      "stroke": "M0,20.452 L32.779,20.452"
+    },
+    {
+      "id": "kaushan-script",
+      "character": "%",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 228.1042,
+        "yMin": 486.0278,
+        "xMax": 380.0625,
+        "yMax": 648.8403
+      },
+      "stroke": "M6.128,5.82 L6.151,4.372"
+    },
+    {
+      "id": "kaushan-script",
+      "character": "%",
+      "component": 2,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 484.9861,
+        "yMin": 98.8958,
+        "xMax": 636.9444,
+        "yMax": 265.3264
+      },
+      "stroke": "M11.325,12.098 L11.36,13.578"
+    },
+    {
+      "id": "ms-madi",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 69,
+        "yMin": 1.4097,
+        "xMax": 140.8958,
+        "yMax": 69.8819
+      },
+      "stroke": "M1.971,15.975 L2.499,15.543"
+    },
+    {
+      "id": "ms-madi",
+      "character": ".",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 53,
+        "yMin": -9.4722,
+        "xMax": 121.4722,
+        "yMax": 59
+      },
+      "stroke": "M1.727,15.68 L1.999,16.29"
+    },
+    {
+      "id": "ms-madi",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 94.3542,
+        "yMin": 189.5278,
+        "xMax": 162.8264,
+        "yMax": 258
+      },
+      "stroke": "M2.509,11.493 L2.944,12.006"
+    },
+    {
+      "id": "ms-madi",
+      "character": ":",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 43,
+        "yMin": 1.2292,
+        "xMax": 111.4722,
+        "yMax": 69.7014
+      },
+      "stroke": "M1.562,16.072 L1.733,15.432"
+    },
+    {
+      "id": "ms-madi",
+      "character": ";",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 93.9792,
+        "yMin": 189.5278,
+        "xMax": 162.4514,
+        "yMax": 258
+      },
+      "stroke": "M2.683,12.078 L2.765,11.426"
+    },
+    {
+      "id": "ms-madi",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 151,
+        "yMin": -9.6389,
+        "xMax": 219.4722,
+        "yMax": 58.8333
+      },
+      "stroke": "M3.807,16.283 L4.114,15.694"
+    },
+    {
+      "id": "nanum-pen-script",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 103,
+        "yMin": 399.9444,
+        "xMax": 211.3611,
+        "yMax": 503.6944
+      },
+      "stroke": "M4.253,1.94 L5.691,2.476"
+    },
+    {
+      "id": "oooh-baby",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 60,
+        "yMin": -7.1667,
+        "xMax": 110.75,
+        "yMax": 43.5833
+      },
+      "stroke": "M2.092,16.318 L2.329,15.742"
+    },
+    {
+      "id": "oooh-baby",
+      "character": ".",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 50,
+        "yMin": 1.25,
+        "xMax": 100.75,
+        "yMax": 52
+      },
+      "stroke": "M1.845,16.108 L2.077,15.531"
+    },
+    {
+      "id": "oooh-baby",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 114.8472,
+        "yMin": 196.25,
+        "xMax": 165.5972,
+        "yMax": 247
+      },
+      "stroke": "M3.363,10.962 L3.892,10.589"
+    },
+    {
+      "id": "oooh-baby",
+      "character": ":",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 50,
+        "yMin": 1.7083,
+        "xMax": 103.5694,
+        "yMax": 52.4583
+      },
+      "stroke": "M1.672,15.914 L2.276,15.73"
+    },
+    {
+      "id": "oooh-baby",
+      "character": ";",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 114.4444,
+        "yMin": 196.25,
+        "xMax": 168.0139,
+        "yMax": 247
+      },
+      "stroke": "M3.362,10.961 L3.894,10.593"
+    },
+    {
+      "id": "oooh-baby",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 80,
+        "yMin": -0.1944,
+        "xMax": 133.5694,
+        "yMax": 50.5556
+      },
+      "stroke": "M2.452,15.954 L3.037,15.708"
+    },
+    {
+      "id": "pangolin",
+      "character": ".",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 47,
+        "yMin": 4,
+        "xMax": 151,
+        "yMax": 112
+      },
+      "stroke": "M1.654,15.022 L1.969,15.849"
+    },
+    {
+      "id": "pangolin",
+      "character": ";",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 76,
+        "yMin": 358,
+        "xMax": 180,
+        "yMax": 454
+      },
+      "stroke": "M1.898,9.171 L2.734,9.058"
+    },
+    {
+      "id": "pangolin",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 119,
+        "yMin": 13,
+        "xMax": 215,
+        "yMax": 93
+      },
+      "stroke": "M2.67,15.582 L3.452,15.5"
+    },
+    {
+      "id": "style-script",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 99,
+        "yMin": -5.0625,
+        "xMax": 193.2708,
+        "yMax": 89.2083
+      },
+      "stroke": "M2.566,15.99 L3.108,15.353"
+    },
+    {
+      "id": "style-script",
+      "character": ".",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 78,
+        "yMin": -3.2708,
+        "xMax": 172.2708,
+        "yMax": 91
+      },
+      "stroke": "M2.143,15.375 L2.727,15.959"
+    },
+    {
+      "id": "style-script",
+      "character": ":",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 103.7708,
+        "yMin": 268.7292,
+        "xMax": 198.0417,
+        "yMax": 363
+      },
+      "stroke": "M2.644,10.111 L3.225,10.7"
+    },
+    {
+      "id": "style-script",
+      "character": "i",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 70.7917,
+        "yMin": 507.7292,
+        "xMax": 165.0625,
+        "yMax": 602
+      },
+      "stroke": "M1.963,5.531 L2.631,6.041"
+    },
+    {
+      "id": "style-script",
+      "character": "j",
+      "component": 0,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 65.5625,
+        "yMin": 507.7292,
+        "xMax": 163.6042,
+        "yMax": 602
+      },
+      "stroke": "M1.828,5.6 L2.575,5.973"
+    },
+    {
+      "id": "walter-turncoat",
+      "character": "!",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 80.4444,
+        "yMin": -7.7778,
+        "xMax": 181.5556,
+        "yMax": 85.5556
+      },
+      "stroke": "M2.049,15.941 L2.803,15.471"
+    },
+    {
+      "id": "walter-turncoat",
+      "character": "?",
+      "component": 1,
+      "method": "compact-source-principal-axis",
+      "reason": "The filled compact source component thins to a point or disappears. A short interior stroke follows its raster centroid and principal axis; no missing-glyph replacement is used.",
+      "rasterXHeight": 144,
+      "sourceBounds": {
+        "xMin": 127.7778,
+        "yMin": -8,
+        "xMax": 240.5556,
+        "yMax": 104.7778
+      },
+      "stroke": "M3.138,15.258 L3.862,15.909"
+    }
+  ],
+  "originals": [
+    {
+      "id": "correspondence",
+      "sourceFamily": "Ink Correspondence",
+      "source": "https://raw.githubusercontent.com/techninja/hersheytextjs/master/hersheytext.min.json",
+      "license": "Public domain",
+      "font": "/fonts/ink-correspondence.otf",
+      "fontSha256": "7500105c8d81acc4e2d9c3552daa763dacc0a9e503e58270019d454d570b9a35",
+      "licenseFile": "/data/HERSHEY-ATTRIBUTION.txt",
+      "licenseSha256": "83392d7915fa91d9ae35336b5e0486817a36de52350f51c81c6c61830c3daeba",
+      "data": "src/writing/fonts.json",
+      "dataSha256": "251bd6a71876eb735e78744bdf98fd445c7b78a43dbeeeb1a2f045f796930098",
+      "method": "Original ordered Hershey Correspondence centerlines preserved exactly."
+    }
   ],
   "fonts": [
     {
@@ -16,40 +822,12 @@
       "font": "/fonts/caveat/Caveat[wght].ttf",
       "fontSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
       "licenseFile": "/fonts/caveat/OFL.txt",
-      "licenseSha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b"
-    },
-    {
-      "id": "patrick-hand",
-      "sourceFamily": "Patrick Hand",
-      "strokeStudy": "Ink Stroke Study 02",
-      "source": "https://github.com/google/fonts/tree/main/ofl/patrickhand",
-      "license": "OFL-1.1",
-      "font": "/fonts/patrickhand/PatrickHand-Regular.ttf",
-      "fontSha256": "0f173b3e6cb6d1af25babf7f0057c5ac4ee11f9992b0469bb817e967ef4ad0fc",
-      "licenseFile": "/fonts/patrickhand/OFL.txt",
-      "licenseSha256": "377f4f9c19e935228552478eb68cc2ed82910988a60ba60e2ac73b09f32d02d1"
-    },
-    {
-      "id": "handlee",
-      "sourceFamily": "Handlee",
-      "strokeStudy": "Ink Stroke Study 03",
-      "source": "https://github.com/google/fonts/tree/main/ofl/handlee",
-      "license": "OFL-1.1",
-      "font": "/fonts/handlee/Handlee-Regular.ttf",
-      "fontSha256": "7b99c0f291b5d52e06c66498a1d0dd6dff45a32e32d13be089c60d2d8dc00445",
-      "licenseFile": "/fonts/handlee/OFL.txt",
-      "licenseSha256": "5f1f5510eff7922864bf326ffa1d4a62f01add5193e9367b542378e5a808b500"
-    },
-    {
-      "id": "indie-flower",
-      "sourceFamily": "Indie Flower",
-      "strokeStudy": "Ink Stroke Study 04",
-      "source": "https://github.com/google/fonts/tree/main/ofl/indieflower",
-      "license": "OFL-1.1",
-      "font": "/fonts/indieflower/IndieFlower-Regular.ttf",
-      "fontSha256": "ccc94b22b156e9c5dfe50fd051f01b097600b252c24473e624bb43a143140a94",
-      "licenseFile": "/fonts/indieflower/OFL.txt",
-      "licenseSha256": "d9cdb075679d15a99bab2a8541b9c4fdc71347502111fbe9affd1d462219d96b"
+      "licenseSha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b",
+      "centerlineSha256": "7f2f7018b4cea3512d7adefed54281b6089dc9c9280c772296385edb04361b46",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "kalam",
@@ -60,62 +838,12 @@
       "font": "/fonts/kalam/Kalam-Regular.ttf",
       "fontSha256": "57cecb63d4608019371954274ae1d8c397764debd5b19d4a33c1efa4dc923c0b",
       "licenseFile": "/fonts/kalam/OFL.txt",
-      "licenseSha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f"
-    },
-    {
-      "id": "shadows-into-light",
-      "sourceFamily": "Shadows Into Light",
-      "strokeStudy": "Ink Stroke Study 06",
-      "source": "https://github.com/google/fonts/tree/main/ofl/shadowsintolight",
-      "license": "OFL-1.1",
-      "font": "/fonts/shadowsintolight/ShadowsIntoLight.ttf",
-      "fontSha256": "1347863151acdc00fa281daaba1a3543dbce5870b55f9cf7479a15bb84007681",
-      "licenseFile": "/fonts/shadowsintolight/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
-    },
-    {
-      "id": "shadows-into-light-two",
-      "sourceFamily": "Shadows Into Light Two",
-      "strokeStudy": "Ink Stroke Study 07",
-      "source": "https://github.com/google/fonts/tree/main/ofl/shadowsintolighttwo",
-      "license": "OFL-1.1",
-      "font": "/fonts/shadowsintolighttwo/ShadowsIntoLightTwo-Regular.ttf",
-      "fontSha256": "d2540170b1b1df3094de433b4632755ba91ecb65626202a3c8affd2245e08405",
-      "licenseFile": "/fonts/shadowsintolighttwo/OFL.txt",
-      "licenseSha256": "6a28d4d5d8b4d1ea89ace5a047ac6e0de182acdb8bfa22897bf7702102094f69"
-    },
-    {
-      "id": "coming-soon",
-      "sourceFamily": "Coming Soon",
-      "strokeStudy": "Ink Stroke Study 08",
-      "source": "https://github.com/google/fonts/tree/main/apache/comingsoon",
-      "license": "Apache-2.0",
-      "font": "/fonts/comingsoon/ComingSoon-Regular.ttf",
-      "fontSha256": "cf81388f587ff6122de1a705d1070b8f00abccdba66108509908b5d10715068c",
-      "licenseFile": "/fonts/comingsoon/LICENSE.txt",
-      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-    },
-    {
-      "id": "schoolbell",
-      "sourceFamily": "Schoolbell",
-      "strokeStudy": "Ink Stroke Study 09",
-      "source": "https://github.com/google/fonts/tree/main/apache/schoolbell",
-      "license": "Apache-2.0",
-      "font": "/fonts/schoolbell/Schoolbell-Regular.ttf",
-      "fontSha256": "00ff6655a5eb1eb70d32f2b7351d1bcf3f45f3f9ca40fd5c0d25da79f7f82a50",
-      "licenseFile": "/fonts/schoolbell/LICENSE.txt",
-      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-    },
-    {
-      "id": "architects-daughter",
-      "sourceFamily": "Architects Daughter",
-      "strokeStudy": "Ink Stroke Study 10",
-      "source": "https://github.com/google/fonts/tree/main/ofl/architectsdaughter",
-      "license": "OFL-1.1",
-      "font": "/fonts/architectsdaughter/ArchitectsDaughter-Regular.ttf",
-      "fontSha256": "6159718a08898e34bc1cb7354086141a5f9a70b73e54dbec27ead0d59a697359",
-      "licenseFile": "/fonts/architectsdaughter/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f",
+      "centerlineSha256": "441df035805589f7865e9fbda4f6b845f389c09794ca375f5c58b47cc9bbb319",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "nothing-you-could-do",
@@ -126,7 +854,12 @@
       "font": "/fonts/nothingyoucoulddo/NothingYouCouldDo.ttf",
       "fontSha256": "1daf8cf79076bf59c5a9117b5efd6ecea35e57a05ef127fe4f95b072b8a5245d",
       "licenseFile": "/fonts/nothingyoucoulddo/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485",
+      "centerlineSha256": "1f9432eca3b30766d8b3ae323e2a837a08bfe0dc98b1bf78dedb4232d8bc2060",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "reenie-beanie",
@@ -137,7 +870,12 @@
       "font": "/fonts/reeniebeanie/ReenieBeanie.ttf",
       "fontSha256": "0ea608aa325bf9e11c9590cc0b63dcf7cd215e270784f1ebbe6fad4927b31ff8",
       "licenseFile": "/fonts/reeniebeanie/OFL.txt",
-      "licenseSha256": "fbb941b371c6348ee2572ce8c78fb66128a61885f960dec1906c4e44ca4b4d3c"
+      "licenseSha256": "fbb941b371c6348ee2572ce8c78fb66128a61885f960dec1906c4e44ca4b4d3c",
+      "centerlineSha256": "894192beba023698a46f725540b3de87f7f98a41f5c7c0b1748b04a2e4b71fb3",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "homemade-apple",
@@ -148,29 +886,12 @@
       "font": "/fonts/homemadeapple/HomemadeApple-Regular.ttf",
       "fontSha256": "dd1baaca3cde1b1f8415aed3b0aea6808655c9d9ca5a99c7282d9accc16c1a58",
       "licenseFile": "/fonts/homemadeapple/LICENSE.txt",
-      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-    },
-    {
-      "id": "sue-ellen-francisco",
-      "sourceFamily": "Sue Ellen Francisco",
-      "strokeStudy": "Ink Stroke Study 14",
-      "source": "https://github.com/google/fonts/tree/main/ofl/sueellenfrancisco",
-      "license": "OFL-1.1",
-      "font": "/fonts/sueellenfrancisco/SueEllenFrancisco-Regular.ttf",
-      "fontSha256": "d6d72e046e8e92f659eacfb7457cf7e1f2142c112c3d8c43c0b5a3904a5c8621",
-      "licenseFile": "/fonts/sueellenfrancisco/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
-    },
-    {
-      "id": "just-another-hand",
-      "sourceFamily": "Just Another Hand",
-      "strokeStudy": "Ink Stroke Study 15",
-      "source": "https://github.com/google/fonts/tree/main/apache/justanotherhand",
-      "license": "Apache-2.0",
-      "font": "/fonts/justanotherhand/JustAnotherHand-Regular.ttf",
-      "fontSha256": "f1cd102ebacdb6388c879c9d481d63908ee0d5939a301415a78cdfdc752f79ea",
-      "licenseFile": "/fonts/justanotherhand/LICENSE.txt",
-      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "centerlineSha256": "0ad46136c4eb4d45088aff615e228ec034535a6a96efdf74990394c6fa2a323a",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "la-belle-aurore",
@@ -181,7 +902,12 @@
       "font": "/fonts/labelleaurore/LaBelleAurore.ttf",
       "fontSha256": "ed67462999e05f0cdac92f686374661e4d68c56fdcd7d05725c6df7b41eabd2a",
       "licenseFile": "/fonts/labelleaurore/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485",
+      "centerlineSha256": "86966e2a92cee588824ded2c211093512c9965f6ba350aae069ad0b5b5d5d684",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "cedarville-cursive",
@@ -192,7 +918,12 @@
       "font": "/fonts/cedarvillecursive/Cedarville-Cursive.ttf",
       "fontSha256": "5f86d71d08a68605d5912b9bcb639a060ce9c0debd7e0b715f5e268d4a4bc317",
       "licenseFile": "/fonts/cedarvillecursive/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485",
+      "centerlineSha256": "763e31c6696158f55e2809ae982c635283d760ec27845bffb4b6846106605029",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "dawning-of-a-new-day",
@@ -203,7 +934,12 @@
       "font": "/fonts/dawningofanewday/DawningofaNewDay.ttf",
       "fontSha256": "2b2afa623dbb1926e3b026603287b4d15ee05778106e26a7b33ef94d4be29dcb",
       "licenseFile": "/fonts/dawningofanewday/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485",
+      "centerlineSha256": "91b2b3b42ab137ba6d9f09fd1f23d33153895f36f5862ea73a8e8a630a01b10b",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
       "id": "give-you-glory",
@@ -214,18 +950,396 @@
       "font": "/fonts/giveyouglory/GiveYouGlory.ttf",
       "fontSha256": "fb71f9a46a3234c2d98dbbe44e711f65654368031c57b927bf7679a46e278c80",
       "licenseFile": "/fonts/giveyouglory/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485",
+      "centerlineSha256": "b6ac92c15eab361580269180f7555b042fe7ba65160df5683efc3eaffc83682c",
+      "preservedOriginalStudy": true,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     },
     {
-      "id": "waiting-for-the-sunrise",
-      "sourceFamily": "Waiting for the Sunrise",
-      "strokeStudy": "Ink Stroke Study 20",
-      "source": "https://github.com/google/fonts/tree/main/ofl/waitingforthesunrise",
+      "id": "alex-brush",
+      "sourceFamily": "Alex Brush",
+      "strokeStudy": "Ink Stroke Study 21",
+      "source": "https://github.com/google/fonts/tree/main/ofl/alexbrush",
       "license": "OFL-1.1",
-      "font": "/fonts/waitingforthesunrise/WaitingfortheSunrise.ttf",
-      "fontSha256": "ac74e70390f5b1be6927c1e079bd6143821a362550b264c5eb7edde34f0899f4",
-      "licenseFile": "/fonts/waitingforthesunrise/OFL.txt",
-      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+      "font": "/fonts/alex-brush/alex-brush.ttf",
+      "fontSha256": "df702038d8e27797230c77959c139eeea38cac0caf53e19ea5b513d3b0d3362d",
+      "licenseFile": "/fonts/alex-brush/OFL.txt",
+      "licenseSha256": "0ee34ce7c99b0deb7f7332bca0a4950d3796c23c00de77ada8aa29a4b55ff2c2",
+      "centerlineSha256": "5c3bcd3d53d2cae76955ddc0380e6aeb93c25e02ac8816010b28edbb4d819c90",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "allura",
+      "sourceFamily": "Allura",
+      "strokeStudy": "Ink Stroke Study 22",
+      "source": "https://github.com/google/fonts/tree/main/ofl/allura",
+      "license": "OFL-1.1",
+      "font": "/fonts/allura/allura.ttf",
+      "fontSha256": "9c142b2e515832c0dfc4ff8b8ea18f40314943bf937b72e2b23c4661bac14cc6",
+      "licenseFile": "/fonts/allura/OFL.txt",
+      "licenseSha256": "c8cb4c94a558b6cb82ac5dc981a73a0b8aee35a5c52c8a7832fc0280c289ad49",
+      "centerlineSha256": "7526b414d51c4e00eb6a07c2988f1bcc902cad67cd9c944db37347f62961627e",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "charm",
+      "sourceFamily": "Charm",
+      "strokeStudy": "Ink Stroke Study 23",
+      "source": "https://github.com/google/fonts/tree/main/ofl/charm",
+      "license": "OFL-1.1",
+      "font": "/fonts/charm/charm.ttf",
+      "fontSha256": "daae102e411243377016dbeb8cb9d53087d13074064fe79658afa966a9ac330e",
+      "licenseFile": "/fonts/charm/OFL.txt",
+      "licenseSha256": "41423e9e1d0ea79d0e78bd5fe9e0b27f4c23140706f5dfbfe116839c83aae91c",
+      "centerlineSha256": "7da8f704f446f0ff0897e6c9499b2c37addff2b5b2ce6054bc6208545cd572b9",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "cookie",
+      "sourceFamily": "Cookie",
+      "strokeStudy": "Ink Stroke Study 24",
+      "source": "https://github.com/google/fonts/tree/main/ofl/cookie",
+      "license": "OFL-1.1",
+      "font": "/fonts/cookie/cookie.ttf",
+      "fontSha256": "9daf3cc9e5efe1b65094cdf1f14729ef6f07a70c27ee0679bf7f544a828b080e",
+      "licenseFile": "/fonts/cookie/OFL.txt",
+      "licenseSha256": "c832a4230a713d080aa2f2544d9a298ed911f689b2c48f7f276a0196b16d2b8a",
+      "centerlineSha256": "80bcb6451a5b5e620414dc4b2f315bf5578d3790c9924082ddc6d4cd7243af94",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "dancing-script",
+      "sourceFamily": "Dancing Script",
+      "strokeStudy": "Ink Stroke Study 25",
+      "source": "https://github.com/google/fonts/tree/main/ofl/dancingscript",
+      "license": "OFL-1.1",
+      "font": "/fonts/dancing-script/dancing-script.ttf",
+      "fontSha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c",
+      "licenseFile": "/fonts/dancing-script/OFL.txt",
+      "licenseSha256": "6f090277c00af96651ce6dbcc38ff1591047a3bffef486e80b6a32e8276a8201",
+      "centerlineSha256": "46c5f929dfb405cbf4225af2ea5b8ecdf9bcb2c11a73299cfb9682b9a0d538e7",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "delius-unicase",
+      "sourceFamily": "Delius Unicase",
+      "strokeStudy": "Ink Stroke Study 26",
+      "source": "https://github.com/google/fonts/tree/main/ofl/deliusunicase",
+      "license": "OFL-1.1",
+      "font": "/fonts/delius-unicase/delius-unicase.ttf",
+      "fontSha256": "26fb53b7297281e4907dfe254cc23c206f28510f683eb726e5c5024ca36dc95d",
+      "licenseFile": "/fonts/delius-unicase/OFL.txt",
+      "licenseSha256": "d8eb8611f8c98d20cbf18a28425652d6022dc2a5cca15026b920f1f2bc92a612",
+      "centerlineSha256": "4a6dbdd26b2b022dfbeb4e1d7fd5e8727c1c3fee360e04a5dc109ecef878fc63",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "gochi-hand",
+      "sourceFamily": "Gochi Hand",
+      "strokeStudy": "Ink Stroke Study 27",
+      "source": "https://github.com/google/fonts/tree/main/ofl/gochihand",
+      "license": "OFL-1.1",
+      "font": "/fonts/gochi-hand/gochi-hand.ttf",
+      "fontSha256": "c46b029ab4846b2935e301af0b2cf85a1d74d2858e6a33636a3e64cf3cc4696b",
+      "licenseFile": "/fonts/gochi-hand/OFL.txt",
+      "licenseSha256": "b36cb03d6ddc163452d9935ce6f325741434272d3889acf42cc23584f31a85bf",
+      "centerlineSha256": "d1215746473fa8eac3364234d293a96444ec1e7f9e906971d10ac706bf3ec2da",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "great-vibes",
+      "sourceFamily": "Great Vibes",
+      "strokeStudy": "Ink Stroke Study 28",
+      "source": "https://github.com/google/fonts/tree/main/ofl/greatvibes",
+      "license": "OFL-1.1",
+      "font": "/fonts/great-vibes/great-vibes.ttf",
+      "fontSha256": "8d509802186f1b51572531ecf313e8098f9a5bfdfaca93f0c9b34467f9982d15",
+      "licenseFile": "/fonts/great-vibes/OFL.txt",
+      "licenseSha256": "61093a21f5e63dedf54222b3c09997e54c0fe43e3851d21386e02ddcbc246d49",
+      "centerlineSha256": "6b9e043c5059fa99ee6ae2c3cef2f8d95eda668417f992be100570b281060718",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "italianno",
+      "sourceFamily": "Italianno",
+      "strokeStudy": "Ink Stroke Study 29",
+      "source": "https://github.com/google/fonts/tree/main/ofl/italianno",
+      "license": "OFL-1.1",
+      "font": "/fonts/italianno/italianno.ttf",
+      "fontSha256": "f6ae96dea0da46c73370eb0575848ab0eda190315bdfda3f5b252bba3dc9173c",
+      "licenseFile": "/fonts/italianno/OFL.txt",
+      "licenseSha256": "bce79721f0203586872bbd7016922baf449980bdd1c44550a821112a3b547185",
+      "centerlineSha256": "3dd612d11689e5fbfac7ce13b45acb0dd3b6e6c9ecfe1ffaf5e972b6bf534ecf",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.5338,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "kaushan-script",
+      "sourceFamily": "Kaushan Script",
+      "strokeStudy": "Ink Stroke Study 30",
+      "source": "https://github.com/google/fonts/tree/main/ofl/kaushanscript",
+      "license": "OFL-1.1",
+      "font": "/fonts/kaushan-script/kaushan-script.ttf",
+      "fontSha256": "6d8d379d9bba98178bee476d68114c8f83812c18005ecccf679e70f60e03d8f6",
+      "licenseFile": "/fonts/kaushan-script/OFL.txt",
+      "licenseSha256": "3336bf5d4e7eedba48ecb831f37bf676e901c39f2e6a422cceadd9d2ffa55be8",
+      "centerlineSha256": "9552864078ae05531db1eb7e66eaa80719b1c50eebfdd414659990b47d051163",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "meddon",
+      "sourceFamily": "Meddon",
+      "strokeStudy": "Ink Stroke Study 31",
+      "source": "https://github.com/google/fonts/tree/main/ofl/meddon",
+      "license": "OFL-1.1",
+      "font": "/fonts/meddon/meddon.ttf",
+      "fontSha256": "c983e998ff7e01242544659c971bf4055bfb43a9fc5a0dd83ca7dafd105f94da",
+      "licenseFile": "/fonts/meddon/OFL.txt",
+      "licenseSha256": "eb1992aec1cf892ec94ffc116d79b62c7cb03dc108141b94a57a4195d210b514",
+      "centerlineSha256": "ae4720af157e430de978f84bb18fc38ad51d464b88ecef192462645b0af340c2",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.2123,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "meie-script",
+      "sourceFamily": "Meie Script",
+      "strokeStudy": "Ink Stroke Study 32",
+      "source": "https://github.com/google/fonts/tree/main/ofl/meiescript",
+      "license": "OFL-1.1",
+      "font": "/fonts/meie-script/meie-script.ttf",
+      "fontSha256": "006c66ba5d8de0b824821d9444ba97b149e26715944c1a8ab427bbb35704e6c0",
+      "licenseFile": "/fonts/meie-script/OFL.txt",
+      "licenseSha256": "e12a3e737fa75c0ee072d965b6185710f35e38a4f7a0793ebc66ba14a216109b",
+      "centerlineSha256": "0e61dfaa1a9a2decad4e4c2ac9c953a27e552c68bfbc707b7ae08464dd73193b",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.3578,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "monsieur-la-doulaise",
+      "sourceFamily": "Monsieur La Doulaise",
+      "strokeStudy": "Ink Stroke Study 33",
+      "source": "https://github.com/google/fonts/tree/main/ofl/monsieurladoulaise",
+      "license": "OFL-1.1",
+      "font": "/fonts/monsieur-la-doulaise/monsieur-la-doulaise.ttf",
+      "fontSha256": "dd3e04fbe661a7a70ff87b56b446e57a2605de5659c84d35ef58f4606ee68fad",
+      "licenseFile": "/fonts/monsieur-la-doulaise/OFL.txt",
+      "licenseSha256": "a5fc033225d145b43fd7391482ae7689825414ce29a01614d651a3012b57c81e",
+      "centerlineSha256": "eb60ff9d71a01be53e648bd795293f8d7a04fe68f7b12ce39b77d442691678d4",
+      "preservedOriginalStudy": false,
+      "writingScale": 0.7119,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "mr-dafoe",
+      "sourceFamily": "Mr Dafoe",
+      "strokeStudy": "Ink Stroke Study 34",
+      "source": "https://github.com/google/fonts/tree/main/ofl/mrdafoe",
+      "license": "OFL-1.1",
+      "font": "/fonts/mr-dafoe/mr-dafoe.ttf",
+      "fontSha256": "a42a3c66a709927f358243fdfcbc437bd8eb188e2ee6a680c52f5be12c670fd2",
+      "licenseFile": "/fonts/mr-dafoe/OFL.txt",
+      "licenseSha256": "0da6a3e5b24a9fa04085c20a2a1d3101eeb1e0bff56a2291f407187e1b2adcf2",
+      "centerlineSha256": "f68d77bfef449bea22d3af5225d4a7fba1541511470d4898c0fbf30c975525d5",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "ms-madi",
+      "sourceFamily": "Ms Madi",
+      "strokeStudy": "Ink Stroke Study 35",
+      "source": "https://github.com/google/fonts/tree/main/ofl/msmadi",
+      "license": "OFL-1.1",
+      "font": "/fonts/ms-madi/ms-madi.ttf",
+      "fontSha256": "08dfe959077490d11a4dd0d3097b48daafdecef821e290c973cd1893595cc208",
+      "licenseFile": "/fonts/ms-madi/OFL.txt",
+      "licenseSha256": "1f3ddf9e7c9ac7445b046a89d9b420fb4a3861f1d62091a85357179db73ebd12",
+      "centerlineSha256": "c70ccbb817e4925948013fd4cfb6155dd901bf481e2c808ed800ed37cc27d5ee",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "nanum-pen-script",
+      "sourceFamily": "Nanum Pen",
+      "strokeStudy": "Ink Stroke Study 36",
+      "source": "https://github.com/google/fonts/tree/main/ofl/nanumpenscript",
+      "license": "OFL-1.1",
+      "font": "/fonts/nanum-pen-script/nanum-pen-script.ttf",
+      "fontSha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+      "licenseFile": "/fonts/nanum-pen-script/OFL.txt",
+      "licenseSha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+      "centerlineSha256": "cbde5b34f3fdf780f0db2b143c6310c52d57d83ac17ead99b4dd6fb44e4b022b",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "oooh-baby",
+      "sourceFamily": "Oooh Baby",
+      "strokeStudy": "Ink Stroke Study 37",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ooohbaby",
+      "license": "OFL-1.1",
+      "font": "/fonts/oooh-baby/oooh-baby.ttf",
+      "fontSha256": "904d1b79093da1ae4b7436ac2190ddf5048e3cb839b2dc0c0516d0f58a1c25ee",
+      "licenseFile": "/fonts/oooh-baby/OFL.txt",
+      "licenseSha256": "a768f4c2b04f8e960236f9854c8afeb3626fb34927f25aa66aa7f1cc8cea715e",
+      "centerlineSha256": "5ec248a708f81faa71f48bafb288f75af5cd6fd0842c16aaa2efa6f9247735f6",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "pangolin",
+      "sourceFamily": "Pangolin",
+      "strokeStudy": "Ink Stroke Study 38",
+      "source": "https://github.com/google/fonts/tree/main/ofl/pangolin",
+      "license": "OFL-1.1",
+      "font": "/fonts/pangolin/pangolin.ttf",
+      "fontSha256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+      "licenseFile": "/fonts/pangolin/OFL.txt",
+      "licenseSha256": "b4fc1d55ce610f255c5712f8169543f9610536d002deb99bbc99bfbba9f8a560",
+      "centerlineSha256": "644aa172cda32ca23cb49f57a477eebd5db0420de76f1a84f844984b13dcc336",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "rock-salt",
+      "sourceFamily": "Rock Salt",
+      "strokeStudy": "Ink Stroke Study 39",
+      "source": "https://github.com/google/fonts/tree/main/apache/rocksalt",
+      "license": "Apache-2.0",
+      "font": "/fonts/rock-salt/rock-salt.ttf",
+      "fontSha256": "c5421d1ced1949488f29d11b75b7ef967abe2d870f816246bf18fdc0f3e29c96",
+      "licenseFile": "/fonts/rock-salt/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "centerlineSha256": "5c04f7b0426f4c93ecadb1d71a42b2fd2c6de33a8d1f77dbd1096dfedeea2ca3",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "ruthie",
+      "sourceFamily": "Ruthie",
+      "strokeStudy": "Ink Stroke Study 40",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ruthie",
+      "license": "OFL-1.1",
+      "font": "/fonts/ruthie/ruthie.ttf",
+      "fontSha256": "f97e99910e79a6caebcc18dcca305969a0ab42595fce6767139f260c193da302",
+      "licenseFile": "/fonts/ruthie/OFL.txt",
+      "licenseSha256": "b044afdd80638da6bb25da192efe7e72e5d2c0944862d2ecd19f21fc95371199",
+      "centerlineSha256": "b17eb2c8ce5da3acabb823aa2f7d833797f1d007517dd751c6eb953f001db4ac",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.5883,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "style-script",
+      "sourceFamily": "Style Script",
+      "strokeStudy": "Ink Stroke Study 41",
+      "source": "https://github.com/google/fonts/tree/main/ofl/stylescript",
+      "license": "OFL-1.1",
+      "font": "/fonts/style-script/style-script.ttf",
+      "fontSha256": "4f285aa7b2e87de9ea8fc3d3a571cc428257c42ac77b5f786d99d9949ac4ed9a",
+      "licenseFile": "/fonts/style-script/OFL.txt",
+      "licenseSha256": "47d3c6fc003cb3231297530b79ca108aaa4e504c0008a80fa3dc2ee4a3e8c4a6",
+      "centerlineSha256": "52de8782769b6bcc62cbb18a64580af4db82dd64e84a510e1de044aa0e5c5028",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "walter-turncoat",
+      "sourceFamily": "Walter Turncoat",
+      "strokeStudy": "Ink Stroke Study 42",
+      "source": "https://github.com/google/fonts/tree/main/apache/walterturncoat",
+      "license": "Apache-2.0",
+      "font": "/fonts/walter-turncoat/walter-turncoat.ttf",
+      "fontSha256": "ab7e9ca31710733211c5a938d2c851c84c0d21f6af4486f32bc6d374281b2da0",
+      "licenseFile": "/fonts/walter-turncoat/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "centerlineSha256": "81e834667d5f0757b3dab8bf160d7409e970bd7a3834db91302e168b04a8bdfc",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.52,
+      "lineHeight": 59,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "whisper",
+      "sourceFamily": "Whisper",
+      "strokeStudy": "Ink Stroke Study 43",
+      "source": "https://github.com/google/fonts/tree/main/ofl/whisper",
+      "license": "OFL-1.1",
+      "font": "/fonts/whisper/whisper.ttf",
+      "fontSha256": "f1f415a0de888897ab638fe6a0547406ecc469901d26afd06af619ddb4c623ec",
+      "licenseFile": "/fonts/whisper/OFL.txt",
+      "licenseSha256": "5a5681c41a0eb58eebe8ce4bad1bc8a088335a362c5d4fe02ca572dcadaae98f",
+      "centerlineSha256": "d33e385c9ee75b721719863c729e1762ef504de7da826241a52f7532bc6dd18b",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
+    },
+    {
+      "id": "windsong",
+      "sourceFamily": "WindSong",
+      "strokeStudy": "Ink Stroke Study 44",
+      "source": "https://github.com/google/fonts/tree/main/ofl/windsong",
+      "license": "OFL-1.1",
+      "font": "/fonts/windsong/windsong.ttf",
+      "fontSha256": "44bea4f8cdb818e9df6eef5334c63915acb7f1877b239debb373277d16b0aac2",
+      "licenseFile": "/fonts/windsong/OFL.txt",
+      "licenseSha256": "6f375e7f24ae282137aff041b3aa4b8efd8234187f9448b91f436b958cd8edc7",
+      "centerlineSha256": "fe1a000ffac93e029f29c0e22ce2a5096d9dea7615983ef091ad29623572d66a",
+      "preservedOriginalStudy": false,
+      "writingScale": 1.66,
+      "lineHeight": 66,
+      "heuristicStrokeOrder": true
     }
   ]
 }

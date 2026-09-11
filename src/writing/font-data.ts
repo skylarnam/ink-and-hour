@@ -20,34 +20,20 @@ export interface HandwritingFontRecord {
   exactOriginal: boolean;
 }
 
-const legacyRecords: Record<'correspondence' | 'print', HandwritingFontRecord> = {
-  correspondence: {
-    id: 'correspondence',
-    name: legacy.correspondence.name,
-    sourceFamily: handwritingStyle('correspondence').family,
-    space: 10,
-    scale: 1.72,
-    lineHeight: 68,
-    terminalPadding: 0.18,
-    chars: legacy.correspondence.chars,
-    script: true,
-    exactOriginal: true,
-  },
-  print: {
-    id: 'print',
-    name: legacy.print.name,
-    sourceFamily: handwritingStyle('print').family,
-    space: 10,
-    scale: 1.5,
-    lineHeight: 58,
-    terminalPadding: 1.2,
-    chars: legacy.print.chars,
-    script: false,
-    exactOriginal: true,
-  },
+const correspondence: HandwritingFontRecord = {
+  id: 'correspondence',
+  name: legacy.correspondence.name,
+  sourceFamily: handwritingStyle('correspondence').family,
+  space: 10,
+  scale: 1.72,
+  lineHeight: 68,
+  terminalPadding: 0.18,
+  chars: legacy.correspondence.chars,
+  script: true,
+  exactOriginal: true,
 };
 
-type GeneratedFontJson = Record<Exclude<HandwritingId, 'correspondence' | 'print'>, {
+type GeneratedFontJson = Record<Exclude<HandwritingId, 'correspondence'>, {
   name: string;
   sourceFamily: string;
   space: number;
@@ -61,7 +47,7 @@ const generatedRecords: GeneratedFontJson = generated;
 
 export const HANDWRITING_FONT_DATA: Record<HandwritingId, HandwritingFontRecord> = Object.fromEntries(
   HANDWRITING_IDS.map((id) => {
-    if (id === 'correspondence' || id === 'print') return [id, legacyRecords[id]];
+    if (id === 'correspondence') return [id, correspondence];
     const style = handwritingStyle(id);
     const font = generatedRecords[id];
     if (!font) throw new Error(`Missing generated handwriting data for ${id}.`);

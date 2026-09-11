@@ -10,9 +10,9 @@ class ElementStub extends EventTarget {
   style = { setProperty: (key, value) => this.properties.set(key, value) };
 }
 
-function rig(t) {
+function rig(t, options = {}) {
   const textarea = new ElementStub();
-  const controls = { smaller: new ElementStub(), larger: new ElementStub(), hint: new ElementStub() };
+  const controls = { smaller: new ElementStub(), larger: new ElementStub(), hint: new ElementStub(), ...options };
   const zoom = createEditorZoom(textarea, controls);
   t.after(() => zoom.dispose());
   return { textarea, controls, zoom };
@@ -125,4 +125,72 @@ test('keyboard-accessible size buttons share the pinch limits and all listeners 
   send(textarea, 'gesturestart', { scale: 1 });
   send(textarea, 'gesturechange', { scale: 2 });
   assert.equal(zoom.scale, size);
+});
+
+test('restored and synchronized sizes never invoke the user-change callback', (t) => {
+  const requests = [];
+  const { textarea, controls, zoom } = rig(t, {
+    initialScale: 1.4,
+    onChange: (scale) => { requests.push(scale); return true; },
+  });
+  close(zoom.scale, 1.4);
+  assert.deepEqual(requests, []);
+  zoom.setScale(1.7);
+  assert.equal(textarea.properties.get('--editor-scale'), '1.7');
+  assert.match(controls.hint.textContent, /170%/);
+  assert.deepEqual(requests, []);
+  send(controls.smaller, 'click');
+  close(zoom.scale, 1.6);
+  close(requests[0], 1.6);
+  assert.throws(() => zoom.setScale(NaN), /finite/);
+  close(zoom.scale, 1.6);
+});
+
+test('a rejected paper layout leaves the editor size unchanged for buttons and pinch', (t) => {
+  const requests = [];
+  const { textarea, controls, zoom } = rig(t, {
+    initialScale: 1.2,
+    onChange: (scale) => { requests.push(scale); return scale <= 1.3; },
+  });
+  send(controls.larger, 'click');
+  close(zoom.scale, 1.3);
+  send(controls.larger, 'click');
+  close(zoom.scale, 1.3);
+  send(textarea, 'touchstart', { targetTouches: touches(100) });
+  send(textarea, 'touchmove', { targetTouches: touches(150) });
+  close(zoom.scale, 1.3);
+  assert.equal(textarea.properties.get('--editor-scale'), '1.3');
+  assert.match(controls.hint.textContent, /130%/);
+  send(textarea, 'touchmove', { targetTouches: touches(120) });
+  close(zoom.scale, 1.04);
+  assert.equal(requests.length, 4);
+});
+
+test('active-writing locks all resize inputs while ordinary scrolling remains available', (t) => {
+  const requests = [];
+  const { textarea, controls, zoom } = rig(t, {
+    onChange: (scale) => { requests.push(scale); return true; },
+  });
+  send(textarea, 'touchstart', { targetTouches: touches(100) });
+  zoom.setEnabled(false);
+  assert.equal(controls.smaller.disabled, true);
+  assert.equal(controls.larger.disabled, true);
+  assert.match(controls.hint.textContent, /Pause to resize/);
+  send(controls.larger, 'click');
+  send(textarea, 'touchmove', { targetTouches: touches(180) });
+  send(textarea, 'touchstart', { targetTouches: touches(100) });
+  send(textarea, 'touchmove', { targetTouches: touches(180) });
+  send(textarea, 'gesturestart', { scale: 1 });
+  send(textarea, 'gesturechange', { scale: 1.8 });
+  send(textarea, 'wheel', { ctrlKey: true, deltaY: -100, deltaMode: 0 });
+  assert.equal(send(textarea, 'wheel', { ctrlKey: false, deltaY: 30, deltaMode: 0 }).defaultPrevented, false);
+  close(zoom.scale, 1);
+  assert.deepEqual(requests, []);
+  zoom.setScale(MIN_EDITOR_ZOOM);
+  assert.equal(controls.larger.disabled, true);
+  zoom.setEnabled(true);
+  assert.equal(controls.smaller.disabled, true);
+  assert.equal(controls.larger.disabled, false);
+  send(controls.larger, 'click');
+  close(zoom.scale, 0.85);
 });

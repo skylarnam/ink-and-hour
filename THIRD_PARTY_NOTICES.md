@@ -29,55 +29,52 @@ with `npm run fonts`; only editor display uses those outlines.
 
 ## Additional handwriting: Google Fonts
 
-The following **unmodified source fonts** were obtained from the official
+The **unmodified source fonts** were obtained from the official
 [google/fonts repository](https://github.com/google/fonts). Each is bundled
-with its original license text in the listed directory. OFL-1.1 and Apache-2.0
+with its original license text under `public/fonts/`. OFL-1.1 and Apache-2.0
 permit this commercial website use and redistribution; these are not unlicensed
 font files inferred from a software package's license.
 
-| Source family | License | Bundled license |
-| --- | --- | --- |
-| Caveat | OFL-1.1 | [OFL](public/fonts/caveat/OFL.txt) |
-| Patrick Hand | OFL-1.1 | [OFL](public/fonts/patrickhand/OFL.txt) |
-| Handlee | OFL-1.1 | [OFL](public/fonts/handlee/OFL.txt) |
-| Indie Flower | OFL-1.1 | [OFL](public/fonts/indieflower/OFL.txt) |
-| Kalam | OFL-1.1 | [OFL](public/fonts/kalam/OFL.txt) |
-| Shadows Into Light | OFL-1.1 | [OFL](public/fonts/shadowsintolight/OFL.txt) |
-| Shadows Into Light Two | OFL-1.1 | [OFL](public/fonts/shadowsintolighttwo/OFL.txt) |
-| Coming Soon | Apache-2.0 | [License](public/fonts/comingsoon/LICENSE.txt) |
-| Schoolbell | Apache-2.0 | [License](public/fonts/schoolbell/LICENSE.txt) |
-| Architects Daughter | OFL-1.1 | [OFL](public/fonts/architectsdaughter/OFL.txt) |
-| Nothing You Could Do | OFL-1.1 | [OFL](public/fonts/nothingyoucoulddo/OFL.txt) |
-| Reenie Beanie | OFL-1.1 | [OFL](public/fonts/reeniebeanie/OFL.txt) |
-| Homemade Apple | Apache-2.0 | [License](public/fonts/homemadeapple/LICENSE.txt) |
-| Sue Ellen Francisco | OFL-1.1 | [OFL](public/fonts/sueellenfrancisco/OFL.txt) |
-| Just Another Hand | Apache-2.0 | [License](public/fonts/justanotherhand/LICENSE.txt) |
-| La Belle Aurore | OFL-1.1 | [OFL](public/fonts/labelleaurore/OFL.txt) |
-| Cedarville Cursive | OFL-1.1 | [OFL](public/fonts/cedarvillecursive/OFL.txt) |
-| Dawning of a New Day | OFL-1.1 | [OFL](public/fonts/dawningofanewday/OFL.txt) |
-| Give You Glory | OFL-1.1 | [OFL](public/fonts/giveyouglory/OFL.txt) |
-| Waiting for the Sunrise | OFL-1.1 | [OFL](public/fonts/waitingforthesunrise/OFL.txt) |
+The approved collection has 34 active faces: the public-domain Correspondence
+face above and 33 Google Fonts. Thirty of the selected Google Fonts use OFL-1.1;
+**Homemade Apple, Rock Salt, and Walter Turncoat** use Apache-2.0.
+The site's About dialog lists every active family and links its original source
+and bundled license. The complete per-family source inventory, exact license
+paths, and checksums are in
+[HANDWRITING-ATTRIBUTION.json](public/data/HANDWRITING-ATTRIBUTION.json).
+The approved IDs and review revision are recorded in
+[applied-selection.json](font-review/applied-selection.json).
 
 The original copyright statements remain in the source font metadata and
 individual license files. The offline-derived centerline datasets in
-`src/writing/handwriting-fonts.json` are separately named **Ink Stroke Study
-01-20**, and each retains its corresponding source's license. Source family
+`src/writing/handwriting-fonts.json` have separate **Ink Stroke Study**
+names, and each retains its corresponding source's license. Source family
 names in the UI identify the original editor fonts, not renamed replacement TTFs.
 No endorsement by the font designers is implied.
 
 These modifications rasterize, skeletonize, simplify, and infer writing
 trails; ordinary fonts do not supply a human stroke timeline. Source URLs,
-font/license SHA-256 checksums, the study-name mapping, and the three explicit
-tiny-punctuation approximations are in
+font/license SHA-256 checksums, the study-name mapping, and any explicit
+tiny-glyph interpretations are in
 [HANDWRITING-ATTRIBUTION.json](public/data/HANDWRITING-ATTRIBUTION.json).
+
+Italianno's source underscore has no outline. The editor's CSS excludes that
+single character from its font face so a system-serif fallback keeps it visible.
+The writing dataset reconstructs the underscore from the original font's
+underline metrics, recorded in the attribution data. Source font bytes are
+unmodified; the fallback does not redistribute a system font.
 
 ## Local font-review candidates
 
-The local `font-review/index.html` checklist includes the 22 current styles and
-78 additional unmodified Google Fonts candidates. The complete review contains
+The local `font-review/index.html` checklist retains all 100 candidates,
+including the original 22 styles and the 34 now selected for the website.
+The complete review contains
 86 OFL-1.1 faces, 12 Apache-2.0 faces, and the two existing public-domain
 Hershey-derived editor faces. These candidates are for selection only; they are
 not automatically added to the website's writing collection or runtime assets.
+Unselected original font assets and their licenses are preserved for review
+and provenance; they are not active handwriting choices. The review catalog
+also retains their exact paths and source attribution.
 
 [font-review/catalog.json](font-review/catalog.json) records each candidate's
 official source, exact font and license SHA-256 checksums, and local asset paths.

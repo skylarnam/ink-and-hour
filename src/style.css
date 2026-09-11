@@ -120,11 +120,15 @@ legend span { float: right; font-size: 9px; letter-spacing: 0; color: #888675; t
 .editor-heading h2 { font: normal 17px var(--serif); margin: 0; letter-spacing: -0.3px; }
 .tiny-nib { color: #9c906d; }
 .tiny-nib .icon { width: 15px; height: 15px; }
+.lettering-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; }
+.lettering-alignment { gap: 4px; }
+.lettering-alignment .choice { display: flex; align-items: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 10px; }
+.lettering-alignment .icon { width: 14px; height: 14px; }
 textarea { width: 100%; resize: vertical; border: 1px solid #dcdacb; border-radius: 5px; padding: 12px 13px; height: 87px; min-height: 65px; max-height: 160px; background: #faf8f1; color: #535a49; font: italic 16px/1.55 var(--serif); }
 textarea:read-only { opacity: 0.8; }
 #message { touch-action: pan-x pan-y; font: normal calc(var(--editor-size, 18px) * var(--editor-scale, 1))/calc(var(--editor-line-height, 27px) * var(--editor-scale, 1)) var(--editor-font, "Ink Correspondence"), var(--serif); }
 .editor-zoom { display: flex; flex-shrink: 0; gap: 2px; }
-.editor-zoom button { font: 11px Arial, sans-serif; color: var(--ink); border: 1px solid var(--line); border-radius: 3px; min-width: 26px; min-height: 26px; padding: 2px; }
+.editor-zoom button { font: 11px Arial, sans-serif; color: var(--ink); border: 1px solid var(--line); border-radius: 3px; min-width: 30px; min-height: 30px; padding: 2px; }
 .editor-zoom button:not(:disabled):hover { color: var(--ink); border-color: var(--brass); }
 .input-guide { display: grid; gap: 3px; }
 .input-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 8px; color: #848571; gap: 8px; }
@@ -239,6 +243,8 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .settings-content { order: 2; padding: 24px; flex: none; overflow: visible; }
   .writing-editor { order: 0; padding: 23px 24px 15px; border-top: 0; }
   .writing-editor h2 { font-size: 20px; }
+  .lettering-alignment .choice { min-height: 40px; padding: 8px 12px; }
+  .editor-zoom button { min-width: 40px; min-height: 40px; }
   textarea { font-size: 18px; height: 93px; }
   .input-meta { font-size: 9px; }
   .writing-options { margin: 18px 0; gap: 25px; }

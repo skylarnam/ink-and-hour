@@ -1,4 +1,5 @@
 import type { Settings } from './types.ts';
+import { MIN_TEXT_SCALE, MAX_TEXT_SCALE } from './types.ts';
 import { isInkColor } from './ink.ts';
 import { LOFI_TRACK_IDS } from './music-library.ts';
 import { HANDWRITING_IDS } from './handwriting.ts';
@@ -15,6 +16,8 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   ink: 'midnight',
   customInk: '#6752a0',
   style: 'correspondence',
+  textScale: 1,
+  textAlignment: 'left',
   speed: 1,
   masterVolume: 0.7,
   writingVolume: 0.3,
@@ -46,6 +49,8 @@ export function sanitizeSettings(value: unknown): Settings {
     ink: choice(data.ink, ['midnight', 'sepia', 'burgundy', 'forest', 'custom'], DEFAULT_SETTINGS.ink),
     customInk: isInkColor(data.customInk) ? data.customInk.toLowerCase() : DEFAULT_SETTINGS.customInk,
     style: choice(data.style, HANDWRITING_IDS, DEFAULT_SETTINGS.style),
+    textScale: number(data.textScale, MIN_TEXT_SCALE, MAX_TEXT_SCALE, DEFAULT_SETTINGS.textScale),
+    textAlignment: choice(data.textAlignment, ['left', 'center'], DEFAULT_SETTINGS.textAlignment),
     speed: number(data.speed, 0.5, 2, DEFAULT_SETTINGS.speed),
     masterVolume: number(data.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume),
     writingVolume: number(data.writingVolume, 0, 1, DEFAULT_SETTINGS.writingVolume),

@@ -38,11 +38,11 @@ export async function renderReview(root, catalog) {
 <title>Ink &amp; Hour - 100 handwriting candidates</title><style>${css}\n${styles.join('\n')}</style></head>
 <body>
 <header><p class="eyebrow">Ink &amp; Hour / font shortlist</p><h1>Find your handwriting.</h1>
-<p class="intro">100 candidates, including all 22 current styles. Check only the ones you like. Nothing changes on the website until you tell me you are done.</p>
+<p class="intro">${catalog.candidates.length} candidates, including all ${catalog.candidates.filter(({ current }) => current).length} currently applied styles. Check only the ones you like. Changing these checkboxes does not change the website; applying a new selection requires your approval.</p>
 <div class="toolbar"><span id="selection-count" aria-live="polite">0 selected</span><span id="font-count">Loading fonts...</span><button type="button" id="download-selection">Download selections</button></div>
 <p id="save-status" role="status" aria-live="polite">Opening checklist...</p></header>
 <main aria-label="100 handwriting candidates">${rows.join('\n')}</main>
-<footer>These are original font previews, not animated pen strokes. All candidates allow commercial use under the listed licenses.<br>In the app panel, every checkbox is saved to <code>font-review/selection.json</code>. The current fonts also start unchecked.
+<footer>These are original font previews, not animated pen strokes. All candidates allow commercial use under the listed licenses.<br>In the app panel, every checkbox is saved to <code>font-review/selection.json</code>. The live website uses the separately approved <code>font-review/applied-selection.json</code> snapshot; saved checkboxes are preserved.
 <details class="license-notices"><summary>Font licenses and copyright notices</summary>${notices.join('\n')}</details></footer>
 <script id="initial-selection" type="application/json">{}</script>
 <script>${script.replaceAll('</script', '<\\/script')}</script>

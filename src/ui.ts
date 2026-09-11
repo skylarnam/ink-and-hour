@@ -21,6 +21,8 @@ export const icons = {
   storm: '<path d="M6 14a4 4 0 1 1 1-8 6 6 0 0 1 11 2 3 3 0 0 1 0 6m-6-2-3 5h4l-3 5"/>',
   orbit: '<ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-30 12 12)"/><circle cx="12" cy="12" r="2"/>',
   move: '<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3"/>',
+  alignLeft: '<path d="M4 5h16M4 10h10M4 15h16M4 20h10"/>',
+  alignCenter: '<path d="M4 5h16M7 10h10M4 15h16M7 20h10"/>',
   roll: '<path d="M4 5h15v14H4M4 5c-4 0-4 14 0 14s4-14 0-14Zm7 0v14m3-9 4 4m-4 0 4-4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
 };
@@ -134,11 +136,18 @@ export function renderUI(): string {
           </section>
         </div>
         <section class="writing-editor" aria-labelledby="editor-heading">
-          <div class="editor-heading"><h2 id="editor-heading">What will you leave here?</h2><div class="editor-zoom" role="group" aria-label="Editor text size"><button id="smaller-editor-text" type="button" aria-label="Smaller editor text" aria-controls="message" title="Smaller editor text">A-</button><button id="larger-editor-text" type="button" aria-label="Larger editor text" aria-controls="message" title="Larger editor text">A+</button></div></div>
+          <div class="editor-heading"><h2 id="editor-heading">What will you leave here?</h2></div>
+          <div class="lettering-controls">
+            <div class="choices lettering-alignment" role="group" aria-label="Lettering alignment">
+              ${choice('textAlignment', 'left', `${icon('alignLeft')}Left`)}
+              ${choice('textAlignment', 'center', `${icon('alignCenter')}Center`)}
+            </div>
+            <div class="editor-zoom" role="group" aria-label="Lettering size in editor and on paper"><button id="smaller-editor-text" type="button" aria-label="Smaller lettering" aria-controls="message desk-canvas" title="Smaller lettering in editor and on paper">A-</button><button id="larger-editor-text" type="button" aria-label="Larger lettering" aria-controls="message desk-canvas" title="Larger lettering in editor and on paper">A+</button></div>
+          </div>
           <label class="visually-hidden" for="message">Your English text</label>
           <textarea id="message" spellcheck="false" rows="3" aria-describedby="input-hint editor-size-hint input-error">Let the world wait.
 Stay a little while.</textarea>
-          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation</span><span id="editor-size-hint">Pinch to resize text</span></span><span id="character-count"></span></div>
+          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation / pinch to resize</span><span id="editor-size-hint">Editor &amp; paper size / 100%</span></span><span id="character-count"></span></div>
           <p id="input-error" class="input-error" role="status" hidden></p>
           <div class="writing-options">
             <label><span>Handwriting</span><select id="style" aria-label="Handwriting style" aria-describedby="handwriting-note">${HANDWRITING_STYLES.map((style) => `<option value="${style.id}">${style.label}</option>`).join('')}</select></label>
@@ -161,11 +170,12 @@ Stay a little while.</textarea>
       <h2>Nothing to finish.<br>Just something to feel.</h2>
       <p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p>
       <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
-      <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. Text and handwriting edits start a fresh page, and the pen rests beside the page when it finishes.</p>
-      <p>The original two styles use ordered Hershey centerlines. Twenty added styles are interpreted stroke studies of commercially licensed Google Fonts. The editor shows each original font; the pen follows inferred centerlines, not its outline. Some connected stems are retraced, and the inferred order is not a recording of a calligrapher's hand.</p>
+      <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page when it finishes.</p>
+      <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: started letters keep their shape, and lines with ink keep their place. Choices that would overflow the remaining page are rejected. A fresh sheet applies your choices to the whole note. Lettering preferences are saved, but your words stay private to this visit.</p>
+      <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of commercially licensed Google Fonts. The editor shows each original font; the pen follows inferred centerlines, not its outline. Some connected stems are retraced, and the inferred order is not a recording of a calligrapher's hand.</p>
       <p>Nib pressure and material sounds are expressive interpretations, not a fluid-dynamics or manufacturer-specific simulation. There is no hand model, arbitrary font import, or physical ink depletion.</p>
       <details class="font-credits">
-        <summary>22 handwriting sources &amp; licenses</summary>
+        <summary>${HANDWRITING_STYLES.length} handwriting sources &amp; licenses</summary>
         <ul>${HANDWRITING_STYLES.map((style) => `<li><a href="${style.source}" target="_blank" rel="noopener noreferrer">${style.label}</a><a href="${style.publicLicensePath}" target="_blank" rel="noopener">${style.license}</a></li>`).join('')}</ul>
         <p class="small-note">Source fonts are unmodified. Added paper styles are separately named Ink Stroke Studies. <a href="/data/HANDWRITING-ATTRIBUTION.json" target="_blank" rel="noopener">Source versions, checksums and derivation notes</a>.</p>
       </details>

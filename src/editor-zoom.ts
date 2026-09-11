@@ -1,19 +1,26 @@
-export const MIN_EDITOR_ZOOM = 0.75;
-export const MAX_EDITOR_ZOOM = 2;
+import { MIN_TEXT_SCALE, MAX_TEXT_SCALE } from './types.ts';
+
+export const MIN_EDITOR_ZOOM = MIN_TEXT_SCALE;
+export const MAX_EDITOR_ZOOM = MAX_TEXT_SCALE;
 
 interface EditorZoomControls {
   smaller: HTMLButtonElement;
   larger: HTMLButtonElement;
   hint: HTMLElement;
+  initialScale?: number;
+  onChange?: (scale: number) => boolean;
 }
 
 export function createEditorZoom(textarea: HTMLTextAreaElement, controls: EditorZoomControls): {
   readonly scale: number;
+  setScale(scale: number): void;
+  setEnabled(enabled: boolean): void;
   dispose(): void;
 } {
   const lifetime = new AbortController();
   const options = { passive: false, signal: lifetime.signal };
   let scale = 1;
+  let enabled = true;
   let pinching = false;
   let previousDistance: number | null = null;
   let previousGestureScale: number | null = null;
@@ -22,9 +29,18 @@ export function createEditorZoom(textarea: HTMLTextAreaElement, controls: Editor
     if (!Number.isFinite(next)) throw new RangeError('Editor text zoom must be finite.');
     scale = Math.min(MAX_EDITOR_ZOOM, Math.max(MIN_EDITOR_ZOOM, next));
     textarea.style.setProperty('--editor-scale', String(scale));
-    controls.smaller.disabled = scale <= MIN_EDITOR_ZOOM;
-    controls.larger.disabled = scale >= MAX_EDITOR_ZOOM;
-    controls.hint.textContent = `Pinch to resize text / ${Math.round(scale * 100)}%`;
+    controls.smaller.disabled = !enabled || scale <= MIN_EDITOR_ZOOM;
+    controls.larger.disabled = !enabled || scale >= MAX_EDITOR_ZOOM;
+    controls.hint.textContent = enabled
+      ? `Editor & paper size / ${Math.round(scale * 100)}%`
+      : `Pause to resize lettering / ${Math.round(scale * 100)}%`;
+  }
+
+  function requestResize(next: number): void {
+    if (!Number.isFinite(next)) throw new RangeError('Lettering size must be finite.');
+    if (!enabled) return;
+    const clamped = Math.min(MAX_EDITOR_ZOOM, Math.max(MIN_EDITOR_ZOOM, next));
+    if (clamped !== scale && (controls.onChange?.(clamped) ?? true)) resize(clamped);
   }
 
   function touchDistance(event: TouchEvent): number | null {
@@ -45,12 +61,13 @@ export function createEditorZoom(textarea: HTMLTextAreaElement, controls: Editor
     if (pinching || previousGestureScale !== null) return;
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? textarea.clientHeight : 1;
     const delta = Math.max(-200, Math.min(200, event.deltaY * unit));
-    resize(scale * Math.exp(-delta * 0.005));
+    requestResize(scale * Math.exp(-delta * 0.005));
   }, options);
 
   textarea.addEventListener('touchstart', (event) => {
     if (event.targetTouches.length < 2) return;
     event.preventDefault();
+    if (!enabled) return;
     pinching = true;
     previousDistance = touchDistance(event);
   }, options);
@@ -60,7 +77,7 @@ export function createEditorZoom(textarea: HTMLTextAreaElement, controls: Editor
     event.preventDefault();
     const distance = touchDistance(event);
     if (previousGestureScale === null && distance !== null && previousDistance !== null) {
-      resize(scale * distance / previousDistance);
+      requestResize(scale * distance / previousDistance);
     }
     previousDistance = distance;
   }, options);
@@ -80,13 +97,13 @@ export function createEditorZoom(textarea: HTMLTextAreaElement, controls: Editor
   // Safari trackpads use GestureEvent; touch and wheel streams must not count it twice.
   textarea.addEventListener('gesturestart', (event) => {
     event.preventDefault();
-    if (!pinching) previousGestureScale = gestureScale(event) ?? 1;
+    if (enabled && !pinching) previousGestureScale = gestureScale(event) ?? 1;
   }, options);
   textarea.addEventListener('gesturechange', (event) => {
     event.preventDefault();
     const next = gestureScale(event);
     if (previousGestureScale !== null && next !== null) {
-      resize(scale * next / previousGestureScale);
+      requestResize(scale * next / previousGestureScale);
       previousGestureScale = next;
     }
   }, options);
@@ -95,12 +112,21 @@ export function createEditorZoom(textarea: HTMLTextAreaElement, controls: Editor
     previousGestureScale = null;
   }, options);
 
-  controls.smaller.addEventListener('click', () => resize(scale - 0.1), { signal: lifetime.signal });
-  controls.larger.addEventListener('click', () => resize(scale + 0.1), { signal: lifetime.signal });
-  resize(1);
+  controls.smaller.addEventListener('click', () => requestResize(scale - 0.1), { signal: lifetime.signal });
+  controls.larger.addEventListener('click', () => requestResize(scale + 0.1), { signal: lifetime.signal });
+  resize(controls.initialScale ?? 1);
 
   return {
     get scale() { return scale; },
+    setScale: resize,
+    setEnabled(next: boolean) {
+      enabled = next;
+      if (!enabled) {
+        pinching = false;
+        previousDistance = previousGestureScale = null;
+      }
+      resize(scale);
+    },
     dispose() { lifetime.abort(); },
   };
 }

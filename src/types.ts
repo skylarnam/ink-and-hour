@@ -9,6 +9,7 @@ export type WritingStyle = HandwritingId;
 export type MusicTrack = 'off' | 'felt' | 'glass' | 'lofi';
 export type CameraPreset = 'desk' | 'detail' | 'overhead';
 export type WritingStatus = 'idle' | 'writing' | 'paused' | 'complete';
+export type TextAlignment = 'left' | 'center';
 
 export interface Settings {
   mood: Mood;
@@ -20,6 +21,8 @@ export interface Settings {
   ink: InkId;
   customInk: string;
   style: WritingStyle;
+  textScale: number;
+  textAlignment: TextAlignment;
   speed: number;
   masterVolume: number;
   writingVolume: number;
@@ -61,6 +64,8 @@ export interface LayoutOptions {
   style: WritingStyle;
   width: number;
   height: number;
+  textScale?: number;
+  textAlignment?: TextAlignment;
 }
 
 export interface LayoutCursor {
@@ -69,6 +74,8 @@ export interface LayoutCursor {
   line: number;
   lineHeight: number;
   style: WritingStyle;
+  textScale?: number;
+  textAlignment?: TextAlignment;
 }
 
 export interface LayoutCharacter {
@@ -102,6 +109,8 @@ export interface AudioContact {
 export type InteractionCue = 'cap' | 'leather' | 'paper' | 'ink';
 
 export const PAGE = { width: 780, height: 1040 } as const;
+export const MIN_TEXT_SCALE = 0.75;
+export const MAX_TEXT_SCALE = 2;
 
 export const INKS: Record<PresetInkId, { label: string; color: string }> = {
   midnight: { label: 'Midnight blue', color: '#24384d' },

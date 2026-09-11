@@ -1,4 +1,5 @@
 import type { LayoutCharacter, LayoutCursor, LayoutOptions, LayoutResult, Point } from '../types.ts';
+import { MIN_TEXT_SCALE, MAX_TEXT_SCALE } from '../types.ts';
 import { isHandwritingId, type HandwritingId } from '../handwriting.ts';
 import { handwritingFontData } from './font-data.ts';
 import { parseStrokePath, smoothStroke } from './paths.ts';
@@ -83,6 +84,14 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
   if (!isHandwritingId(style)) {
     return error('Choose one of the bundled handwriting styles for this sheet.');
   }
+  const textScale = options.textScale === undefined ? 1 : options.textScale;
+  const textAlignment = options.textAlignment === undefined ? 'left' : options.textAlignment;
+  if (!Number.isFinite(textScale) || textScale < MIN_TEXT_SCALE || textScale > MAX_TEXT_SCALE) {
+    return error('Choose a lettering size between 75% and 200%.');
+  }
+  if (textAlignment !== 'left' && textAlignment !== 'center') {
+    return error('Choose left or center alignment for the lettering.');
+  }
   if (!Number.isFinite(options.width) || !Number.isFinite(options.height)
     || options.width <= 0 || options.height <= 0) {
     return error('The sheet must have a finite, positive width and height.');
@@ -102,13 +111,17 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
     || !Number.isFinite(continuation.cursor.x) || !Number.isFinite(continuation.cursor.y)
     || !Number.isInteger(continuation.cursor.line) || continuation.cursor.line < 1
     || !Number.isFinite(continuation.cursor.lineHeight) || continuation.cursor.lineHeight <= 0
-    || !isHandwritingId(continuation.cursor.style))) {
+    || !isHandwritingId(continuation.cursor.style)
+    || continuation.cursor.textScale !== undefined && (!Number.isFinite(continuation.cursor.textScale)
+      || continuation.cursor.textScale < MIN_TEXT_SCALE || continuation.cursor.textScale > MAX_TEXT_SCALE)
+    || continuation.cursor.textAlignment !== undefined
+      && continuation.cursor.textAlignment !== 'left' && continuation.cursor.textAlignment !== 'center')) {
     return error('The remaining handwriting needs a valid position on the sheet.');
   }
 
   const font = getFont(style);
-  const scale = font.scale;
-  const lineHeight = font.lineHeight;
+  const scale = font.scale * textScale;
+  const lineHeight = font.lineHeight * textScale;
   const inkInset = 3.5;
   const left = Math.min(72, options.width * 0.095) + inkInset;
   const right = options.width - Math.min(72, options.width * 0.095) - inkInset;
@@ -137,15 +150,17 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
   const fullMessage = continuation
     ? 'The selected handwriting needs more room than remains on this sheet.'
     : `This note reaches the end of the sheet (${maxLines} lines). `
-      + 'Shorten it or remove a few line breaks; nothing has been left out.';
+      + 'Shorten it, reduce the lettering size or remove a few line breaks; nothing has been left out.';
   const strokes: Point[][] = [];
   const characters: LayoutCharacter[] = [];
+  const lines = new Map<number, { start: number; end: number; min: number; max: number }>();
   let x = continuation?.cursor.x ?? originX;
   let lineCount = continuation?.cursor.line ?? 1;
   let lineTop = continuation?.cursor.y ?? top;
   let linePitch = Math.max(continuation?.cursor.lineHeight ?? lineHeight, lineHeight);
   let characterIndex = continuation?.index ?? 0;
-  let protectPreviousInk = continuation !== undefined && continuation.cursor.style !== style;
+  let protectPreviousInk = continuation !== undefined
+    && (continuation.cursor.style !== style || (continuation.cursor.textScale ?? 1) !== textScale);
   if (lineTop < top || lineTop + fontHeight > bottom) return error(fullMessage);
   const newline = (): boolean => {
     x = originX;
@@ -190,13 +205,38 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
       const y = lineTop - font.minY * scale;
       const strokeStart = strokes.length;
       for (const path of letter.strokes) {
-        strokes.push(path.map((point) => ({ x: x + point.x * scale, y: y + point.y * scale })));
+        const points = path.map((point) => ({ x: x + point.x * scale, y: y + point.y * scale }));
+        const line = lines.get(lineCount) ?? { start: strokes.length, end: strokes.length, min: Infinity, max: -Infinity };
+        for (const point of points) {
+          line.min = Math.min(line.min, point.x);
+          line.max = Math.max(line.max, point.x);
+        }
+        line.end = strokes.length + 1;
+        lines.set(lineCount, line);
+        strokes.push(points);
       }
       x += letter.advance * scale;
       characters.push({
         index: characterIndex++, strokeStart, strokeEnd: strokes.length,
-        after: { x, y: lineTop, line: lineCount, lineHeight: linePitch, style },
+        after: {
+          x, y: lineTop, line: lineCount, lineHeight: linePitch, style, textScale,
+          textAlignment: continuation?.cursor.line === lineCount
+            ? continuation.cursor.textAlignment ?? 'left' : textAlignment,
+        },
       });
+    }
+  }
+  if (textAlignment === 'center') {
+    for (const [number, line] of lines) {
+      // A line that already has ink keeps its anchor; only untouched lines can be recentered.
+      if (continuation?.cursor.line === number) continue;
+      const offset = (left + right - line.min - line.max) / 2;
+      for (let index = line.start; index < line.end; index++) {
+        for (const point of strokes[index]) point.x += offset;
+      }
+      for (const character of characters) {
+        if (character.after.line === number) character.after.x += offset;
+      }
     }
   }
   return { ok: true, error: null, strokes, lineCount, characterCount: text.length, characters };

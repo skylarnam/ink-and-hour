@@ -7,22 +7,6 @@
 }
 
 @font-face {
-  font-family: "Ink Everyday";
-  src: url("/fonts/ink-everyday.otf") format("opentype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Architects Daughter";
-  src: url("/fonts/architectsdaughter/ArchitectsDaughter-Regular.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "Caveat";
   src: url("/fonts/caveat/Caveat[wght].ttf") format("truetype");
   font-style: normal;
@@ -31,16 +15,48 @@
 }
 
 @font-face {
-  font-family: "Cedarville Cursive";
-  src: url("/fonts/cedarvillecursive/Cedarville-Cursive.ttf") format("truetype");
+  font-family: "Kalam";
+  src: url("/fonts/kalam/Kalam-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Coming Soon";
-  src: url("/fonts/comingsoon/ComingSoon-Regular.ttf") format("truetype");
+  font-family: "Nothing You Could Do";
+  src: url("/fonts/nothingyoucoulddo/NothingYouCouldDo.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Reenie Beanie";
+  src: url("/fonts/reeniebeanie/ReenieBeanie.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Homemade Apple";
+  src: url("/fonts/homemadeapple/HomemadeApple-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "La Belle Aurore";
+  src: url("/fonts/labelleaurore/LaBelleAurore.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cedarville Cursive";
+  src: url("/fonts/cedarvillecursive/Cedarville-Cursive.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -63,112 +79,193 @@
 }
 
 @font-face {
-  font-family: "Handlee";
-  src: url("/fonts/handlee/Handlee-Regular.ttf") format("truetype");
+  font-family: "Alex Brush";
+  src: url("/fonts/alex-brush/alex-brush.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Homemade Apple";
-  src: url("/fonts/homemadeapple/HomemadeApple-Regular.ttf") format("truetype");
+  font-family: "Allura";
+  src: url("/fonts/allura/allura.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Indie Flower";
-  src: url("/fonts/indieflower/IndieFlower-Regular.ttf") format("truetype");
+  font-family: "Charm";
+  src: url("/fonts/charm/charm.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Just Another Hand";
-  src: url("/fonts/justanotherhand/JustAnotherHand-Regular.ttf") format("truetype");
+  font-family: "Cookie";
+  src: url("/fonts/cookie/cookie.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Kalam";
-  src: url("/fonts/kalam/Kalam-Regular.ttf") format("truetype");
+  font-family: "Dancing Script";
+  src: url("/fonts/dancing-script/dancing-script.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Delius Unicase";
+  src: url("/fonts/delius-unicase/delius-unicase.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "La Belle Aurore";
-  src: url("/fonts/labelleaurore/LaBelleAurore.ttf") format("truetype");
+  font-family: "Gochi Hand";
+  src: url("/fonts/gochi-hand/gochi-hand.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Nothing You Could Do";
-  src: url("/fonts/nothingyoucoulddo/NothingYouCouldDo.ttf") format("truetype");
+  font-family: "Great Vibes";
+  src: url("/fonts/great-vibes/great-vibes.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Patrick Hand";
-  src: url("/fonts/patrickhand/PatrickHand-Regular.ttf") format("truetype");
+  font-family: "Italianno";
+  src: url("/fonts/italianno/italianno.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0000-005E, U+0060-10FFFF;
+}
+
+@font-face {
+  font-family: "Kaushan Script";
+  src: url("/fonts/kaushan-script/kaushan-script.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Reenie Beanie";
-  src: url("/fonts/reeniebeanie/ReenieBeanie.ttf") format("truetype");
+  font-family: "Meddon";
+  src: url("/fonts/meddon/meddon.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Schoolbell";
-  src: url("/fonts/schoolbell/Schoolbell-Regular.ttf") format("truetype");
+  font-family: "Meie Script";
+  src: url("/fonts/meie-script/meie-script.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Shadows Into Light";
-  src: url("/fonts/shadowsintolight/ShadowsIntoLight.ttf") format("truetype");
+  font-family: "Monsieur La Doulaise";
+  src: url("/fonts/monsieur-la-doulaise/monsieur-la-doulaise.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Shadows Into Light Two";
-  src: url("/fonts/shadowsintolighttwo/ShadowsIntoLightTwo-Regular.ttf") format("truetype");
+  font-family: "Mr Dafoe";
+  src: url("/fonts/mr-dafoe/mr-dafoe.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Sue Ellen Francisco";
-  src: url("/fonts/sueellenfrancisco/SueEllenFrancisco-Regular.ttf") format("truetype");
+  font-family: "Ms Madi";
+  src: url("/fonts/ms-madi/ms-madi.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Waiting for the Sunrise";
-  src: url("/fonts/waitingforthesunrise/WaitingfortheSunrise.ttf") format("truetype");
+  font-family: "Nanum Pen";
+  src: url("/fonts/nanum-pen-script/nanum-pen-script.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Oooh Baby";
+  src: url("/fonts/oooh-baby/oooh-baby.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pangolin";
+  src: url("/fonts/pangolin/pangolin.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rock Salt";
+  src: url("/fonts/rock-salt/rock-salt.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ruthie";
+  src: url("/fonts/ruthie/ruthie.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Style Script";
+  src: url("/fonts/style-script/style-script.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Walter Turncoat";
+  src: url("/fonts/walter-turncoat/walter-turncoat.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Whisper";
+  src: url("/fonts/whisper/whisper.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "WindSong";
+  src: url("/fonts/windsong/windsong.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;

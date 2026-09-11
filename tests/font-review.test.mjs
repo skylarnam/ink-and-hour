@@ -1,16 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import opentype from 'opentype.js';
 import { HANDWRITING_STYLES } from '../src/handwriting.ts';
 import { ReviewStore, readCatalog, projectFile, SAMPLE } from '../font-review/store.mjs';
 import { startReviewServer } from '../font-review/server.mjs';
 
-test('the real collection has 100 distinct licensed faces, full ASCII and all 22 current styles', async () => {
+test('the real collection preserves 100 distinct licensed faces and marks all 34 applied styles', async () => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const catalog = await readCatalog(root);
   assert.equal(new Set(catalog.candidates.map(({ family }) => family.toLowerCase())).size, 100);
@@ -33,14 +32,18 @@ test('the real collection has 100 distinct licensed faces, full ASCII and all 22
   assert.ok(checkboxes.every((markup) => !/\schecked(?:\s|=|>)/.test(markup)));
   assert.equal((html.match(/@font-face\s*\{/g) ?? []).length, 100);
   assert.equal((html.match(/class="sample"/g) ?? []).length, 100);
+  assert.match(html, /including all 34 currently applied styles/);
+  assert.match(html, /font-review\/applied-selection\.json/);
+  assert.equal(catalog.candidates.find(({ id }) => id === 'print').current, false);
 });
 
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'ink-font-review-'));
+  const root = join(fileURLToPath(new URL('../', import.meta.url)), `.font-review-test-${randomUUID()}`);
+  await mkdir(root);
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, 'font-review'));
   const candidates = Array.from({ length: 100 }, (_, index) => ({
-    id: `font-${index}`, label: `Font ${index}`, family: `Font ${index}`, current: index < 22,
+    id: `font-${index}`, label: `Font ${index}`, family: `Font ${index}`, current: index < 34,
     fontFile: `font-review/fonts/font-${index}.ttf`, licenseFile: `font-review/licenses/font-${index}/OFL.txt`,
     source: 'https://github.com/google/fonts', license: 'OFL-1.1',
     fontSha256: 'a'.repeat(64), licenseSha256: 'b'.repeat(64), missingAscii: [],
@@ -75,6 +78,17 @@ test('queued checkbox changes preserve every selection and survive a new store i
   assert.deepEqual(summary.selectedFonts.map(({ id }) => id), ['font-2', 'font-99']);
   assert.equal(summary.revision, 4);
   assert.equal(summary.file, join(root, 'font-review/selection.json'));
+});
+
+test('later checkbox edits never overwrite the separately applied website snapshot', async (t) => {
+  const { root, store } = await fixture(t);
+  const path = join(root, 'font-review/applied-selection.json');
+  const approved = '{"version":1,"sourceRevision":34,"selected":["font-4"]}\n';
+  await writeFile(path, approved);
+  await store.update('font-80', true);
+  await store.update('font-4', false);
+  assert.deepEqual((await store.read()).selected, ['font-80']);
+  assert.equal(await readFile(path, 'utf8'), approved);
 });
 
 test('unknown choices reject explicitly without poisoning the next valid save', async (t) => {

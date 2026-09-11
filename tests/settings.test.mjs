@@ -28,7 +28,7 @@ test('preferences reject unknown choices and nonfinite numbers', () => {
 test('preferences preserve real choices and clamp every numeric control', () => {
   const result = sanitizeSettings({
     mood: 'storybook', weather: 'clear', paper: 'cotton', ink: 'forest', pen: 'dip',
-    nib: 'broad', style: 'print', musicTrack: 'glass', time: 99, speed: -4,
+    nib: 'broad', style: 'caveat', musicTrack: 'glass', time: 99, speed: -4,
     masterVolume: 4, writingVolume: -2, ambienceVolume: 0.36, musicVolume: 0,
   });
   assert.equal(result.mood, 'storybook');
@@ -41,6 +41,19 @@ test('preferences preserve real choices and clamp every numeric control', () => 
   assert.equal(result.ambienceVolume, 0.36);
   assert.equal(result.musicVolume, 0);
   assert.equal('enabled' in result, false);
+});
+
+test('lettering defaults are left aligned at 100% and invalid preferences are sanitized', () => {
+  assert.equal(DEFAULT_SETTINGS.textScale, 1);
+  assert.equal(DEFAULT_SETTINGS.textAlignment, 'left');
+  for (const textScale of [NaN, Infinity, null, '2']) {
+    assert.equal(sanitizeSettings({ textScale }).textScale, 1);
+  }
+  assert.equal(sanitizeSettings({ textScale: 9 }).textScale, 2);
+  assert.equal(sanitizeSettings({ textScale: -1 }).textScale, 0.75);
+  assert.equal(sanitizeSettings({ textAlignment: 'right' }).textAlignment, 'left');
+  assert.equal(sanitizeSettings({ textAlignment: 'center', textScale: 1.35 }).textAlignment, 'center');
+  assert.equal(sanitizeSettings({ textScale: 1.35 }).textScale, 1.35);
 });
 
 function withStorage(storage, run) {
@@ -59,7 +72,10 @@ test('saved preferences round-trip without persisting text or sound consent', ()
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
   }, () => {
-    const desired = { ...DEFAULT_SETTINGS, mood: 'atelier', nib: 'fine', musicTrack: 'glass' };
+    const desired = {
+      ...DEFAULT_SETTINGS, mood: 'atelier', nib: 'fine', musicTrack: 'glass',
+      textScale: 1.35, textAlignment: 'center',
+    };
     saveSettings({ ...desired, enabled: true, message: 'Private note' }, (message) => errors.push(message));
     assert.deepEqual(loadSettings((message) => errors.push(message)), desired);
     const saved = JSON.parse(values.get(STORAGE_KEY));

@@ -10,7 +10,7 @@ import { loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
 import { PaperSurface } from './textures.ts';
 import { icon, renderUI } from './ui.ts';
 import { PAGE } from './types.ts';
-import type { CameraPreset, Settings, WritingStatus } from './types.ts';
+import type { CameraPreset, LayoutOptions, PenSample, Settings, WritingStatus } from './types.ts';
 import { layoutText, restyleRemainingText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
 
 function element<T extends Element>(selector: string): T {
@@ -43,13 +43,15 @@ const editorZoom = createEditorZoom(textarea, {
   smaller: element<HTMLButtonElement>('#smaller-editor-text'),
   larger: element<HTMLButtonElement>('#larger-editor-text'),
   hint: element<HTMLElement>('#editor-size-hint'),
+  initialScale: settings.textScale,
+  onChange: (textScale) => updateLettering({ textScale }, false),
 });
 const beginButton = element<HTMLButtonElement>('#begin-writing');
 const styleSelect = element<HTMLSelectElement>('#style');
 const paper = new PaperSurface();
 paper.setPaper(settings.paper);
-let layout = layoutText(textarea.value, { ...PAGE, style: settings.style });
-let engine = new WritingEngine(layout, settings);
+let layout = layoutText(textarea.value, letteringOptions());
+let engine = layout.ok ? new WritingEngine(layout, settings) : null;
 let scene: DeskScene | null = null;
 let rollOpen = false;
 let capped = settings.pen === 'fountain';
@@ -60,6 +62,16 @@ let lastTimestamp = 0;
 let elapsed = 0;
 let animationId = 0;
 let soundActivation: Promise<boolean> | null = null;
+
+function letteringOptions(next = settings): LayoutOptions {
+  return { ...PAGE, style: next.style, textScale: next.textScale, textAlignment: next.textAlignment };
+}
+
+function currentPen(): PenSample {
+  return engine?.peek() ?? {
+    x: 0, y: 0, contact: false, lift: 0.42, pressure: 0, speed: 0, angle: 0, progress: 0, status: 'idle',
+  };
+}
 
 const rooms = {
   study: { name: 'Rainy Study', description: 'Walnut, lamplight, and nowhere else to be.' },
@@ -190,8 +202,14 @@ function syncSettings(): void {
   textarea.dataset.handwriting = settings.style;
   textarea.style.setProperty('--editor-font', JSON.stringify(handwriting.family));
   textarea.style.setProperty('--editor-size', `${handwriting.editorSize}px`);
-  textarea.style.setProperty('--editor-line-height', settings.style === 'print' ? '27.2px' : '27px');
-  element<HTMLElement>('#handwriting-note').hidden = settings.style === 'correspondence' || settings.style === 'print';
+  textarea.style.setProperty('--editor-line-height', `${Math.max(27, handwriting.editorSize * 1.5)}px`);
+  textarea.style.textAlign = settings.textAlignment;
+  editorZoom.setScale(settings.textScale);
+  const handwritingNote = element<HTMLElement>('#handwriting-note');
+  handwritingNote.hidden = settings.style === 'correspondence';
+  handwritingNote.textContent = settings.style === 'italianno'
+    ? 'An interpreted stroke study. A serif fallback keeps its blank source underscores visible.'
+    : 'A font-inspired stroke study, with an interpreted pen order.';
   element<HTMLOutputElement>('#speed-label').value = `${settings.speed.toFixed(1).replace('.0', '')}x`;
   const hours = Math.floor(settings.time) % 24;
   const minutes = Math.round((settings.time % 1) * 60);
@@ -216,7 +234,7 @@ function updateSettings(next: unknown): void {
   if (settings.musicTrack !== 'lofi') recordedMusic.pause();
   recordedMusic.select(settings.lofiTrack);
   if (previous.pen !== settings.pen) {
-    capped = settings.pen === 'fountain' && engine.status === 'idle';
+    capped = settings.pen === 'fountain' && (engine?.status ?? 'idle') === 'idle';
     scene?.setCapped(capped);
     audio.cue('cap');
   }
@@ -225,13 +243,13 @@ function updateSettings(next: unknown): void {
   if (previous.nib !== settings.nib) audio.cue('cap');
   scene?.configure(settings);
   audio.configure(settings);
-  engine.updateOptions(settings);
+  engine?.updateOptions(settings);
   saveSettings(settings, notify);
   syncSettings();
 }
 
 function validateDraft(): void {
-  layout = layoutText(textarea.value, { ...PAGE, style: settings.style });
+  layout = layoutText(textarea.value, letteringOptions());
   const error = element<HTMLParagraphElement>('#input-error');
   error.textContent = layout.error;
   error.hidden = layout.ok;
@@ -241,7 +259,7 @@ function validateDraft(): void {
 }
 
 function syncWriting(): void {
-  const status = engine.status;
+  const status = engine?.status ?? 'idle';
   const active = status === 'writing';
   const paused = status === 'paused';
   const complete = status === 'complete';
@@ -250,6 +268,10 @@ function syncWriting(): void {
   beginButton.innerHTML = `${icon(buttonIcon)}<span>${label}</span>${icon('arrow', 'begin-arrow')}`;
   textarea.readOnly = active || paused;
   styleSelect.disabled = active;
+  editorZoom.setEnabled(!active);
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting="textAlignment"]')) {
+    button.disabled = active;
+  }
   element<HTMLButtonElement>('#export-sheet').hidden = !complete;
   element<HTMLElement>('#scene-status').textContent = active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
   element<HTMLElement>('#writing-note').textContent = active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep it, or begin again.' : 'No hurry. No right words.';
@@ -259,7 +281,7 @@ function syncWriting(): void {
 
 function newSheet(announce = true): void {
   audio.updateContact({ contact: false, speed: 0, pressure: 0 });
-  engine.reset();
+  engine?.reset();
   paper.clear();
   dirtyDraft = false;
   validateDraft();
@@ -279,7 +301,7 @@ function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
     element<HTMLButtonElement>('#toggle-roll').setAttribute('aria-pressed', String(rollOpen));
     element<HTMLSpanElement>('#toggle-roll span').textContent = rollOpen ? 'Tie leather roll' : 'Untie leather roll';
   } else if (action === 'cap' && settings.pen === 'fountain') {
-    if (engine.status === 'writing') {
+    if (engine?.status === 'writing') {
       notify('Pause the pen before replacing its cap.');
       return;
     }
@@ -299,7 +321,7 @@ try {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   scene.setReducedMotion(reducedMotion.matches);
   reducedMotion.addEventListener('change', (event) => scene?.setReducedMotion(event.matches));
-  scene.updatePen(engine.peek());
+  scene.updatePen(currentPen());
   scene.update(0, 0);
   element<HTMLDivElement>('#scene-loading').hidden = true;
 } catch (error) {
@@ -311,16 +333,16 @@ try {
 }
 
 beginButton.addEventListener('click', () => {
-  if (engine.status === 'writing') {
+  if (engine?.status === 'writing') {
     engine.pause();
     audio.updateContact(engine.peek());
-  } else if (engine.status === 'paused') {
+  } else if (engine?.status === 'paused') {
     if (capped) { capped = false; scene?.setCapped(false); audio.cue('cap'); }
     engine.resume();
   } else {
     validateDraft();
     if (!layout.ok) return;
-    if (engine.status === 'complete' || dirtyDraft) paper.clear();
+    if (engine?.status === 'complete' || dirtyDraft) paper.clear();
     engine = new WritingEngine(layout, settings);
     if (capped) { capped = false; scene?.setCapped(false); audio.cue('cap'); }
     if (settings.pen === 'dip') audio.cue('ink');
@@ -333,13 +355,47 @@ beginButton.addEventListener('click', () => {
 
 textarea.addEventListener('input', () => {
   dirtyDraft = true;
-  if (engine.status === 'complete') {
+  if (engine?.status === 'complete') {
     engine.reset();
     paper.clear();
     syncWriting();
   }
   validateDraft();
 });
+
+function updateLettering(change: Partial<Pick<Settings, 'style' | 'textScale' | 'textAlignment'>>, announce = true): boolean {
+  const next = sanitizeSettings({ ...settings, ...change });
+  if (next.style === settings.style && next.textScale === settings.textScale
+    && next.textAlignment === settings.textAlignment) return true;
+  if (engine?.status === 'writing') {
+    notify('Pause the pen before changing the lettering.');
+    syncSettings();
+    return false;
+  }
+  if (engine?.status === 'paused') {
+    const revised = restyleRemainingText(textarea.value, layout, letteringOptions(next), engine.startedStrokeCount);
+    if (!revised.layout.ok) {
+      notify(`The remaining words do not fit at that lettering size or style. Your ink is unchanged. ${revised.layout.error}`);
+      syncSettings();
+      return false;
+    }
+    const hasNewLetters = revised.fromStroke < layout.strokes.length;
+    const alignmentChanged = next.textAlignment !== settings.textAlignment;
+    if (hasNewLetters) engine.replaceUnwrittenStrokes(revised.fromStroke, revised.layout.strokes.slice(revised.fromStroke));
+    layout = revised.layout;
+    updateSettings(next);
+    syncWriting();
+    if (announce) notify(!hasNewLetters
+      ? 'This is the last letter. Your lettering choice is ready for the next sheet.'
+      : alignmentChanged
+        ? 'Lines with ink keep their place. New lines use your chosen alignment.'
+        : 'The current letter keeps its shape. Your new lettering starts with the next letter.');
+    return true;
+  }
+  updateSettings(next);
+  newSheet(false);
+  return true;
+}
 
 styleSelect.addEventListener('change', () => {
   const style = styleSelect.value;
@@ -348,36 +404,17 @@ styleSelect.addEventListener('change', () => {
     syncSettings();
     return;
   }
-  if (engine.status === 'writing') {
-    notify('Pause the pen before changing handwriting.');
-    syncSettings();
-    return;
-  }
-  if (engine.status === 'paused') {
-    const revised = restyleRemainingText(textarea.value, layout, { ...PAGE, style }, engine.startedStrokeCount);
-    if (!revised.layout.ok) {
-      notify(`The remaining words do not fit in that handwriting. Your ink is unchanged. ${revised.layout.error}`);
-      syncSettings();
-      return;
-    }
-    const hasNewLetters = revised.fromStroke < layout.strokes.length;
-    if (hasNewLetters) engine.replaceUnwrittenStrokes(revised.fromStroke, revised.layout.strokes.slice(revised.fromStroke));
-    layout = revised.layout;
-    updateSettings({ ...settings, style });
-    syncWriting();
-    notify(hasNewLetters
-      ? 'The current letter will keep its shape. New handwriting starts with the next letter.'
-      : 'This is the last letter. Your new handwriting is ready for the next sheet.');
-    return;
-  }
-  updateSettings({ ...settings, style });
-  newSheet(false);
+  updateLettering({ style });
 });
 
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting]')) {
   button.addEventListener('click', () => {
     const key = button.dataset.setting;
-    if (key === 'musicTrack' && button.dataset.value === 'lofi') void startRecordedMusic();
+    if (key === 'textAlignment') {
+      const textAlignment = button.dataset.value;
+      if (textAlignment === 'left' || textAlignment === 'center') updateLettering({ textAlignment });
+      else notify('Choose left or center alignment.');
+    } else if (key === 'musicTrack' && button.dataset.value === 'lofi') void startRecordedMusic();
     else if (key) updateSettings({ ...settings, [key]: button.dataset.value });
   });
 }
@@ -464,15 +501,15 @@ element<HTMLButtonElement>('#close-about').addEventListener('click', () => dialo
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
 function visibilityChanged(): void {
   if (document.hidden) recordedMusic.setAvailable(false);
-  if (document.hidden && engine.status === 'writing') { engine.pause(); syncWriting(); }
+  if (document.hidden && engine?.status === 'writing') { engine.pause(); syncWriting(); }
   lastTimestamp = 0;
   void audio.setHidden(document.hidden).then(() => { if (!disposed) updateAudioButtons(); });
 }
 document.addEventListener('visibilitychange', visibilityChanged);
 element<HTMLCanvasElement>('#desk-canvas').addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
-  engine.pause();
-  audio.updateContact(engine.peek());
+  engine?.pause();
+  audio.updateContact(currentPen());
   syncWriting();
   notify('The graphics context was interrupted. Reload the page to restore the room.');
 });
@@ -487,13 +524,13 @@ function frame(timestamp: number): void {
   lastTimestamp = timestamp;
   if (!document.hidden && scene) {
     elapsed += delta;
-    const result = engine.tick(delta);
+    const result = engine?.tick(delta) ?? { pen: currentPen(), segments: [] };
     paper.draw(result.segments, inkColor(settings));
     paper.flush();
     scene.updatePen(result.pen, delta);
     audio.updateContact(result.pen);
     scene.update(delta, elapsed);
-    if (engine.status !== lastStatus) syncWriting();
+    if (result.pen.status !== lastStatus) syncWriting();
   }
   animationId = requestAnimationFrame(frame);
 }
@@ -509,10 +546,10 @@ if (import.meta.env.DEV) {
   Object.defineProperty(window, '__inkAndHour', {
     configurable: true,
     get: () => ({
-      scene: scene?.diagnostics ?? null, writing: { ...engine.peek(), strokeCount: layout.strokes.length },
+      scene: scene?.diagnostics ?? null, writing: { ...currentPen(), strokeCount: layout.strokes.length },
       audio: audio.diagnostics, settings: { ...settings }, validInput: layout.ok, inputError: layout.error,
       music: recordedMusic.state,
-      editor: { zoom: editorZoom.scale },
+      editor: { zoom: editorZoom.scale, alignment: settings.textAlignment },
     }),
   });
 }
