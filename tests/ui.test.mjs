@@ -4,7 +4,7 @@ import { LOFI_TRACKS } from '../src/music-library.ts';
 import { HANDWRITING_STYLES } from '../src/handwriting.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { renderUI } from '../src/ui.ts';
-import { WRITING_SOUNDS } from '../src/writing-sounds.ts';
+import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, writingSoundDescriptor } from '../src/writing-sounds.ts';
 
 test('the footer no longer duplicates the completed scene caption or retired gallery', () => {
   const html = renderUI();
@@ -40,16 +40,18 @@ test('the mini-player is before the sound switch and includes transport labels a
   }
 });
 
-test('the sound panel offers an accessible live comparison and an explicit original-sound rollback', () => {
+test('the sound panel offers only the four approved sounds and describes Dry fibers initially', () => {
   const html = renderUI();
   const panel = html.match(/<section id="panel-sound"[\s\S]*?<\/section>/)[0];
-  assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 7);
+  assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 4);
   for (const { id, label } of WRITING_SOUNDS) {
     assert.ok(panel.includes(`data-setting="writingSound" data-value="${id}" aria-pressed="false">${label}</button>`));
   }
   assert.ok(panel.includes('id="writing-sound-description"'));
   assert.match(panel, /<fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND<\/legend>/);
-  assert.ok(panel.includes('Original restores the previous pen sound'));
+  for (const retired of ['original', 'warm-paper', 'crisp-nib']) assert.equal(panel.includes(`data-value="${retired}"`), false);
+  assert.equal(panel.includes('Original restores'), false);
+  assert.ok(panel.includes(`<span id="writing-sound-description">${writingSoundDescriptor(DEFAULT_WRITING_SOUND).description}</span>`));
   assert.ok(panel.includes('Compare while writing'));
   assert.ok(panel.includes('Your choice is saved'));
 });

@@ -11,12 +11,7 @@ export const WRITING_SOUNDS = [
   {
     id: 'textured',
     label: 'Textured',
-    description: 'An irregular contact texture that responds to pressure, paper and nib. The default.',
-  },
-  {
-    id: 'original',
-    label: 'Original',
-    description: 'Original restores the previous pen sound, a single filtered friction layer.',
+    description: 'An irregular contact texture that responds to pressure, paper and nib.',
   },
   {
     id: 'soft-glide',
@@ -31,24 +26,13 @@ export const WRITING_SOUNDS = [
   {
     id: 'dry-fibers',
     label: 'Dry fibers',
-    description: 'Coarser, clearly separated fiber drag with longer pauses between patches.',
-  },
-  {
-    id: 'warm-paper',
-    label: 'Warm paper',
-    description: 'A darker, broad rubbing body with only faint fiber accents beneath it.',
-  },
-  {
-    id: 'crisp-nib',
-    label: 'Crisp nib',
-    description: 'Compact, brighter fine-nib scratch detail over a restrained, narrow body.',
+    description: 'Coarser, clearly separated fiber drag with longer pauses between patches. The default.',
   },
 ] as const satisfies readonly WritingSoundDescriptor[];
 
 export type WritingSoundId = (typeof WRITING_SOUNDS)[number]['id'];
 
-/** Every contact-texture palette, i.e. every writing sound except the single-layer Original. */
-export type ContactSoundId = Exclude<WritingSoundId, 'original'>;
+export const DEFAULT_WRITING_SOUND: WritingSoundId = 'dry-fibers';
 
 export const WRITING_SOUND_IDS: readonly WritingSoundId[] = WRITING_SOUNDS.map((sound) => sound.id);
 

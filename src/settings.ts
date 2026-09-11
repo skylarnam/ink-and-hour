@@ -3,7 +3,7 @@ import { MIN_TEXT_SCALE, MAX_TEXT_SCALE } from './types.ts';
 import { isInkColor } from './ink.ts';
 import { LOFI_TRACK_IDS } from './music-library.ts';
 import { HANDWRITING_IDS } from './handwriting.ts';
-import { WRITING_SOUND_IDS } from './writing-sounds.ts';
+import { DEFAULT_WRITING_SOUND, WRITING_SOUND_IDS } from './writing-sounds.ts';
 
 export const STORAGE_KEY = 'ink-and-hour:preferences:v1';
 
@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   speed: 1,
   masterVolume: 0.7,
   writingVolume: 0.3,
-  writingSound: 'textured',
+  writingSound: DEFAULT_WRITING_SOUND,
   ambienceVolume: 0.2,
   musicVolume: 0.2,
   musicTrack: 'lofi',

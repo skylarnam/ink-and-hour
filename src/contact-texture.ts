@@ -1,5 +1,5 @@
 import type { AudioContact, Settings } from './types.ts';
-import type { ContactSoundId } from './writing-sounds.ts';
+import { DEFAULT_WRITING_SOUND, type WritingSoundId } from './writing-sounds.ts';
 
 export interface ContactTextureParameters {
   gain: number;
@@ -26,27 +26,23 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 // Per-palette spectral/balance bias layered on the same pressure/speed/paper/nib/holder model.
-// 'textured' is the identity (grainBias 0, brightness 1) so the published Textured output is
-// byte-for-byte unaffected by adding the other five palettes here.
 interface ProfileVoicing {
   readonly grainBias: number;
   readonly bodyBrightness: number;
   readonly grainBrightness: number;
 }
 
-const PROFILE_VOICING: Record<ContactSoundId, ProfileVoicing> = {
+const PROFILE_VOICING: Record<WritingSoundId, ProfileVoicing> = {
   textured: { grainBias: 0, bodyBrightness: 1, grainBrightness: 1 },
   'soft-glide': { grainBias: -0.10, bodyBrightness: 0.86, grainBrightness: 0.82 },
   'fine-feedback': { grainBias: 0.05, bodyBrightness: 0.96, grainBrightness: 1.16 },
   'dry-fibers': { grainBias: 0.09, bodyBrightness: 0.92, grainBrightness: 1.06 },
-  'warm-paper': { grainBias: -0.15, bodyBrightness: 0.72, grainBrightness: 0.68 },
-  'crisp-nib': { grainBias: 0.11, bodyBrightness: 1.04, grainBrightness: 1.34 },
 };
 
 export function contactTextureParameters(
   sample: AudioContact,
   settings: Settings,
-  profile: ContactSoundId = 'textured',
+  profile: WritingSoundId = DEFAULT_WRITING_SOUND,
 ): ContactTextureParameters {
   const speed = Number.isFinite(sample.speed) ? clamp(sample.speed, 0, 280) : 0;
   const motion = speed / 280;
@@ -186,7 +182,7 @@ interface BodyConfig {
   readonly rubbingValue: readonly [number, number];
 }
 
-const BODY_CONFIG: Record<ContactSoundId, BodyConfig> = {
+const BODY_CONFIG: Record<WritingSoundId, BodyConfig> = {
   textured: {
     noiseSeed: 0x681bc3a7, structureSeed: 0x2d4f906b, lowHz: 2300, highHz: 105,
     surfaceTime: [0.16, 0.73], surfaceValue: [0.58, 1.28], rubbingTime: [0.025, 0.11], rubbingValue: [0.82, 1.12],
@@ -205,16 +201,6 @@ const BODY_CONFIG: Record<ContactSoundId, BodyConfig> = {
   'dry-fibers': {
     noiseSeed: 0x2c85f471, structureSeed: 0x6b3ea90d, lowHz: 1900, highHz: 95,
     surfaceTime: [0.22, 0.95], surfaceValue: [0.50, 1.35], rubbingTime: [0.03, 0.15], rubbingValue: [0.70, 1.25],
-  },
-  // Darker, broad rubbing body: the darkest band, slowest and narrowest drift.
-  'warm-paper': {
-    noiseSeed: 0xd41a7c56, structureSeed: 0x35f80e2a, lowHz: 1150, highHz: 60,
-    surfaceTime: [0.40, 1.30], surfaceValue: [0.80, 1.10], rubbingTime: [0.06, 0.28], rubbingValue: [0.92, 1.05],
-  },
-  // Compact bright detail sits above this: a restrained, moderately bright body.
-  'crisp-nib': {
-    noiseSeed: 0x5f2b93c4, structureSeed: 0xe07a41d8, lowHz: 2600, highHz: 130,
-    surfaceTime: [0.10, 0.45], surfaceValue: [0.55, 1.25], rubbingTime: [0.02, 0.09], rubbingValue: [0.80, 1.15],
   },
 };
 
@@ -236,7 +222,7 @@ interface GrainConfig {
   readonly gapPower: number;
 }
 
-const GRAIN_CONFIG: Record<ContactSoundId, GrainConfig> = {
+const GRAIN_CONFIG: Record<WritingSoundId, GrainConfig> = {
   textured: {
     noiseSeed: 0xc0a4f39d, structureSeed: 0x9752de13, lowHz: 6200, highHz: 650,
     fibersTime: [0.12, 0.48], fibersValue: [0.45, 1.15], initialGap: 0.013,
@@ -259,18 +245,6 @@ const GRAIN_CONFIG: Record<ContactSoundId, GrainConfig> = {
     noiseSeed: 0x3ae07c95, structureSeed: 0xb6428f10, lowHz: 6800, highHz: 750,
     fibersTime: [0.18, 0.60], fibersValue: [0.40, 1.30], initialGap: 0.030,
     patchLength: [0.030, 0.110], strength: [0.45, 1.20], gapBase: 0.020, gapScale: 0.120, gapPower: 2,
-  },
-  // Faint fiber accents under a dominant body: darkest grain band, quiet and sparse.
-  'warm-paper': {
-    noiseSeed: 0x9c48e731, structureSeed: 0x257da9c4, lowHz: 3400, highHz: 420,
-    fibersTime: [0.25, 0.85], fibersValue: [0.35, 0.90], initialGap: 0.028,
-    patchLength: [0.025, 0.090], strength: [0.20, 0.65], gapBase: 0.018, gapScale: 0.100, gapPower: 2,
-  },
-  // Compact, brighter fine-nib scratch detail: the brightest band, dense short patches.
-  'crisp-nib': {
-    noiseSeed: 0x6b1fd845, structureSeed: 0xa03e97c2, lowHz: 8200, highHz: 1050,
-    fibersTime: [0.06, 0.24], fibersValue: [0.55, 1.30], initialGap: 0.004,
-    patchLength: [0.005, 0.018], strength: [0.45, 1.15], gapBase: 0.002, gapScale: 0.014, gapPower: 1.4,
   },
 };
 
@@ -337,7 +311,7 @@ function grainTexture(sampleRate: number, config: GrainConfig): Float32Array {
 }
 
 /** Mono synthesis for unity-rate playback; callers own lazy generation and caching. */
-export function createContactTextures(sampleRate: number, profile: ContactSoundId = 'textured'): ContactTextures {
+export function createContactTextures(sampleRate: number, profile: WritingSoundId = DEFAULT_WRITING_SOUND): ContactTextures {
   // At most 4,608,000 samples; supported rates retain their 11/13-second durations.
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 192000) {
     throw new RangeError('Contact textures require an integer sample rate between 8000 and 192000 Hz.');

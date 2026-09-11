@@ -126,12 +126,11 @@ it in a terminal separates its lifetime from the agent's completed work.
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
   Previously saved volume and music choices, including **Off**, are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
-  **Sound > Writing sound** offers **Textured** (still the default), **Original**
-  (the previous writing sound, unchanged), **Soft glide**, **Fine feedback**,
-  **Dry fibers**, **Warm paper**, and **Crisp nib**. Switch during a stroke to compare;
+  **Sound > Writing sound** offers **Textured**, **Soft glide**, **Fine feedback**,
+  and **Dry fibers** (the default). Switch during a stroke to compare;
   it does not restart the pen or change the page. The choice persists across
-  visits. Choose **Original** to revert instantly, without a reinstall or
-  deployment. This choice affects only writing friction, not the mixer levels,
+  visits. Saved choices among these four are preserved; missing or retired
+  choices use Dry fibers. This choice affects only writing friction, not the mixer levels,
   rain, music, cap, leather, paper, or bottle sounds.
   The ambience slider controls rain and thunder together. Recordings share
   the music/master mixer and pause when muted, hidden, or set to zero volume.
@@ -235,16 +234,15 @@ restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 Paper relief has its own cached height texture; ink changes do not rebuild it.
 
-Writing has seven independently selectable sound profiles. **Original** retains
-the previous soft, filtered friction buffer, modulation, and parameter mapping.
-**Textured** blends original, procedurally generated rubbing and irregular
-paper-fiber detail through broad, non-resonant filters. Its balance follows
+Writing has four independently selectable sound profiles, with **Dry fibers**
+as the default. They blend original, procedurally generated rubbing and irregular
+paper-fiber detail through broad, non-resonant filters. Their balance follows
 speed, pressure, paper, nib, and holder; broad-edge contact also follows stroke
-direction. It uses no pitched grains, control oscillators, or playback-rate
-changes. **Soft glide**, **Fine feedback**, **Dry fibers**, **Warm paper**, and
-**Crisp nib** retain that contact model, with distinct rubbing drift, fiber-patch
+direction. They use no pitched grains, control oscillators, or playback-rate
+changes. **Textured**, **Soft glide**, **Fine feedback**, and **Dry fibers**
+share that contact model, with distinct rubbing drift, fiber-patch
 lengths/gaps, spectral bands, and layer balances. They are synthesis palettes,
-not recordings of particular pen models. Original and Textured remain unchanged.
+not recordings of particular pen models. All four retain their established timbres.
 A downstroke is not automatically treated as a hard contact.
 All profiles exist only during moving contact: their friction fades to exact
 zero within 7 ms of a lift and their sources stop within 12 ms. Material
@@ -287,7 +285,7 @@ fallbacks; playback intent is not stored.
   nib hardware. Broad and flex behavior are deliberately different.
 - Friction/weather/material sounds and the two original beds are synthesized,
   not recorded ASMR. The new lo-fi playlist is genuine recorded music.
-  The six contact-texture profiles are experimental interpretations of contact
+  The four contact-texture profiles are experimental interpretations of contact
   mechanics, not a calibrated physical model or a reproduction of reference
   recordings. No YouTube audio was sampled or bundled; reference study used
   visual/signal analysis and specialist sources, not direct audio audition.

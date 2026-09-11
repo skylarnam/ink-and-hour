@@ -1,20 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WRITING_SOUNDS, WRITING_SOUND_IDS, isWritingSoundId, writingSoundDescriptor } from '../src/writing-sounds.ts';
+import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, WRITING_SOUND_IDS, isWritingSoundId, writingSoundDescriptor } from '../src/writing-sounds.ts';
 
-test('the registry has exactly seven entries in the required order with the exact ids and labels', () => {
-  assert.equal(WRITING_SOUNDS.length, 7);
+test('the registry contains only the four approved sounds, with Dry fibers as default', () => {
+  assert.equal(DEFAULT_WRITING_SOUND, 'dry-fibers');
+  assert.equal(WRITING_SOUNDS.length, 4);
   assert.deepEqual(WRITING_SOUNDS.map((sound) => sound.id), [
-    'textured', 'original', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib',
+    'textured', 'soft-glide', 'fine-feedback', 'dry-fibers',
   ]);
   const expectedLabels = {
     textured: 'Textured',
-    original: 'Original',
     'soft-glide': 'Soft glide',
     'fine-feedback': 'Fine feedback',
     'dry-fibers': 'Dry fibers',
-    'warm-paper': 'Warm paper',
-    'crisp-nib': 'Crisp nib',
   };
   for (const sound of WRITING_SOUNDS) assert.equal(sound.label, expectedLabels[sound.id]);
 });
@@ -35,7 +33,7 @@ test('WRITING_SOUND_IDS mirrors the registry order exactly', () => {
 
 test('isWritingSoundId accepts every registered id and rejects unknown or malformed values', () => {
   for (const id of WRITING_SOUND_IDS) assert.equal(isWritingSoundId(id), true);
-  for (const value of ['', 'Original', 'unknown', 'soft_glide', 'Soft glide', ' textured', 'textured ']) {
+  for (const value of ['original', 'warm-paper', 'crisp-nib', '', 'Original', 'unknown', 'soft_glide', 'Soft glide', ' textured', 'textured ']) {
     assert.equal(isWritingSoundId(value), false);
   }
 });

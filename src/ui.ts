@@ -1,7 +1,7 @@
 import { LOFI_TRACKS } from './music-library.ts';
 import { HANDWRITING_STYLES } from './handwriting.ts';
 import { soundPresentation } from './sound-startup.ts';
-import { WRITING_SOUNDS } from './writing-sounds.ts';
+import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, writingSoundDescriptor } from './writing-sounds.ts';
 
 export const icons = {
   nib: '<path d="m12 2-7 13 7 7 7-7-7-13Z"/><path d="M12 3v11"/><circle cx="12" cy="15" r="1.7"/>',
@@ -128,7 +128,7 @@ export function renderUI(): string {
             <button type="button" id="panel-enable-sound" class="audio-gate" aria-pressed="true">${icon('sound')}<span>${sound.panelLabel}</span></button>
             <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices writing-sound-choices">
               ${WRITING_SOUNDS.map((sound) => choice('writingSound', sound.id, sound.label)).join('')}
-            </div><p class="small-note" id="writing-sound-note"><span id="writing-sound-description">${WRITING_SOUNDS[0].description}</span> Compare while writing. Original restores the previous pen sound. Your choice is saved.</p></fieldset>
+            </div><p class="small-note" id="writing-sound-note"><span id="writing-sound-description">${writingSoundDescriptor(DEFAULT_WRITING_SOUND).description}</span> Compare while writing. Your choice is saved.</p></fieldset>
             <div class="volume-controls">
               ${volume('masterVolume', 'Overall volume', 'Keep it gentle.')}
               ${volume('writingVolume', 'Pen & materials', 'Nib friction, paper, cap and leather.')}

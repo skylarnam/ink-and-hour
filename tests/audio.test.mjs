@@ -1,42 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frictionParameters, weatherGain, RitualAudio } from '../src/audio.ts';
+import { weatherGain, RitualAudio } from '../src/audio.ts';
 import { contactTextureParameters } from '../src/contact-texture.ts';
 import { DEFAULT_SETTINGS as APP_DEFAULTS } from '../src/settings.ts';
 import { layoutText, WritingEngine } from '../src/writing/index.ts';
 import { PAGE } from '../src/types.ts';
+import { WRITING_SOUND_IDS } from '../src/writing-sounds.ts';
 
-const DEFAULT_SETTINGS = { ...APP_DEFAULTS, writingSound: 'original' };
-const TEXTURED_SETTINGS = { ...APP_DEFAULTS, ambienceVolume: 0, musicVolume: 0, musicTrack: 'off' };
-
-test('friction is silent on every pen-up or stationary frame', () => {
-  for (const speed of [0, 10, 100, 400]) {
-    assert.equal(frictionParameters({ contact: false, speed, pressure: 1 }, DEFAULT_SETTINGS).gain, 0);
-  }
-  assert.equal(frictionParameters({ contact: true, speed: 0, pressure: 1 }, DEFAULT_SETTINGS).gain, 0);
-});
-
-test('speed, paper, pressure, nib and holder affect friction, with a bounded ceiling', () => {
-  const sample = { contact: true, speed: 110, pressure: 0.6 };
-  const normal = frictionParameters(sample, DEFAULT_SETTINGS);
-  for (const change of [{ paper: 'cotton' }, { nib: 'broad' }, { pen: 'dip' }]) {
-    assert.notEqual(frictionParameters(sample, { ...DEFAULT_SETTINGS, ...change }).gain, normal.gain);
-  }
-  assert.ok(frictionParameters({ ...sample, speed: 30 }, DEFAULT_SETTINGS).gain < normal.gain);
-  assert.ok(frictionParameters({ ...sample, pressure: 0.1 }, DEFAULT_SETTINGS).gain < normal.gain);
-  for (const speed of [NaN, Infinity, -1, 1e6]) {
-    const params = frictionParameters({ ...sample, speed }, { ...DEFAULT_SETTINGS, paper: 'cotton', nib: 'broad' });
-    assert.ok(Number.isFinite(params.gain) && params.gain >= 0 && params.gain <= 0.32);
-  }
-});
-
-test('the original friction filter profile is restored without pitched-grain playback', () => {
-  const sample = { contact: true, speed: 100, pressure: 0.6 };
-  const parameters = frictionParameters(sample, DEFAULT_SETTINGS);
-  assert.equal(parameters.frequency, 1100 + 0.5 * 1500 + 0.22 * 1600);
-  assert.equal(parameters.lowpass, 3200 + 0.22 * 3100 + 0.5 * 700);
-  assert.equal('playbackRate' in parameters, false);
-});
+const DEFAULT_SETTINGS = APP_DEFAULTS;
+const TEXTURED_SETTINGS = { ...APP_DEFAULTS, writingSound: 'textured', ambienceVolume: 0, musicVolume: 0, musicTrack: 'off' };
 
 test('clear weather really has no rain signal', () => {
   assert.equal(weatherGain({ ...DEFAULT_SETTINGS, weather: 'clear' }), 0);
@@ -51,7 +23,7 @@ test('both rain beds are 25 percent quieter without changing the independent mix
       const settings = { ...DEFAULT_SETTINGS, weather, writingVolume: 0.83, ambienceVolume: 0.41, musicVolume: 0.37 };
       audio.configure(settings);
       assert.equal(weatherGain(settings), previousGain * 0.75);
-      assert.equal(ctx.gains[5].gain.value, previousGain * 0.75);
+      assert.equal(audio.rain.gain.value, previousGain * 0.75);
       assert.equal(ctx.gains[1].gain.value, settings.writingVolume);
       assert.equal(ctx.gains[2].gain.value, settings.ambienceVolume);
       assert.equal(ctx.gains[3].gain.value, settings.musicVolume);
@@ -187,26 +159,56 @@ test('a gesture creates one reusable graph across concurrent enable and repeated
   });
 });
 
+test('rain and material cues retain their shared nine-second noise buffer', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const source = audio.rainVoice.source;
+    assert.equal(source.buffer, audio.noise);
+    assert.equal(source.playbackRate.value, 1);
+    assert.equal(source.buffer.duration, 9);
+    let seed = 91721;
+    let pink = 0;
+    const expected = new Float32Array(128);
+    for (let i = 0; i < expected.length; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const white = seed / 2147483648 - 1;
+      pink = pink * 0.96 + white * 0.04;
+      expected[i] = white * 0.68 + pink * 2.6;
+    }
+    assert.deepEqual(source.buffer.getChannelData(0).slice(0, 128), expected);
+    for (const cue of ['paper', 'cap', 'leather', 'ink']) {
+      const before = audio.voices.size;
+      audio.cue(cue);
+      const added = [...audio.voices].slice(before);
+      assert.equal(added.length, cue === 'paper' ? 1 : 2);
+      assert.ok(added.every((voice) => voice.kind === 'interaction'));
+      assert.equal(added.filter((voice) => voice.source.buffer === audio.noise).length, 1);
+    }
+  });
+});
+
 test('pen lift reaches scheduled exact zero without repeated frames postponing silence', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     audio.updateContact({ contact: true, speed: 132, pressure: 0.8 });
     assert.ok(audio.diagnostics.writingGain > 0);
     const ctx = FakeContext.instances[0];
-    const friction = ctx.gains[4].gain;
+    const parameters = Object.values(audio.texturedLayers).map((layer) => layer.gain.gain);
     audio.updateContact({ contact: false, speed: 0, pressure: 0 });
     assert.equal(audio.diagnostics.writingGain, 0);
-    const events = friction.events.length;
+    const eventCounts = parameters.map((parameter) => parameter.events.length);
     for (let i = 0; i < 60; i++) audio.updateContact({ contact: false, speed: 0, pressure: 0 });
-    assert.equal(friction.events.length, events);
-    const zero = friction.events.at(-1);
-    assert.equal(zero[0], 'set');
-    assert.equal(zero[1], 0);
-    assert.ok(zero[2] - ctx.currentTime <= 0.025);
+    for (const [index, parameter] of parameters.entries()) {
+      assert.equal(parameter.events.length, eventCounts[index]);
+      const zero = parameter.events.at(-1);
+      assert.equal(zero[0], 'set');
+      assert.equal(zero[1], 0);
+      assert.ok(zero[2] - ctx.currentTime <= 0.0071);
+    }
   });
 });
 
-test('pen-only idle has no looping sources and lifts stop the actual contact source', async () => {
+test('pen-only idle has no looping sources and lifts stop both actual contact sources', async () => {
   await withAudio(async (audio) => {
     audio.configure({ ...DEFAULT_SETTINGS, masterVolume: 0.41, writingVolume: 1, ambienceVolume: 0, musicVolume: 0 });
     await audio.enable();
@@ -215,29 +217,22 @@ test('pen-only idle has no looping sources and lifts stop the actual contact sou
     assert.equal(audio.diagnostics.contactSources, 0);
     assert.equal(audio.diagnostics.weatherSources, 0);
     audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
-    assert.equal(audio.diagnostics.contactSources, 1);
-    const source = audio.contactVoice.source;
-    assert.equal(source.buffer, audio.noise);
-    assert.equal(source.playbackRate.value, 1);
-    assert.equal(source.buffer.duration, 9);
-    let seed = 91721;
-    let pink = 0;
-    const original = new Float32Array(128);
-    for (let i = 0; i < original.length; i++) {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      const white = seed / 2147483648 - 1;
-      pink = pink * 0.96 + white * 0.04;
-      original[i] = white * 0.68 + pink * 2.6;
+    assert.equal(audio.diagnostics.contactSources, 2);
+    assert.equal(audio.diagnostics.preparedContactSound, 'dry-fibers');
+    const sources = Object.values(audio.texturedLayers).map((layer) => layer.voice.source);
+    for (const [index, source] of sources.entries()) {
+      assert.notEqual(source.buffer, audio.noise);
+      assert.equal(source.playbackRate.value, 1);
+      assert.equal(source.buffer.duration, index === 0 ? 11 : 13);
     }
-    assert.deepEqual(source.buffer.getChannelData(0).slice(0, 128), original);
     for (let i = 0; i < 12; i++) audio.updateContact({ contact: true, speed: 140 + i, pressure: 0.7 });
-    assert.equal(audio.contactVoice.source, source);
+    assert.deepEqual(Object.values(audio.texturedLayers).map((layer) => layer.voice.source), sources);
     audio.updateContact({ contact: false, speed: 0, pressure: 0 });
     assert.equal(audio.diagnostics.contactSources, 0);
-    assert.ok(source.stopTime - ctx.currentTime <= 0.013);
+    for (const source of sources) assert.ok(source.stopTime - ctx.currentTime <= 0.013);
     ctx.advance(0.02);
     assert.equal(audio.diagnostics.continuousSources, 0);
-    assert.equal(source.connected, false);
+    for (const source of sources) assert.equal(source.connected, false);
   });
 });
 
@@ -254,13 +249,13 @@ test('stationary, invalid-speed and lifted contact release sources without mutin
       { contact: false, speed: 150, pressure: 1 },
     ]) {
       audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
-      const source = audio.contactVoice.source;
+      const sources = Object.values(audio.texturedLayers).map((layer) => layer.voice.source);
       audio.updateContact(sample);
       assert.equal(audio.diagnostics.contact, false);
       assert.equal(audio.diagnostics.writingGain, 0);
-      assert.ok(source.stopTime - ctx.currentTime <= 0.013);
+      for (const source of sources) assert.ok(source.stopTime - ctx.currentTime <= 0.013);
       ctx.advance(0.02);
-      assert.equal(source.connected, false);
+      for (const source of sources) assert.equal(source.connected, false);
       assert.equal(audio.diagnostics.continuousSources, 0);
       assert.equal(audio.diagnostics.activeCues, 1, 'the independent paper cue must remain audible');
     }
@@ -318,7 +313,7 @@ test('the reported pen-only mix stays silent across mute and hidden lifecycle un
     for (const hide of [false, true]) {
       audio.updateContact(sample);
       audio.cue('ink');
-      assert.equal(audio.diagnostics.contactSources, 1);
+      assert.equal(audio.diagnostics.contactSources, 2);
       if (hide) await audio.setHidden(true);
       else await audio.disable();
       assert.equal(audio.diagnostics.contextState, 'suspended');
@@ -338,7 +333,7 @@ test('the reported pen-only mix stays silent across mute and hidden lifecycle un
     }
     assert.equal(FakeContext.instances.length, 1);
     audio.updateContact(sample);
-    assert.equal(audio.diagnostics.contactSources, 1, 'lifecycle silence must not disable later writing');
+    assert.equal(audio.diagnostics.contactSources, 2, 'lifecycle silence must not disable later writing');
     assert.ok(audio.diagnostics.writingGain > 0);
   });
 });
@@ -361,24 +356,29 @@ test('muted weather is disconnected and cannot reappear when unrelated settings 
   });
 });
 
-test('live holder changes reshape the original friction without pitch changes or source restarts', async () => {
+test('live holder changes reshape contact balance without pitch changes or source restarts', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const ctx = FakeContext.instances[0];
     const sample = { contact: true, speed: 150, pressure: 0.65 };
     audio.updateContact(sample);
-    const source = audio.contactVoice.source;
+    const layers = audio.texturedLayers;
+    const sources = Object.values(layers).map((layer) => layer.voice.source);
     const gain = audio.diagnostics.writingGain;
+    const bodyMix = layers.body.gain.gain.value;
+    const grainMix = layers.grain.gain.gain.value;
     audio.configure({ ...DEFAULT_SETTINGS, pen: 'dip' });
     audio.updateContact(sample);
-    assert.equal(audio.contactVoice.source, source);
-    assert.equal(source.playbackRate.value, 1);
-    assert.notEqual(audio.diagnostics.writingGain, gain);
-    assert.equal(audio.diagnostics.contactSources, 1);
+    assert.deepEqual(Object.values(layers).map((layer) => layer.voice.source), sources);
+    for (const source of sources) assert.equal(source.playbackRate.value, 1);
+    assert.equal(audio.diagnostics.writingGain, gain);
+    assert.notEqual(layers.body.gain.gain.value, bodyMix);
+    assert.notEqual(layers.grain.gain.gain.value, grainMix);
+    assert.equal(audio.diagnostics.contactSources, 2);
     for (let i = 0; i < 50; i++) {
       audio.configure({ ...DEFAULT_SETTINGS, ambienceVolume: i % 2 ? 0 : 0.48, pen: i % 2 ? 'dip' : 'fountain' });
       audio.updateContact({ ...sample, contact: i % 3 !== 0 });
-      assert.ok(audio.diagnostics.continuousSources <= 4);
+      assert.ok(audio.diagnostics.continuousSources <= 6);
     }
     audio.configure({ ...DEFAULT_SETTINGS, writingVolume: 0, ambienceVolume: 0 });
     ctx.advance(0.02);
@@ -491,7 +491,7 @@ test('a delayed resume cannot override a later disable or visibility change', as
   });
 });
 
-test('the new profile allocates two fixed-rate contact layers lazily, never an idle sound bed', async () => {
+test('Textured allocates two fixed-rate contact layers lazily, never an idle sound bed', async () => {
   await withAudio(async (audio) => {
     assert.equal(audio.diagnostics.writingSound, 'textured');
     assert.equal(audio.texturedLayers, null);
@@ -504,7 +504,6 @@ test('the new profile allocates two fixed-rate contact layers lazily, never an i
     audio.updateContact(sample);
     assert.equal(audio.diagnostics.contactSources, 2);
     assert.equal(audio.diagnostics.texturedContactSources, 2);
-    assert.equal(audio.diagnostics.originalContactSources, 0);
     assert.equal(ctx.sources.length, 2);
     const layers = audio.texturedLayers;
     for (const [kind, layer] of Object.entries(layers)) {
@@ -524,7 +523,7 @@ test('the new profile allocates two fixed-rate contact layers lazily, never an i
           for (const angle of [-Math.PI, 0, Math.PI / 4, Math.PI / 2, Math.PI]) {
             const contact = { ...sample, angle };
             audio.updateContact(contact);
-            const parameters = contactTextureParameters(contact, settings);
+            const parameters = contactTextureParameters(contact, settings, settings.writingSound);
             assert.equal(audio.diagnostics.writingGain, parameters.gain);
             assert.equal(layers.body.gain.gain.value, parameters.gain * parameters.bodyMix);
             assert.equal(layers.grain.gain.gain.value, parameters.gain * parameters.grainMix);
@@ -553,7 +552,7 @@ test('the new profile allocates two fixed-rate contact layers lazily, never an i
   }, TEXTURED_SETTINGS);
 });
 
-test('live sound comparison restores the exact original source and modulation without touching other buses', async () => {
+test('live sound comparison switches textures and restores cached buffers without touching other buses', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const ctx = FakeContext.instances[0];
@@ -562,48 +561,47 @@ test('live sound comparison restores the exact original source and modulation wi
     audio.cue('paper');
     const layers = audio.texturedLayers;
     const texturedSources = [layers.body.voice.source, layers.grain.voice.source];
+    const texturedBuffers = [layers.body.buffer, layers.grain.buffer];
     const mixer = audio.diagnostics.mixer;
-    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'original' });
+    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'dry-fibers' });
     assert.equal(audio.diagnostics.contactSources, 0, 'profile changes must not replay a cached contact');
     assert.equal(audio.diagnostics.writingGain, 0);
     audio.updateContact(sample);
-    assert.equal(audio.diagnostics.contactSources, 1);
-    assert.equal(audio.diagnostics.originalContactSources, 1);
-    assert.equal(audio.diagnostics.texturedContactSources, 0);
-    assert.equal(audio.contactVoice.source.buffer, audio.noise);
-    assert.equal(audio.contactVoice.source.playbackRate.value, 1);
-    assert.equal(audio.contactVoice.source.buffer.duration, 9);
-    const parameters = frictionParameters(sample, TEXTURED_SETTINGS);
-    const originalModulation = 0.86 + 0.11 * Math.sin(ctx.currentTime * 42) + 0.04 * Math.sin(ctx.currentTime * 117);
-    assert.equal(audio.friction.gain.value, parameters.gain * originalModulation);
-    assert.equal(audio.frictionBand.frequency.value, parameters.frequency);
-    assert.equal(audio.frictionLowpass.frequency.value, parameters.lowpass);
+    assert.equal(audio.diagnostics.contactSources, 2);
+    assert.equal(audio.diagnostics.preparedContactSound, 'dry-fibers');
+    const parameters = contactTextureParameters(sample, TEXTURED_SETTINGS, 'dry-fibers');
+    assert.equal(layers.body.gain.gain.value, parameters.gain * parameters.bodyMix);
+    assert.equal(layers.grain.gain.gain.value, parameters.gain * parameters.grainMix);
+    for (const [index, layer] of Object.values(layers).entries()) {
+      assert.notEqual(layer.buffer, texturedBuffers[index]);
+      assert.equal(layer.voice.source.playbackRate.value, 1);
+    }
     assert.deepEqual(audio.diagnostics.mixer, mixer);
     assert.equal(audio.diagnostics.activeCues, 1);
     assert.equal(audio.diagnostics.weatherSources, 0);
     assert.equal(audio.diagnostics.musicTrack, 'off');
     ctx.advance(0.02);
     for (const source of texturedSources) assert.equal(source.connected, false);
-    assert.equal(audio.diagnostics.continuousSources, 1);
-    const originalSource = audio.contactVoice.source;
+    assert.equal(audio.diagnostics.continuousSources, 2);
+    const drySources = [layers.body.voice.source, layers.grain.voice.source];
     audio.configure(TEXTURED_SETTINGS);
     assert.equal(audio.diagnostics.contactSources, 0);
     audio.updateContact(sample);
     assert.equal(audio.diagnostics.contactSources, 2);
-    assert.equal(audio.diagnostics.originalContactSources, 0);
     assert.equal(audio.texturedLayers, layers, 'comparison must reuse the generated textures');
+    assert.deepEqual([layers.body.buffer, layers.grain.buffer], texturedBuffers);
     ctx.advance(0.02);
-    assert.equal(originalSource.connected, false);
+    for (const source of drySources) assert.equal(source.connected, false);
     assert.equal(audio.diagnostics.continuousSources, 2);
     assert.equal(FakeContext.instances.length, 1);
   }, TEXTURED_SETTINGS);
 });
 
-test('all seven sound palettes use their own contact model and reuse a bounded three-palette cache', async () => {
+test('all four sound palettes use their own contact model and reuse a bounded three-palette cache', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const sample = { contact: true, speed: 132, pressure: 0.65, angle: Math.PI / 3 };
-    const sounds = ['textured', 'original', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib'];
+    const sounds = WRITING_SOUND_IDS;
     for (const writingSound of sounds) audio.configure({ ...TEXTURED_SETTINGS, writingSound });
     assert.equal(audio.diagnostics.contactBufferPairs, 0, 'choosing a sound at rest should not generate contact audio');
     let graph;
@@ -613,27 +611,24 @@ test('all seven sound palettes use their own contact model and reuse a bounded t
       audio.configure(settings);
       assert.equal(audio.diagnostics.contactSources, 0);
       audio.updateContact(sample);
-      const parameters = writingSound === 'original'
-        ? frictionParameters(sample, settings) : contactTextureParameters(sample, settings, writingSound);
+      const parameters = contactTextureParameters(sample, settings, writingSound);
       assert.equal(audio.diagnostics.writingGain, parameters.gain);
-      assert.equal(audio.diagnostics.contactSources, writingSound === 'original' ? 1 : 2);
+      assert.equal(audio.diagnostics.contactSources, 2);
       assert.ok(audio.diagnostics.contactBufferPairs <= 3);
-      if (writingSound !== 'original') {
-        graph ??= audio.texturedLayers;
-        assert.equal(audio.texturedLayers, graph, 'changing palettes must reuse the two-layer graph');
-        assert.equal(audio.diagnostics.preparedContactSound, writingSound);
-        assert.equal(graph.body.gain.gain.value, parameters.gain * parameters.bodyMix);
-        assert.equal(graph.grain.gain.gain.value, parameters.gain * parameters.grainMix);
-        assert.equal(graph.body.voice.source.buffer, graph.body.buffer);
-        assert.equal(graph.grain.voice.source.buffer, graph.grain.buffer);
-        bodyBuffers.add(graph.body.buffer);
-      }
+      graph ??= audio.texturedLayers;
+      assert.equal(audio.texturedLayers, graph, 'changing palettes must reuse the two-layer graph');
+      assert.equal(audio.diagnostics.preparedContactSound, writingSound);
+      assert.equal(graph.body.gain.gain.value, parameters.gain * parameters.bodyMix);
+      assert.equal(graph.grain.gain.gain.value, parameters.gain * parameters.grainMix);
+      assert.equal(graph.body.voice.source.buffer, graph.body.buffer);
+      assert.equal(graph.grain.voice.source.buffer, graph.grain.buffer);
+      bodyBuffers.add(graph.body.buffer);
     }
-    assert.equal(bodyBuffers.size, 6, 'the six contact palettes must not share one placeholder buffer');
+    assert.equal(bodyBuffers.size, 4, 'the four contact palettes must not share one placeholder buffer');
     const cached = audio.texturedLayers.body.buffer;
-    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'warm-paper' });
+    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'fine-feedback' });
     audio.updateContact(sample);
-    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'crisp-nib' });
+    audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'dry-fibers' });
     audio.updateContact(sample);
     assert.equal(audio.texturedLayers.body.buffer, cached);
     audio.dispose();
@@ -642,16 +637,16 @@ test('all seven sound palettes use their own contact model and reuse a bounded t
   }, TEXTURED_SETTINGS);
 });
 
-test('rapid seven-way comparison and pen lifts keep active and retiring sources bounded', async () => {
+test('rapid four-way comparison and pen lifts keep active and retiring sources bounded', async () => {
   await withAudio(async (audio) => {
     await audio.enable();
     const ctx = FakeContext.instances[0];
     for (let step = 0; step < 160; step++) {
-      const writingSound = ['textured', 'original', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib'][step % 7];
+      const writingSound = WRITING_SOUND_IDS[step % WRITING_SOUND_IDS.length];
       audio.configure({ ...TEXTURED_SETTINGS, writingSound });
       audio.updateContact({ contact: step % 3 !== 0, speed: 132, pressure: 0.7, angle: step * 0.2 });
-      assert.ok(audio.diagnostics.contactSources <= (writingSound === 'original' ? 1 : 2));
-      assert.ok(audio.diagnostics.continuousSources <= 6);
+      assert.ok(audio.diagnostics.contactSources <= 2);
+      assert.ok(audio.diagnostics.continuousSources <= 4);
       assert.ok(audio.diagnostics.contactBufferPairs <= 3);
     }
     audio.updateContact({ contact: false, speed: 0, pressure: 0 });
@@ -663,11 +658,11 @@ test('rapid seven-way comparison and pen lifts keep active and retiring sources 
 });
 
 test('a profile change waits for a fresh contact instead of replaying the last moving sample', async () => {
-  for (const writingSound of ['original', 'textured']) {
+  for (const [index, writingSound] of WRITING_SOUND_IDS.entries()) {
     await withAudio(async (audio) => {
       await audio.enable();
       audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
-      audio.configure({ ...TEXTURED_SETTINGS, writingSound: writingSound === 'original' ? 'textured' : 'original' });
+      audio.configure({ ...TEXTURED_SETTINGS, writingSound: WRITING_SOUND_IDS[(index + 1) % WRITING_SOUND_IDS.length] });
       assert.equal(audio.diagnostics.writingGain, 0);
       assert.equal(audio.diagnostics.contactSources, 0);
       audio.updateContact({ contact: false, speed: 132, pressure: 0.7 });
@@ -689,7 +684,7 @@ test('sound comparison preserves music playback, pause intent and the connected 
     const timer = audio.musicTimer;
     const voices = audio.diagnostics.activeMusicVoices;
     audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
-    for (const writingSound of ['original', 'textured']) {
+    for (const writingSound of WRITING_SOUND_IDS) {
       audio.configure({ ...settings, writingSound });
       assert.equal(audio.musicTimer, timer);
       assert.equal(audio.diagnostics.activeMusicVoices, voices);
@@ -698,7 +693,7 @@ test('sound comparison preserves music playback, pause intent and the connected 
       assert.equal(audio.recordingGain.gain.value, 0.18);
     }
     audio.pauseMusic();
-    for (const writingSound of ['original', 'textured']) {
+    for (const writingSound of WRITING_SOUND_IDS) {
       audio.configure({ ...settings, writingSound });
       assert.equal(audio.diagnostics.musicPaused, true);
       assert.equal(audio.diagnostics.musicTimerActive, false);
@@ -717,13 +712,13 @@ test('profile changes cannot resurrect stale contact after mute, hidden state or
       if (action === 'mute') await audio.disable();
       else if (action === 'hide') await audio.setHidden(true);
       else audio.configure({ ...TEXTURED_SETTINGS, writingVolume: 0 });
-      audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'original', writingVolume: action === 'zero' ? 0 : 0.3 });
+      audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'dry-fibers', writingVolume: action === 'zero' ? 0 : 0.3 });
       ctx.advance(0.02);
       assert.equal(audio.diagnostics.contactSources, 0);
       assert.equal(audio.diagnostics.continuousSources, 0);
       if (action === 'mute') await audio.enable();
       else if (action === 'hide') await audio.setHidden(false);
-      else audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'original' });
+      else audio.configure({ ...TEXTURED_SETTINGS, writingSound: 'dry-fibers' });
       audio.configure(TEXTURED_SETTINGS);
       assert.equal(audio.diagnostics.writingGain, 0);
       assert.equal(audio.diagnostics.continuousSources, 0);
@@ -733,8 +728,8 @@ test('profile changes cannot resurrect stale contact after mute, hidden state or
   }
 });
 
-test('all seven sounds follow actual engine lifts, pause, resume, completion and reset', async () => {
-  for (const writingSound of ['original', 'textured', 'soft-glide', 'fine-feedback', 'dry-fibers', 'warm-paper', 'crisp-nib']) {
+test('all four sounds follow actual engine lifts, pause, resume, completion and reset', async () => {
+  for (const writingSound of WRITING_SOUND_IDS) {
     const settings = { ...TEXTURED_SETTINGS, writingSound };
     await withAudio(async (audio) => {
       await audio.enable();
