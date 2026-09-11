@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings.ts';
+import { contactTextureParameters, createContactTextures } from './contact-texture.ts';
 import type { AudioContact, InteractionCue, Settings } from './types.ts';
 
 const clamp = (value: number, max = 1): number => Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : 0;
@@ -48,8 +49,16 @@ interface Voice {
 interface LoopVoice {
   source: AudioBufferSourceNode;
   gate: GainNode;
-  kind: 'contact' | 'rain';
+  kind: 'contact' | 'body' | 'grain' | 'rain';
   releasing: boolean;
+}
+
+interface ContactLayer {
+  buffer: AudioBuffer;
+  input: BiquadFilterNode;
+  lowpass: BiquadFilterNode;
+  gain: GainNode;
+  voice: LoopVoice | null;
 }
 
 export class RitualAudio {
@@ -64,6 +73,7 @@ export class RitualAudio {
   private friction: GainNode | null = null;
   private frictionBand: BiquadFilterNode | null = null;
   private frictionLowpass: BiquadFilterNode | null = null;
+  private texturedLayers: { body: ContactLayer; grain: ContactLayer } | null = null;
   private rain: GainNode | null = null;
   private rainFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
@@ -246,6 +256,31 @@ export class RitualAudio {
     return voice;
   }
 
+  private prepareTexturedLayers(): { body: ContactLayer; grain: ContactLayer } {
+    if (this.texturedLayers) return this.texturedLayers;
+    const ctx = this.context;
+    const writing = this.writing;
+    if (!ctx || !writing) throw new Error('The writing sound is not initialized.');
+    const textures = createContactTextures(ctx.sampleRate);
+    const layer = (samples: Float32Array, highpassFrequency: number): ContactLayer => {
+      const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      buffer.getChannelData(0).set(samples);
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = Math.min(highpassFrequency, ctx.sampleRate * 0.45);
+      highpass.Q.value = 0.5;
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.Q.value = 0.5;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      highpass.connect(lowpass).connect(gain).connect(writing);
+      return { buffer, lowpass, gain, voice: null, input: highpass };
+    };
+    this.texturedLayers = { body: layer(textures.body, 160), grain: layer(textures.grain, 850) };
+    return this.texturedLayers;
+  }
+
   private stopLoop(voice: LoopVoice, immediate = false): void {
     const now = this.context?.currentTime ?? 0;
     if (immediate) {
@@ -267,11 +302,15 @@ export class RitualAudio {
     this.loops.delete(voice);
     if (this.contactVoice === voice) this.contactVoice = null;
     if (this.rainVoice === voice) this.rainVoice = null;
+    if (this.texturedLayers?.body.voice === voice) this.texturedLayers.body.voice = null;
+    if (this.texturedLayers?.grain.voice === voice) this.texturedLayers.grain.voice = null;
   }
 
   configure(settings: Settings): void {
     const previous = this.settings;
     this.settings = sanitizeSettings(settings);
+    const changedWritingSound = previous.writingSound !== this.settings.writingSound;
+    if (changedWritingSound) this.stopContact();
     this.applyMixer();
     if (previous.weather !== this.settings.weather && this.settings.weather !== 'storm') this.stopVoices('thunder');
     if (previous.musicTrack !== this.settings.musicTrack) {
@@ -307,12 +346,19 @@ export class RitualAudio {
 
   updateContact(sample: AudioContact): void {
     const audible = this.ready() && this.settings.writingVolume > 0 && this.settings.masterVolume > 0;
-    const parameters = frictionParameters(audible ? sample : { contact: false, speed: 0, pressure: 0 }, this.settings);
+    const input = audible ? sample : { contact: false, speed: 0, pressure: 0 };
+    const parameters = this.settings.writingSound === 'textured'
+      ? contactTextureParameters(input, this.settings) : frictionParameters(input, this.settings);
     const previousGain = this.writingTarget;
     this.contact = parameters.gain > 0;
     this.writingTarget = parameters.gain;
     const ctx = this.context;
-    if (!ctx || !this.friction || !this.frictionBand || !this.frictionLowpass || (previousGain === 0 && parameters.gain === 0)) return;
+    if (!ctx || (previousGain === 0 && parameters.gain === 0)) return;
+    if ('bodyMix' in parameters) {
+      this.updateTexturedContact(parameters);
+      return;
+    }
+    if (!this.friction || !this.frictionBand || !this.frictionLowpass) return;
     const modulation = 0.86 + 0.11 * Math.sin(ctx.currentTime * 42) + 0.04 * Math.sin(ctx.currentTime * 117);
     target(this.friction.gain, parameters.gain * modulation, ctx.currentTime, parameters.gain === 0 ? 0.003 : 0.012);
     if (parameters.gain === 0) {
@@ -326,12 +372,48 @@ export class RitualAudio {
     target(this.frictionLowpass.frequency, parameters.lowpass, ctx.currentTime, 0.018);
   }
 
+  private updateTexturedContact(parameters: ReturnType<typeof contactTextureParameters>): void {
+    const ctx = this.context;
+    if (!ctx) return;
+    const layers = parameters.gain > 0 ? this.prepareTexturedLayers() : this.texturedLayers;
+    if (!layers) return;
+    for (const kind of ['body', 'grain'] as const) {
+      const layer = layers[kind];
+      const gain = parameters.gain * (kind === 'body' ? parameters.bodyMix : parameters.grainMix);
+      target(layer.gain.gain, gain, ctx.currentTime, gain === 0 ? 0.003 : 0.012);
+      if (gain === 0) {
+        if (layer.voice) this.stopLoop(layer.voice);
+        layer.voice = null;
+      } else {
+        target(layer.lowpass.frequency, Math.min(ctx.sampleRate * 0.45,
+          kind === 'body' ? parameters.bodyLowpass : parameters.grainLowpass), ctx.currentTime, 0.035);
+        if (!layer.voice) layer.voice = this.startLoop(kind, layer.buffer, layer.input);
+      }
+    }
+  }
+
+  private stopContact(): void {
+    const now = this.context?.currentTime ?? 0;
+    if (this.friction) target(this.friction.gain, 0, now, 0.003);
+    if (this.texturedLayers) {
+      for (const layer of Object.values(this.texturedLayers)) {
+        target(layer.gain.gain, 0, now, 0.003);
+        layer.voice = null;
+      }
+    }
+    for (const voice of this.loops) if (voice.kind !== 'rain') this.stopLoop(voice);
+    this.contactVoice = null;
+    this.contact = false;
+    this.writingTarget = 0;
+  }
+
   private silence(): void {
     this.contact = false;
     this.writingTarget = 0;
     this.rainTarget = 0;
     const now = this.context?.currentTime ?? 0;
-    for (const gain of [this.master, this.friction, this.rain]) {
+    for (const gain of [this.master, this.friction, this.rain,
+      this.texturedLayers?.body.gain, this.texturedLayers?.grain.gain]) {
       if (gain) {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(0, now);
@@ -456,11 +538,14 @@ export class RitualAudio {
     return {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
       contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
+      writingSound: this.settings.writingSound,
       rainGain: this.rainTarget, musicTrack: this.settings.musicTrack,
       musicPaused: this.musicPaused, recordingConnected: this.recordingSource !== null,
       activeMusicVoices: [...this.voices].filter((voice) => voice.kind === 'music' && !voice.releasing).length,
       musicTimerActive: this.musicTimer !== null, continuousSources: this.loops.size,
-      contactSources: [...this.loops].filter((voice) => voice.kind === 'contact' && !voice.releasing).length,
+      contactSources: [...this.loops].filter((voice) => voice.kind !== 'rain' && !voice.releasing).length,
+      originalContactSources: [...this.loops].filter((voice) => voice.kind === 'contact' && !voice.releasing).length,
+      texturedContactSources: [...this.loops].filter((voice) => (voice.kind === 'body' || voice.kind === 'grain') && !voice.releasing).length,
       weatherSources: [...this.loops].filter((voice) => voice.kind === 'rain' && !voice.releasing).length,
       mixer: { master: this.master?.gain.value ?? 0, pen: this.writing?.gain.value ?? 0,
         ambience: this.ambience?.gain.value ?? 0, music: this.music?.gain.value ?? 0 },

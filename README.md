@@ -123,6 +123,12 @@ it in a terminal separates its lifetime from the agent's completed work.
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
   Previously saved volume and music choices, including **Off**, are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
+  **Sound > Writing sound** offers **Textured** (the new default) and **Original**
+  (the previous writing sound, unchanged). Switch during a stroke to compare;
+  it does not restart the pen or change the page. The choice persists across
+  visits. Choose **Original** to revert instantly, without a reinstall or
+  deployment. This choice affects only writing friction, not the mixer levels,
+  rain, music, cap, leather, paper, or bottle sounds.
   The ambience slider controls rain and thunder together. Recordings share
   the music/master mixer and pause when muted, hidden, or set to zero volume.
   No remote music API, streaming account, key, or runtime third-party request
@@ -222,12 +228,17 @@ restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 Paper relief has its own cached height texture; ink changes do not rebuild it.
 
-Writing uses the original soft, filtered friction sound, with a stronger mix
-but no pitched grains, resonant chirps, or playback-rate changes. Filtering
-and gain follow speed, pressure, paper, nib, and holder. The contact source
-exists only during moving contact: it fades to exact zero within 7 ms of a
-lift and stops within 12 ms. Material changes reshape the current stroke
-without restarting its sound.
+Writing has two independently selectable sound profiles. **Original** retains
+the previous soft, filtered friction buffer, modulation, and parameter mapping.
+**Textured** blends original, procedurally generated rubbing and irregular
+paper-fiber detail through broad, non-resonant filters. Its balance follows
+speed, pressure, paper, nib, and holder; broad-edge contact also follows stroke
+direction. It uses no pitched grains, control oscillators, or playback-rate
+changes. A downstroke is not automatically treated as a hard contact.
+Both profiles exist only during moving contact: their friction fades to exact
+zero within 7 ms of a lift and their sources stop within 12 ms. Material
+changes reshape the current stroke without restarting its sound; switching
+profiles briefly crossfades the sources without restarting writing.
 
 Cap, paper, leather, and bottle events are separate short voices. One reusable
 AudioContext has writing, ambience, and music buses behind a bounded
@@ -259,6 +270,10 @@ fallbacks; playback intent is not stored.
   nib hardware. Broad and flex behavior are deliberately different.
 - Friction/weather/material sounds and the two original beds are synthesized,
   not recorded ASMR. The new lo-fi playlist is genuine recorded music.
+  The Textured writing profile is an experimental interpretation of contact
+  mechanics, not a calibrated physical model or a reproduction of reference
+  recordings. No YouTube audio was sampled or bundled; reference study used
+  visual/signal analysis and specialist sources, not direct audio audition.
   Quiet headphones are recommended; output character depends on the device.
 - The outdoor view is a lightweight, depth-compressed procedural landscape,
   not a scanned forest, volumetric sky, or physical rain/refraction simulation.
@@ -273,7 +288,8 @@ fallbacks; playback intent is not stored.
 are the responsive, keyboard-labeled interface; `src/scene.ts` builds the room;
 `src/outdoors.ts` builds its layered landscape and weather; `src/textures.ts`
 makes procedural materials and ink; `src/writing/` owns layout and stroke
-playback; `src/audio.ts` owns Web Audio; `src/settings.ts` validates saved
+playback; `src/audio.ts` owns Web Audio; `src/contact-texture.ts` generates the
+experimental contact textures and their parameter model; `src/settings.ts` validates saved
 preferences. `tests/` exercises those pure/stateful boundaries.
 
 `src/handwriting.ts` is the 22-style registry, and `src/fonts.css` declares the

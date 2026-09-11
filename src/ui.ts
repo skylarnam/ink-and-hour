@@ -123,6 +123,9 @@ export function renderUI(): string {
           <section id="panel-sound" role="tabpanel" aria-labelledby="tab-sound" class="settings-panel" hidden>
             <div class="panel-intro"><h2>Listen a little closer.</h2><p>Headphones welcome. Music entirely optional.</p></div>
             <button type="button" id="panel-enable-sound" class="audio-gate" aria-pressed="true">${icon('sound')}<span>Sound is on - tap to mute</span></button>
+            <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices compact">
+              ${choice('writingSound', 'textured', 'Textured <small>New</small>')}${choice('writingSound', 'original', 'Original')}
+            </div><p class="small-note" id="writing-sound-note">Compare while writing. Original restores the previous pen sound. Your choice is saved.</p></fieldset>
             <div class="volume-controls">
               ${volume('masterVolume', 'Overall volume', 'Keep it gentle.')}
               ${volume('writingVolume', 'Pen & materials', 'Nib friction, paper, cap and leather.')}

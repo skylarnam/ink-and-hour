@@ -7,6 +7,7 @@ export type PresetInkId = 'midnight' | 'sepia' | 'burgundy' | 'forest';
 export type InkId = PresetInkId | 'custom';
 export type WritingStyle = HandwritingId;
 export type MusicTrack = 'off' | 'felt' | 'glass' | 'lofi';
+export type WritingSound = 'original' | 'textured';
 export type CameraPreset = 'desk' | 'detail' | 'overhead';
 export type WritingStatus = 'idle' | 'writing' | 'paused' | 'complete';
 export type TextAlignment = 'left' | 'center';
@@ -26,6 +27,7 @@ export interface Settings {
   speed: number;
   masterVolume: number;
   writingVolume: number;
+  writingSound: WritingSound;
   ambienceVolume: number;
   musicVolume: number;
   musicTrack: MusicTrack;
@@ -104,6 +106,7 @@ export interface AudioContact {
   contact: boolean;
   speed: number;
   pressure: number;
+  angle?: number;
 }
 
 export type InteractionCue = 'cap' | 'leather' | 'paper' | 'ink';

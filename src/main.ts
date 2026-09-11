@@ -244,6 +244,7 @@ function updateSettings(next: unknown): void {
   scene?.configure(settings);
   audio.configure(settings);
   engine?.updateOptions(settings);
+  if (previous.writingSound !== settings.writingSound) audio.updateContact(currentPen());
   saveSettings(settings, notify);
   syncSettings();
 }

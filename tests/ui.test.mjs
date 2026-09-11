@@ -39,6 +39,19 @@ test('the mini-player is before the sound switch and includes transport labels a
   }
 });
 
+test('the sound panel offers an accessible live comparison and an explicit original-sound rollback', () => {
+  const html = renderUI();
+  const panel = html.match(/<section id="panel-sound"[\s\S]*?<\/section>/)[0];
+  assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 2);
+  for (const value of ['textured', 'original']) {
+    assert.ok(panel.includes(`data-setting="writingSound" data-value="${value}" aria-pressed="false"`));
+  }
+  assert.match(panel, /<fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND<\/legend>/);
+  assert.ok(panel.includes('Original restores the previous pen sound'));
+  assert.ok(panel.includes('Compare while writing'));
+  assert.ok(panel.includes('Your choice is saved'));
+});
+
 test('all 34 approved handwriting choices expose their source licenses and the inferred-order limitation', () => {
   const html = renderUI();
   const selector = html.match(/<select id="style"[\s\S]*?<\/select>/)[0];

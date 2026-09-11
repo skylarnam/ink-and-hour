@@ -95,6 +95,33 @@ test('new audio defaults do not overwrite saved levels or Music Off', () => {
   });
 });
 
+test('the new writing texture is default without overwriting legacy mixer or music choices', () => {
+  assert.equal(DEFAULT_SETTINGS.writingSound, 'textured');
+  const { writingSound: _previouslyAbsent, ...legacy } = {
+    ...DEFAULT_SETTINGS, writingVolume: 0.47, ambienceVolume: 0, musicTrack: 'off',
+  };
+  withStorage({ getItem: () => JSON.stringify(legacy) }, () => {
+    assert.deepEqual(loadSettings(assert.fail), { ...legacy, writingSound: 'textured' });
+  });
+  for (const writingSound of ['unknown', '', null, 1, true]) {
+    assert.equal(sanitizeSettings({ writingSound }).writingSound, 'textured');
+  }
+});
+
+test('the original writing sound is a persisted, reversible choice', () => {
+  const stored = new Map();
+  withStorage({
+    getItem: (key) => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, value),
+  }, () => {
+    for (const writingSound of ['original', 'textured', 'original']) {
+      const settings = { ...DEFAULT_SETTINGS, writingSound, musicTrack: 'off', musicVolume: 0 };
+      saveSettings(settings, assert.fail);
+      assert.deepEqual(loadSettings(assert.fail), settings);
+    }
+  });
+});
+
 test('corrupt saved JSON produces an explicit notice and a safe room', () => {
   const errors = [];
   withStorage({ getItem: () => '{invalid json' }, () => {
