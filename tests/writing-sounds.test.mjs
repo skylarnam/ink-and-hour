@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, WRITING_SOUND_IDS, isWritingSoundId, writingSoundDescriptor } from '../src/writing-sounds.ts';
 
-test('the registry contains only the four approved sounds, with Dry fibers as default', () => {
-  assert.equal(DEFAULT_WRITING_SOUND, 'dry-fibers');
+test('the registry contains only the four approved sounds, with Textured as default', () => {
+  assert.equal(DEFAULT_WRITING_SOUND, 'textured');
   assert.equal(WRITING_SOUNDS.length, 4);
   assert.deepEqual(WRITING_SOUNDS.map((sound) => sound.id), [
     'textured', 'soft-glide', 'fine-feedback', 'dry-fibers',

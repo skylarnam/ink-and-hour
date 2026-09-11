@@ -218,7 +218,7 @@ test('pen-only idle has no looping sources and lifts stop both actual contact so
     assert.equal(audio.diagnostics.weatherSources, 0);
     audio.updateContact({ contact: true, speed: 140, pressure: 0.7 });
     assert.equal(audio.diagnostics.contactSources, 2);
-    assert.equal(audio.diagnostics.preparedContactSound, 'dry-fibers');
+    assert.equal(audio.diagnostics.preparedContactSound, 'textured');
     const sources = Object.values(audio.texturedLayers).map((layer) => layer.voice.source);
     for (const [index, source] of sources.entries()) {
       assert.notEqual(source.buffer, audio.noise);

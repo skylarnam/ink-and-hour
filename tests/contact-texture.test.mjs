@@ -322,10 +322,10 @@ test('invalid or unbounded sample rates reject before allocating buffers', () =>
   }
 });
 
-test('the synthesis API defaults to Dry fibers and includes only the four retained palettes', () => {
-  assert.equal(DEFAULT_WRITING_SOUND, 'dry-fibers');
-  assert.deepEqual(createContactTextures(44100), createContactTextures(44100, 'dry-fibers'));
-  assert.deepEqual(contactTextureParameters(SAMPLE, SETTINGS), contactTextureParameters(SAMPLE, SETTINGS, 'dry-fibers'));
+test('the synthesis API defaults to Textured and includes only the four retained palettes', () => {
+  assert.equal(DEFAULT_WRITING_SOUND, 'textured');
+  assert.deepEqual(createContactTextures(44100), createContactTextures(44100, 'textured'));
+  assert.deepEqual(contactTextureParameters(SAMPLE, SETTINGS), contactTextureParameters(SAMPLE, SETTINGS, 'textured'));
   assert.equal(CONTACT_PROFILES.length, 4);
   assert.deepEqual(CONTACT_PROFILES, ['textured', 'soft-glide', 'fine-feedback', 'dry-fibers']);
 });

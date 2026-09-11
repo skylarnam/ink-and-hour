@@ -11,7 +11,7 @@ export const WRITING_SOUNDS = [
   {
     id: 'textured',
     label: 'Textured',
-    description: 'An irregular contact texture that responds to pressure, paper and nib.',
+    description: 'An irregular contact texture that responds to pressure, paper and nib. The default.',
   },
   {
     id: 'soft-glide',
@@ -26,13 +26,13 @@ export const WRITING_SOUNDS = [
   {
     id: 'dry-fibers',
     label: 'Dry fibers',
-    description: 'Coarser, clearly separated fiber drag with longer pauses between patches. The default.',
+    description: 'Coarser, clearly separated fiber drag with longer pauses between patches.',
   },
 ] as const satisfies readonly WritingSoundDescriptor[];
 
 export type WritingSoundId = (typeof WRITING_SOUNDS)[number]['id'];
 
-export const DEFAULT_WRITING_SOUND: WritingSoundId = 'dry-fibers';
+export const DEFAULT_WRITING_SOUND: WritingSoundId = 'textured';
 
 export const WRITING_SOUND_IDS: readonly WritingSoundId[] = WRITING_SOUNDS.map((sound) => sound.id);
 

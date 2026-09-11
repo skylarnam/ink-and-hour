@@ -40,7 +40,7 @@ test('the mini-player is before the sound switch and includes transport labels a
   }
 });
 
-test('the sound panel offers only the four approved sounds and describes Dry fibers initially', () => {
+test('the sound panel offers only the four approved sounds and describes Textured initially', () => {
   const html = renderUI();
   const panel = html.match(/<section id="panel-sound"[\s\S]*?<\/section>/)[0];
   assert.equal((panel.match(/data-setting="writingSound"/g) ?? []).length, 4);

@@ -9,7 +9,7 @@ test('fresh preferences use the 70/30/20/20 mix with lo-fi selected', () => {
   assert.equal(DEFAULT_SETTINGS.musicVolume, 0.2);
   assert.equal(DEFAULT_SETTINGS.musicTrack, 'lofi');
   assert.equal(DEFAULT_SETTINGS.lofiTrack, 'first-snow');
-  assert.equal(DEFAULT_SETTINGS.writingSound, 'dry-fibers');
+  assert.equal(DEFAULT_SETTINGS.writingSound, 'textured');
   withStorage({ getItem: () => null }, () => {
     assert.deepEqual(loadSettings(assert.fail), DEFAULT_SETTINGS);
   });
@@ -96,27 +96,27 @@ test('new audio defaults do not overwrite saved levels or Music Off', () => {
   });
 });
 
-test('Dry fibers is the default without overwriting legacy mixer or music choices', () => {
-  assert.equal(DEFAULT_SETTINGS.writingSound, 'dry-fibers');
+test('Textured is the default without overwriting legacy mixer or music choices', () => {
+  assert.equal(DEFAULT_SETTINGS.writingSound, 'textured');
   const { writingSound: _previouslyAbsent, ...legacy } = {
     ...DEFAULT_SETTINGS, writingVolume: 0.47, ambienceVolume: 0, musicTrack: 'off',
   };
   withStorage({ getItem: () => JSON.stringify(legacy) }, () => {
-    assert.deepEqual(loadSettings(assert.fail), { ...legacy, writingSound: 'dry-fibers' });
+    assert.deepEqual(loadSettings(assert.fail), { ...legacy, writingSound: 'textured' });
   });
   for (const writingSound of ['unknown', '', null, 1, true]) {
-    assert.equal(sanitizeSettings({ writingSound }).writingSound, 'dry-fibers');
+    assert.equal(sanitizeSettings({ writingSound }).writingSound, 'textured');
   }
 });
 
-test('retired saved sound selections migrate to Dry fibers without resetting other preferences', () => {
+test('retired saved sound selections migrate to Textured without resetting other preferences', () => {
   for (const writingSound of ['original', 'warm-paper', 'crisp-nib']) {
     const saved = {
       ...DEFAULT_SETTINGS, writingSound, style: 'kalam', ink: 'burgundy',
       masterVolume: 0.43, writingVolume: 0.61, ambienceVolume: 0.09, musicVolume: 0, musicTrack: 'off',
     };
     withStorage({ getItem: () => JSON.stringify(saved) }, () => {
-      assert.deepEqual(loadSettings(assert.fail), { ...saved, writingSound: 'dry-fibers' });
+      assert.deepEqual(loadSettings(assert.fail), { ...saved, writingSound: 'textured' });
     });
   }
 });

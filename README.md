@@ -126,11 +126,11 @@ it in a terminal separates its lifetime from the agent's completed work.
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
   Previously saved volume and music choices, including **Off**, are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
-  **Sound > Writing sound** offers **Textured**, **Soft glide**, **Fine feedback**,
-  and **Dry fibers** (the default). Switch during a stroke to compare;
+  **Sound > Writing sound** offers **Textured** (the default), **Soft glide**,
+  **Fine feedback**, and **Dry fibers**. Switch during a stroke to compare;
   it does not restart the pen or change the page. The choice persists across
   visits. Saved choices among these four are preserved; missing or retired
-  choices use Dry fibers. This choice affects only writing friction, not the mixer levels,
+  choices use Textured. This choice affects only writing friction, not the mixer levels,
   rain, music, cap, leather, paper, or bottle sounds.
   The ambience slider controls rain and thunder together. Recordings share
   the music/master mixer and pause when muted, hidden, or set to zero volume.
@@ -234,7 +234,7 @@ restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 Paper relief has its own cached height texture; ink changes do not rebuild it.
 
-Writing has four independently selectable sound profiles, with **Dry fibers**
+Writing has four independently selectable sound profiles, with **Textured**
 as the default. They blend original, procedurally generated rubbing and irregular
 paper-fiber detail through broad, non-resonant filters. Their balance follows
 speed, pressure, paper, nib, and holder; broad-edge contact also follows stroke
