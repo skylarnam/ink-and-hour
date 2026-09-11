@@ -52,11 +52,14 @@ it in a terminal separates its lifetime from the agent's completed work.
 
 ## Settle in
 
-- Write an English note, choose **Correspondence** or **Everyday print**, and
+- Write an English note, choose one of **22 handwritings**, and
   select **Begin writing**. Pause/resume preserves the exact writing position.
-  The editable text uses the selected handwriting's matching local font.
+  Correspondence and Everyday print are joined by 20 locally bundled Google
+  Fonts families. The editable text uses the selected handwriting's source font;
+  the additional pen styles are interpreted centerline studies of those faces.
   **Write it again** replays a completed note. **Fresh sheet** clears the ink but
   keeps the words. **Keep this page** exports the completed sheet as a 1560 x 2080 PNG.
+  When writing finishes, the pen lifts and settles beside the completed sheet.
 - The editor starts at a compact 18px for Correspondence and 16px for print.
   Pinch over the textbox with a trackpad or two fingers to resize its text, or
   use the keyboard-accessible **A- / A+** buttons. Display zoom is bounded to
@@ -73,9 +76,13 @@ it in a terminal separates its lifetime from the agent's completed work.
   canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan,
   plus/minus zoom, and Home restores the desk framing. Presets recenter panning.
 - **Tools** offers a lacquer fountain pen and a wooden dip holder, three nib
-  characters (fine, broad edge, soft flex), three paper surfaces, and four inks.
+  characters (fine, broad edge, soft flex), three paper surfaces, four preset inks,
+  and a **rainbow color picker** for a custom shade.
   Nib, ink, paper, and pace can change during writing. Existing ink keeps its
   color; new strokes use the new color. Text and style are locked during a run.
+  The custom shade persists. Cotton has warmer cellulose mottling, longer
+  fibers, more matte relief, and slightly softer/wider absorbed ink; Smooth
+  stays fine-grained and lightly finished.
 - In rotation mode, click the pen/cap, glass bottle, or tied leather roll in the scene. The same
   cap and roll actions have labeled buttons. The roll unfolds into four pen
   pockets. The dip holder has no cap.
@@ -87,21 +94,29 @@ it in a terminal separates its lifetime from the agent's completed work.
   near-window streaks that remain visible in the default desktop and phone
   views, plus beads and trailing drops on the glass. Clear removes all rain layers.
   Storms have isolated, gentle light pulses with delayed thunder, not repeated
-  rapid flashes. The coffee cup sits behind the paper, clear of both roll states.
+  rapid flashes. The coffee cup has a joined, open-D ceramic handle and sits
+  behind the paper, clear of both roll states. Books angle away from the roll.
 - Sound is on by default and starts at the first browser-allowed interaction;
   no separate enable click is needed. Click **Sound is on** to mute, even before
   the first interaction. A chosen mute remains in force for the current visit.
   Writing/materials, ambience, music, and overall volume have independent controls. Music starts
-  **Off**; **Felt notes** and **Glass garden** are original synthesized beds.
+  **Off**. The mini-player immediately left of the sound switch offers previous,
+  play/pause, and next for three real **CC0 lo-fi recordings**. Click its title
+  for artist/source/license credits. The selected track persists, but recordings
+  never auto-resume on a new visit. Tracks load only when needed and advance
+  when they end. **Felt notes** and **Glass garden** remain optional original
+  synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
   Pen sound is balanced ahead of default rain. New visits start Pen & materials
   at 90%; previously saved volume choices are preserved. Muting ambience stops
   its rain source, and idle/lifted pens have no continuing friction source.
-  The ambience slider controls rain and thunder together. No recording or
-  copyrighted composition is bundled.
+  The ambience slider controls rain and thunder together. Recordings share
+  the music/master mixer and pause when muted, hidden, or set to zero volume.
+  No remote music API, streaming account, key, or runtime third-party request
+  is needed. The audio assets have separate licensing in the notices below.
 - Leaving the tab pauses writing, silences friction, and suspends audio. On
   return, audio can resume if previously enabled, but writing waits for Resume.
   Reduced-motion preferences remove storm flashes and floating dust, freeze
-  cloud/leaf motion, and make camera/case/cap transitions immediate.
+  cloud/leaf motion, and make camera/case/cap/pen-return transitions immediate.
 
 ## How the writing works
 
@@ -118,10 +133,38 @@ letterforms, not just an italic CSS treatment. These static outline fonts are
 only for the text editor; the pen still uses stroke-order playback. Regenerate
 the checked-in font assets with `npm run fonts`.
 
+The 20 additional families come from Google's official `google/fonts`
+repository under OFL-1.1 or Apache-2.0; each unmodified TTF and its own license
+is bundled. An offline generator rasterizes glyphs, thins them to centerlines,
+prunes tiny spurs, infers connected writing trails, and simplifies the paths.
+The derived datasets are named **Ink Stroke Study 01-20**, distinct from the
+original source-font names. Their selected family names identify the source
+shown in the editor. Actual pen playback draws these generated centerlines,
+not outlines, a typeset reveal, or a motion unrelated to the ink.
+
+Stroke order in an ordinary font is **inferred**, not recorded by its designer.
+Some shared branches are retraced; completed trails are not gratuitously traced
+back to their start. Tiny periods/colon in Coming Soon and a period in Schoolbell
+use explicit short punctuation strokes. No added family silently falls back to
+another font. The source versions, SHA-256 checksums, and individual license paths
+are recorded in `public/data/HANDWRITING-ATTRIBUTION.json`.
+
+Offline regeneration (not part of the production build):
+
+```sh
+node --experimental-strip-types scripts/generate-handwriting-data.ts
+node --experimental-strip-types scripts/render-handwriting-contact-sheet.ts /tmp/ink-hour-font-studies
+```
+
+`scripts/fetch-handwriting-fonts.ts` is an opt-in source update command; it
+downloads the upstream source fonts/licenses again and overwrites those named
+assets. Review changes and regenerate the stroke data after an intentional update.
+
 Pointed flex width is pressure/downstroke-sensitive; broad-edge width depends
 on the relationship between a fixed edge angle and stroke direction. Fine is
 restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
+Paper relief has its own cached height texture; ink changes do not rebuild it.
 
 Writing uses the original soft, filtered friction sound, with a stronger mix
 but no pitched grains, resonant chirps, or playback-rate changes. Filtering
@@ -138,6 +181,10 @@ changing away from storm also stops a pending thunder voice. Zero music volume
 or Music Off stops the music timer and releases its voices. Enable, mute, and
 tab-visibility transitions are serialized so a delayed resume cannot override
 a newer mute request.
+The recording transport separately invalidates stale play promises, pauses its
+single reusable media element when unavailable, and routes through the same
+music bus at a restrained pre-gain. Loading failures are visible, not silent
+fallbacks; playback intent is not stored.
 
 ## Honest prototype limits
 
@@ -145,16 +192,18 @@ a newer mute request.
   only. Unsupported characters get a visible error; they are never discarded.
   There is a 420-character input ceiling and a stricter physical sheet-capacity
   check. Words and long unbroken text wrap; there is no automatic second page.
-- The two curated stroke styles are not arbitrary font imports. Historical
-  engraving centerlines are an expressive starting point, not a recording of a
-  calligrapher's motor motion. Some print letters use several lifts; script
-  letters are not continuously connected across every character boundary.
+- These are 22 curated styles, not arbitrary font imports. The original two
+  use historical ordered centerlines; the added 20 approximate font shapes and
+  infer their writing order. They are not recordings of a calligrapher's motion.
+  Some letters use several lifts or shared-stem retracing, and script letters
+  are not continuously connected across every character boundary.
 - No hand model, fluid simulation, ink depletion, automatic dipping, nib alloy
   simulation, or manufacturer-specific measurements. "Fine", "broad edge", and
   "soft flex" are generic expressive profiles, not claims of real interchangeable
   nib hardware. Broad and flex behavior are deliberately different.
-- Friction/weather/music are synthesized rather than recorded ASMR. Quiet
-  headphones are recommended; output character depends on the device.
+- Friction/weather/material sounds and the two original beds are synthesized,
+  not recorded ASMR. The new lo-fi playlist is genuine recorded music.
+  Quiet headphones are recommended; output character depends on the device.
 - The outdoor view is a lightweight, depth-compressed procedural landscape,
   not a scanned forest, volumetric sky, or physical rain/refraction simulation.
 - A page is kept only for the current browser session unless exported. Material,
@@ -171,14 +220,17 @@ makes procedural materials and ink; `src/writing/` owns layout and stroke
 playback; `src/audio.ts` owns Web Audio; `src/settings.ts` validates saved
 preferences. `tests/` exercises those pure/stateful boundaries.
 
-`src/fonts.css` shares the locally generated editor faces.
+`src/handwriting.ts` is the 22-style registry, and `src/fonts.css` declares the
+local editor faces. `src/ink.ts` resolves preset/custom ink. `src/recorded-music.ts`
+owns the recording transport; `src/music-library.ts` declares the three licensed
+records without downloading or starting them at import time.
 
 During `npm run dev`, `window.__inkAndHour` is a read-only snapshot getter for
 writing contact/progress, audio gain targets/lifecycle, and scene settings.
 It provides no mutation methods and is omitted from production builds.
 
 See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for the separately tracked
-software and lettering provenance.
+software, lettering, and recording provenance.
 
 The distinction between soft/pointed flex and stub/music broad-edge behavior
 was informed by [Pilot's nib guide](https://www.pilot-custom.jp/en/feature/nib.html);

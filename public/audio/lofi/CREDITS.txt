@@ -1,0 +1,37 @@
+Ink & Hour / Lo-fi recordings
+
+These recordings are distributed under their creators' CC0 1.0 declarations.
+CC0 permits commercial use, copying, and redistribution. Attribution is not
+required, but the artists and original releases are credited here.
+
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+First Snow
+Artist: HoliznaCC0 (OpenGameArt uploader: Holizna)
+Source: https://opengameart.org/content/lo-fi-and-chill-collection
+Download: https://opengameart.org/sites/default/files/01_holiznacc0_-_first_snow.mp3.mp3
+The creator states, "This music is public domain Cc0, so use it how you want!"
+Local file: first-snow.mp3
+SHA-256: 855a35d81441ec653ceb36b44dbdbd1f750b62a2b530d8ccf2f03172349f6ee8
+
+Chill lofi inspired
+Artist: omfgdude
+Source: https://opengameart.org/content/chill-lofi-inspired
+Download: https://opengameart.org/sites/default/files/ChillLofiR_0.mp3
+The OpenGameArt release declares CC0.
+Local file: chill-lofi-inspired.mp3
+SHA-256: 1796a480e3db0c02d5e58059b2ae7cfbeab344f95e0443496790da022cbe91b5
+
+happy lofi day
+Artist: Tarush Singhal
+Source: https://opengameart.org/content/happy-lofi-day
+Download: https://opengameart.org/sites/default/files/rhodes.mp3
+The OpenGameArt release declares CC0.
+Local file: happy-lofi-day.mp3
+SHA-256: 50e70d0b7b7a2df31c6b6e900f66d77dee3302a0e631849edcc78fe628cf4c3a
+
+Retrieved: 2026-09-11.
+Audio files are unmodified; only their filenames have been normalized.
+Playback level is reduced in the app's music bus, not in the recordings.
+No artist endorsement is implied.

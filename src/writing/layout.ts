@@ -1,8 +1,12 @@
-import fonts from './fonts.json' with { type: 'json' };
-import type { LayoutOptions, LayoutResult, Point, WritingStyle } from '../types.ts';
+import type { LayoutOptions, LayoutResult, Point } from '../types.ts';
+import { isHandwritingId, type HandwritingId } from '../handwriting.ts';
+import { handwritingFontData } from './font-data.ts';
 import { parseStrokePath, smoothStroke } from './paths.ts';
 
 export const MAX_CHARACTERS = 420;
+
+export type LayoutStyle = HandwritingId;
+export type LayoutTextOptions = LayoutOptions;
 
 interface Glyph {
   strokes: Point[][];
@@ -15,17 +19,29 @@ interface Font {
   minX: number;
   minY: number;
   maxY: number;
+  space: number;
+  scale: number;
+  lineHeight: number;
 }
 
-const fontCache = new Map<WritingStyle, Font>();
+const fontCache = new Map<HandwritingId, Font>();
 
-function getFont(style: WritingStyle): Font {
+function getFont(style: HandwritingId): Font {
   const cached = fontCache.get(style);
   if (cached) return cached;
-  const font: Font = { glyphs: new Map(), minX: 0, minY: Infinity, maxY: -Infinity };
+  const source = handwritingFontData(style);
+  const font: Font = {
+    glyphs: new Map(),
+    minX: 0,
+    minY: Infinity,
+    maxY: -Infinity,
+    space: source.space,
+    scale: source.scale,
+    lineHeight: source.lineHeight,
+  };
   for (let index = 0; index < 94; index++) {
-    const source = fonts[style].chars[index];
-    const paths = parseStrokePath(source.d);
+    const character = source.chars[index];
+    const paths = parseStrokePath(character.d);
     let maxX = -Infinity;
     for (const point of paths.flat()) {
       font.minX = Math.min(font.minX, point.x);
@@ -33,11 +49,9 @@ function getFont(style: WritingStyle): Font {
       font.maxY = Math.max(font.maxY, point.y);
       maxX = Math.max(maxX, point.x);
     }
-    // Upstream uses o * 1.68, not o alone. Respect wider terminal strokes as well.
-    const advance = Math.max(source.o * 1.68 + (style === 'print' ? 0.8 : 0),
-      maxX + (style === 'print' ? 1.2 : 0.18));
+    const advance = Math.max(character.o * 1.68, maxX + source.terminalPadding);
     font.glyphs.set(String.fromCharCode(index + 33), {
-      strokes: paths.map((path) => smoothStroke(path, style === 'correspondence')),
+      strokes: paths.map((path) => smoothStroke(path, source.script)),
       advance,
       maxX,
     });
@@ -46,13 +60,18 @@ function getFont(style: WritingStyle): Font {
   return font;
 }
 
-export function layoutText(input: string, options: LayoutOptions): LayoutResult {
+export function layoutText(input: string, options: LayoutTextOptions): LayoutResult {
   const text = input.replace(/\r\n?/g, '\n');
   const error = (message: string): LayoutResult => ({
-    ok: false, error: message, strokes: [], lineCount: 0, characterCount: text.length,
+    ok: false,
+    error: message,
+    strokes: [],
+    lineCount: 0,
+    characterCount: text.length,
   });
-  if (options.style !== 'correspondence' && options.style !== 'print') {
-    return error('Choose correspondence or neat print for this sheet.');
+  const style = String(options.style);
+  if (!isHandwritingId(style)) {
+    return error('Choose one of the bundled handwriting styles for this sheet.');
   }
   if (!Number.isFinite(options.width) || !Number.isFinite(options.height)
     || options.width <= 0 || options.height <= 0) {
@@ -70,9 +89,9 @@ export function layoutText(input: string, options: LayoutOptions): LayoutResult 
   }
   if (!/[!-~]/.test(text)) return error('A word, a thought, a little hello. Add something to write.');
 
-  const font = getFont(options.style);
-  const scale = options.style === 'correspondence' ? 1.72 : 1.5;
-  const lineHeight = options.style === 'correspondence' ? 68 : 58;
+  const font = getFont(style);
+  const scale = font.scale;
+  const lineHeight = font.lineHeight;
   const inkInset = 3.5;
   const left = Math.min(72, options.width * 0.095) + inkInset;
   const right = options.width - Math.min(72, options.width * 0.095) - inkInset;
@@ -116,10 +135,10 @@ export function layoutText(input: string, options: LayoutOptions): LayoutResult 
     }
     if (token[0] === ' ') {
       for (let index = 0; index < token.length; index++) {
-        if (x + 10 * scale > right) {
+        if (x + font.space * scale > right) {
           if (!newline()) return error(fullMessage);
         } else {
-          x += 10 * scale;
+          x += font.space * scale;
         }
       }
       continue;

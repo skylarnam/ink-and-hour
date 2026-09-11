@@ -1,0 +1,4 @@
+# Keep upstream font/license bytes intact for the recorded provenance hashes.
+public/fonts/** -text
+public/fonts/**/OFL.txt -whitespace
+public/fonts/**/LICENSE.txt -whitespace

@@ -1,4 +1,7 @@
 import type { Settings } from './types.ts';
+import { isInkColor } from './ink.ts';
+import { LOFI_TRACK_IDS } from './music-library.ts';
+import { HANDWRITING_IDS } from './handwriting.ts';
 
 export const STORAGE_KEY = 'ink-and-hour:preferences:v1';
 
@@ -10,6 +13,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   nib: 'flex',
   paper: 'smooth',
   ink: 'midnight',
+  customInk: '#6752a0',
   style: 'correspondence',
   speed: 1,
   masterVolume: 0.68,
@@ -17,6 +21,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   ambienceVolume: 0.48,
   musicVolume: 0.22,
   musicTrack: 'off',
+  lofiTrack: 'first-snow',
 };
 
 function choice<T extends string>(value: unknown, values: readonly T[], fallback: T): T {
@@ -38,14 +43,16 @@ export function sanitizeSettings(value: unknown): Settings {
     pen: choice(data.pen, ['fountain', 'dip'], DEFAULT_SETTINGS.pen),
     nib: choice(data.nib, ['fine', 'broad', 'flex'], DEFAULT_SETTINGS.nib),
     paper: choice(data.paper, ['smooth', 'parchment', 'cotton'], DEFAULT_SETTINGS.paper),
-    ink: choice(data.ink, ['midnight', 'sepia', 'burgundy', 'forest'], DEFAULT_SETTINGS.ink),
-    style: choice(data.style, ['correspondence', 'print'], DEFAULT_SETTINGS.style),
+    ink: choice(data.ink, ['midnight', 'sepia', 'burgundy', 'forest', 'custom'], DEFAULT_SETTINGS.ink),
+    customInk: isInkColor(data.customInk) ? data.customInk.toLowerCase() : DEFAULT_SETTINGS.customInk,
+    style: choice(data.style, HANDWRITING_IDS, DEFAULT_SETTINGS.style),
     speed: number(data.speed, 0.5, 2, DEFAULT_SETTINGS.speed),
     masterVolume: number(data.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume),
     writingVolume: number(data.writingVolume, 0, 1, DEFAULT_SETTINGS.writingVolume),
     ambienceVolume: number(data.ambienceVolume, 0, 1, DEFAULT_SETTINGS.ambienceVolume),
     musicVolume: number(data.musicVolume, 0, 1, DEFAULT_SETTINGS.musicVolume),
-    musicTrack: choice(data.musicTrack, ['off', 'felt', 'glass'], DEFAULT_SETTINGS.musicTrack),
+    musicTrack: choice(data.musicTrack, ['off', 'felt', 'glass', 'lofi'], DEFAULT_SETTINGS.musicTrack),
+    lofiTrack: choice(data.lofiTrack, LOFI_TRACK_IDS, DEFAULT_SETTINGS.lofiTrack),
   };
 }
 

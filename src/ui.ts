@@ -1,3 +1,6 @@
+import { LOFI_TRACKS } from './music-library.ts';
+import { HANDWRITING_STYLES } from './handwriting.ts';
+
 export const icons = {
   nib: '<path d="m12 2-7 13 7 7 7-7-7-13Z"/><path d="M12 3v11"/><circle cx="12" cy="15" r="1.7"/>',
   sound: '<path d="M4 14v-4h4l5-4v12l-5-4H4Z"/><path d="M17 8c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/>',
@@ -5,6 +8,8 @@ export const icons = {
   tools: '<path d="m5 19 2-6L17 3l4 4-10 10-6 2Zm2-6 4 4M15 5l4 4M3 22h18"/>',
   play: '<path d="m9 5 10 7-10 7V5Z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
+  previous: '<path d="M5 5v14m14-14L8 12l11 7V5Z"/>',
+  next: '<path d="M19 5v14M5 5l11 7-11 7V5Z"/>',
   reset: '<path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/>',
   freshSheet: '<path d="M13 2H5v20h14V8l-6-6Zm0 0v6h6"/><path d="M9 15h6m-3-3v6"/>',
   arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
@@ -40,7 +45,17 @@ export function renderUI(): string {
         <span><span class="brand-name">Ink <i>&amp;</i> Hour</span><span class="brand-note">A WRITING RITUAL</span></span>
       </a>
       <p class="header-thought">For the pleasure of putting pen to paper.</p>
-      <button class="sound-toggle" id="enable-sound" type="button" aria-pressed="true" title="Mute sound">${icon('sound')}<span>Sound is on</span><span class="sound-dot"></span></button>
+      <div class="header-audio">
+        <div class="music-player" role="group" aria-label="Lo-fi mini music player">
+          <button class="music-info" id="music-credits" type="button" aria-label="Music details and credits" title="Music details and credits"><span id="music-title">First Snow</span><small id="music-detail">Lo-fi / tap play</small></button>
+          <div class="music-transport">
+            <button id="music-previous" type="button" aria-label="Previous lo-fi track" title="Previous lo-fi track">${icon('previous')}</button>
+            <button id="music-play" type="button" aria-label="Play music" title="Play music" aria-pressed="false">${icon('play')}</button>
+            <button id="music-next" type="button" aria-label="Next lo-fi track" title="Next lo-fi track">${icon('next')}</button>
+          </div>
+        </div>
+        <button class="sound-toggle" id="enable-sound" type="button" aria-pressed="true" title="Mute sound">${icon('sound')}<span>Sound is on</span><span class="sound-dot"></span></button>
+      </div>
     </header>
     <main class="workspace">
       <section class="stage" aria-label="Interactive three-dimensional writing desk">
@@ -81,8 +96,9 @@ export function renderUI(): string {
               <button type="button" class="ink-swatch" style="--ink:#76503b" data-setting="ink" data-value="sepia" aria-label="Warm sepia ink" aria-pressed="false"></button>
               <button type="button" class="ink-swatch" style="--ink:#793e4b" data-setting="ink" data-value="burgundy" aria-label="Oxblood ink" aria-pressed="false"></button>
               <button type="button" class="ink-swatch" style="--ink:#3f5947" data-setting="ink" data-value="forest" aria-label="Deep moss ink" aria-pressed="false"></button>
+              <button type="button" id="custom-ink-swatch" class="ink-swatch rainbow-swatch" data-setting="ink" data-value="custom" aria-label="Choose a custom ink color" aria-controls="custom-ink-controls" aria-pressed="false" title="Choose your own ink color"></button>
               <span class="ink-note">A color to linger in.</span>
-            </div></fieldset>
+            </div><div id="custom-ink-controls" class="custom-ink-controls" hidden><label for="custom-ink-color">Your shade</label><input type="color" id="custom-ink-color" value="#6752a0" aria-label="Custom ink color"><output id="custom-ink-value" for="custom-ink-color">#6752A0</output><span>New strokes only.</span></div></fieldset>
             <fieldset><legend>THE PAPER</legend><div class="choices paper-choices">
               ${choice('paper', 'smooth', '<span class="paper-sample smooth"></span>Smooth')}
               ${choice('paper', 'parchment', '<span class="paper-sample parchment"></span>Parchment')}
@@ -110,10 +126,10 @@ export function renderUI(): string {
               ${volume('masterVolume', 'Overall volume', 'Keep it gentle.')}
               ${volume('writingVolume', 'Pen & materials', 'Nib friction, paper, cap and leather.')}
               ${volume('ambienceVolume', 'Outside the window', 'Rain and distant thunder. Silent on clear days.')}
-              ${volume('musicVolume', 'Background music', 'An original, softly synthesized companion.')}
+              ${volume('musicVolume', 'Background music', 'Lo-fi recordings or an original, quiet soundscape.')}
             </div>
             <fieldset><legend>A LITTLE BACKGROUND</legend><div class="choices compact">
-              ${choice('musicTrack', 'off', 'Off')}${choice('musicTrack', 'felt', 'Felt notes')}${choice('musicTrack', 'glass', 'Glass garden')}
+              ${choice('musicTrack', 'off', 'Off')}${choice('musicTrack', 'lofi', 'Lo-fi')}${choice('musicTrack', 'felt', 'Felt notes')}${choice('musicTrack', 'glass', 'Glass garden')}
             </div></fieldset>
             <p class="small-note" id="sound-note">Sound is ready. Your first click, tap, or keypress starts it.</p>
           </section>
@@ -126,9 +142,10 @@ Stay a little while.</textarea>
           <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation</span><span id="editor-size-hint">Pinch to resize text</span></span><span id="character-count"></span></div>
           <p id="input-error" class="input-error" role="status" hidden></p>
           <div class="writing-options">
-            <label><span>Handwriting</span><select id="style" aria-label="Handwriting style"><option value="correspondence">Correspondence</option><option value="print">Everyday print</option></select></label>
+            <label><span>Handwriting</span><select id="style" aria-label="Handwriting style" aria-describedby="handwriting-note">${HANDWRITING_STYLES.map((style) => `<option value="${style.id}">${style.label}</option>`).join('')}</select></label>
             <label class="pace-control"><span>Pace <output id="speed-label">1x</output></span><input type="range" data-range="speed" min="0.5" max="2" step="0.1" aria-label="Writing pace"></label>
           </div>
+          <p class="handwriting-note" id="handwriting-note" hidden>A font-inspired stroke study, with an interpreted pen order.</p>
           <div class="writing-actions">
             <button type="button" class="begin-button" id="begin-writing">${icon('play')}<span>Begin writing</span>${icon('arrow', 'begin-arrow')}</button>
             <button type="button" class="new-sheet-button" id="new-sheet" title="Start a fresh sheet" aria-label="Start a fresh sheet">${icon('freshSheet')}<span>Fresh sheet</span></button>
@@ -137,8 +154,29 @@ Stay a little while.</textarea>
         </section>
       </aside>
     </main>
-    <footer class="site-footer"><span>Relax, and sit in your quiet corner.</span><button id="about-button" type="button">About this little world ${icon('info')}</button></footer>
+    <footer class="site-footer"><button id="about-button" type="button">About this little world ${icon('info')}</button></footer>
     <div id="notice" class="toast" role="status" hidden><span></span><button id="dismiss-notice" aria-label="Dismiss message">${icon('close')}</button></div>
-    <dialog id="about-dialog"><button id="close-about" class="dialog-close" aria-label="Close about">${icon('close')}</button><span class="eyebrow">INK &amp; HOUR / FIRST EDITION</span><h2>Nothing to finish.<br>Just something to feel.</h2><p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p><p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. Movement stays gently bounded around your camera preset. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p><p>This first edition uses real stroke-defined Hershey lettering, not traced font outlines. Nib pressure and sounds are expressive interpretations, not a fluid-dynamics or manufacturer-specific simulation. There is no hand model, arbitrary font import, or physical ink depletion.</p><p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink or nib while writing; text and handwriting edits start a fresh page.</p><p class="small-note">All room geometry, textures and synthesized sounds are original. The two original Hershey stroke datasets are public domain. No external fonts, recordings, account, analytics or runtime CDN.</p></dialog>
+    <dialog id="about-dialog">
+      <button id="close-about" class="dialog-close" aria-label="Close about">${icon('close')}</button>
+      <span class="eyebrow">INK &amp; HOUR / FIRST EDITION</span>
+      <h2>Nothing to finish.<br>Just something to feel.</h2>
+      <p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p>
+      <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
+      <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. Text and handwriting edits start a fresh page, and the pen rests beside the page when it finishes.</p>
+      <p>The original two styles use ordered Hershey centerlines. Twenty added styles are interpreted stroke studies of commercially licensed Google Fonts. The editor shows each original font; the pen follows inferred centerlines, not its outline. Some connected stems are retraced, and the inferred order is not a recording of a calligrapher's hand.</p>
+      <p>Nib pressure and material sounds are expressive interpretations, not a fluid-dynamics or manufacturer-specific simulation. There is no hand model, arbitrary font import, or physical ink depletion.</p>
+      <details class="font-credits">
+        <summary>22 handwriting sources &amp; licenses</summary>
+        <ul>${HANDWRITING_STYLES.map((style) => `<li><a href="${style.source}" target="_blank" rel="noopener noreferrer">${style.label}</a><a href="${style.publicLicensePath}" target="_blank" rel="noopener">${style.license}</a></li>`).join('')}</ul>
+        <p class="small-note">Source fonts are unmodified. Added paper styles are separately named Ink Stroke Studies. <a href="/data/HANDWRITING-ATTRIBUTION.json" target="_blank" rel="noopener">Source versions, checksums and derivation notes</a>.</p>
+      </details>
+      <section id="music-attribution" aria-labelledby="music-attribution-title">
+        <h3 id="music-attribution-title">Records for a quiet corner.</h3>
+        <p>Three locally bundled lo-fi recordings, shared by their creators under CC0. No streaming account or outside playback service. Music starts only when you choose it.</p>
+        <ul class="music-attribution">${LOFI_TRACKS.map((track) => `<li><a href="${track.source}" target="_blank" rel="noopener noreferrer">${track.title}</a><span>${track.artist} / <a href="${track.license}" target="_blank" rel="noopener noreferrer">CC0 1.0</a></span></li>`).join('')}</ul>
+        <p class="small-note"><a href="/audio/lofi/CREDITS.txt" target="_blank" rel="noopener">Recording sources and credits</a>. Felt notes and Glass garden are the original synthesized soundscapes.</p>
+      </section>
+      <p class="small-note">Room geometry, textures and synthesized material/weather sounds are original. No account, analytics or runtime CDN.</p>
+    </dialog>
   `;
 }

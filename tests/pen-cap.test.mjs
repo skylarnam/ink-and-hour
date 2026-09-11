@@ -77,17 +77,57 @@ test('the removed cap is genuinely hollow at the mouth and closed at its rounded
   assert.ok(scene.cap.position.distanceTo(scene.pen.position) > 0.5);
 });
 
-test('capping a paused or finished pen keeps the crown above the paper and writing still meets the ink point', (t) => {
+test('capped pens clear the paper while paused and the desk after returning home', (t) => {
   const scene = penRig(t);
   for (const status of ['paused', 'complete']) {
     scene.updatePen({ ...sample, status });
-    assert.ok(new THREE.Box3().setFromObject(scene.cap, true).min.y >= 0.064);
+    assert.ok(new THREE.Box3().setFromObject(scene.cap, true).min.y >= (status === 'paused' ? 0.064 : 0));
   }
   scene.setCapped(false);
   scene.updatePen({ ...sample, status: 'writing', contact: true });
   close(scene.pen.position.x, (sample.x / 780 - 0.5) * 3.8);
   close(scene.pen.position.z, (sample.y / 1040 - 0.5) * (3.8 * 1040 / 780));
   close(scene.pen.position.y, 0.068);
+});
+
+test('a finished pen lifts before traveling home and stays there without changing writing coordinates', (t) => {
+  const scene = penRig(t);
+  scene.reducedMotion = false;
+  scene.setCapped(false);
+  scene.capAmount = 0;
+  scene.updatePen(sample);
+  const home = scene.pen.position.clone();
+  const homeRotation = scene.pen.quaternion.clone();
+  const finished = { ...sample, x: 260, y: 330, status: 'complete', progress: 1 };
+  scene.updatePen({ ...finished, status: 'writing', contact: true });
+  const last = scene.pen.position.clone();
+  for (let i = 0; i < 5; i++) scene.updatePen(finished, 0.05);
+  close(scene.pen.position.x, last.x);
+  close(scene.pen.position.z, last.z);
+  assert.ok(scene.pen.position.y > last.y);
+  for (let i = 0; i < 40; i++) scene.updatePen(finished, 0.05);
+  assert.ok(scene.pen.position.distanceTo(home) < 1e-8);
+  assert.ok(scene.pen.quaternion.angleTo(homeRotation) < 1e-7);
+  scene.updatePen(finished, 1);
+  assert.ok(scene.pen.position.distanceTo(home) < 1e-8);
+  assert.equal(finished.x, 260);
+  assert.equal(finished.y, 330);
+});
+
+test('replay cancels a return and reduced motion returns immediately', (t) => {
+  const scene = penRig(t);
+  scene.reducedMotion = false;
+  scene.setCapped(false);
+  scene.capAmount = 0;
+  scene.updatePen({ ...sample, status: 'complete' }, 0.6);
+  const writing = { ...sample, x: 150, y: 120, status: 'writing', contact: true };
+  scene.updatePen(writing, 0.02);
+  close(scene.pen.position.x, (150 / 780 - 0.5) * 3.8);
+  close(scene.pen.position.y, 0.068);
+  assert.equal(scene.penReturn, null);
+  scene.reducedMotion = true;
+  scene.updatePen({ ...sample, status: 'complete' });
+  assert.deepEqual(scene.pen.position.toArray(), [2.08, 0.16, 1.4]);
 });
 
 test('the metal mouth lip sits ahead of the shell rather than sharing a flickering end face', (t) => {

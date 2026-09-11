@@ -125,7 +125,7 @@ test('speed changes apply live and pause does not consume writing time', () => {
   assert.equal(slow.tick(0.08).pen.contact, false);
 });
 
-test('only the two vetted original fonts and their 94 printable records are bundled', () => {
+test('legacy Hershey source data stays limited to the original two 94-glyph datasets', () => {
   assert.deepEqual(Object.keys(fonts), ['correspondence', 'print']);
   assert.equal(fonts.correspondence.name, 'Script 1-stroke');
   assert.equal(fonts.print.name, 'Sans 1-stroke');

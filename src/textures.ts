@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { INKS, PAGE, PAPER_COLORS } from './types.ts';
-import type { InkId, InkSegment, PaperKind } from './types.ts';
+import { PAGE, PAPER_COLORS } from './types.ts';
+import type { InkSegment, PaperKind } from './types.ts';
 
 export function randomSource(seed: number): () => number {
   let state = seed >>> 0;
@@ -96,11 +96,14 @@ export function makeLabelTexture(title: string, subtitle: string): THREE.CanvasT
 export class PaperSurface {
   readonly canvas: HTMLCanvasElement;
   readonly texture: THREE.CanvasTexture;
+  readonly heightTexture: THREE.CanvasTexture;
   private readonly context: CanvasRenderingContext2D;
   private readonly paperCanvas: HTMLCanvasElement;
   private readonly paperContext: CanvasRenderingContext2D;
   private readonly inkCanvas: HTMLCanvasElement;
   private readonly inkContext: CanvasRenderingContext2D;
+  private readonly heightCanvas: HTMLCanvasElement;
+  private readonly heightContext: CanvasRenderingContext2D;
   private paper: PaperKind = 'smooth';
   private readonly scale = 2;
   private dirty = false;
@@ -109,10 +112,13 @@ export class PaperSurface {
     [this.canvas, this.context] = canvas2D(PAGE.width * this.scale, PAGE.height * this.scale);
     [this.paperCanvas, this.paperContext] = canvas2D(PAGE.width * this.scale, PAGE.height * this.scale);
     [this.inkCanvas, this.inkContext] = canvas2D(PAGE.width * this.scale, PAGE.height * this.scale);
+    [this.heightCanvas, this.heightContext] = canvas2D(780, 1040);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.anisotropy = 8;
     this.texture.generateMipmaps = true;
+    this.heightTexture = new THREE.CanvasTexture(this.heightCanvas);
+    this.heightTexture.anisotropy = 8;
     this.preparePaper();
     this.compose();
   }
@@ -129,13 +135,13 @@ export class PaperSurface {
     this.compose();
   }
 
-  draw(segments: InkSegment[], ink: InkId): void {
+  draw(segments: InkSegment[], color: string): void {
     if (!segments.length) return;
     const ctx = this.inkContext;
     ctx.save();
     ctx.scale(this.scale, this.scale);
-    ctx.fillStyle = INKS[ink].color;
-    ctx.strokeStyle = INKS[ink].color;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     for (const segment of segments) {
@@ -145,8 +151,9 @@ export class PaperSurface {
       const length = Math.hypot(dx, dy);
       const nx = length > 0 ? -dy / length : 0;
       const ny = length > 0 ? dx / length : 1;
-      const w0 = Math.max(0.4, fromWidth) / 2;
-      const w1 = Math.max(0.4, toWidth) / 2;
+      const absorption = this.paper === 'cotton' ? 1.08 : 1;
+      const w0 = Math.max(0.4, fromWidth) * absorption / 2;
+      const w1 = Math.max(0.4, toWidth) * absorption / 2;
       ctx.globalAlpha = this.paper === 'cotton' ? 0.9 : 0.96;
       ctx.beginPath();
       ctx.moveTo(from.x + nx * w0, from.y + ny * w0);
@@ -174,13 +181,48 @@ export class PaperSurface {
     ctx.fillStyle = PAPER_COLORS[this.paper];
     ctx.fillRect(0, 0, w, h);
     const random = randomSource(84);
-    const grain = this.paper === 'smooth' ? 0.035 : this.paper === 'cotton' ? 0.08 : 0.065;
+    const height = this.heightContext;
+    height.fillStyle = '#808080';
+    height.fillRect(0, 0, this.heightCanvas.width, this.heightCanvas.height);
+    if (this.paper === 'cotton') {
+      for (let i = 0; i < 1900; i++) {
+        const x = random() * w;
+        const y = random() * h;
+        const radius = 5 + random() * 24;
+        const shade = random() > 0.5;
+        const patch = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        patch.addColorStop(0, shade ? 'rgba(119,108,84,.13)' : 'rgba(255,254,241,.32)');
+        patch.addColorStop(1, 'rgba(180,166,138,0)');
+        ctx.fillStyle = patch;
+        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        const relief = height.createRadialGradient(x / 2, y / 2, 0, x / 2, y / 2, radius / 2);
+        relief.addColorStop(0, shade ? 'rgba(20,20,20,.32)' : 'rgba(245,245,245,.32)');
+        relief.addColorStop(1, 'rgba(128,128,128,0)');
+        height.fillStyle = relief;
+        height.fillRect((x - radius) / 2, (y - radius) / 2, radius, radius);
+      }
+    }
+    const grain = this.paper === 'smooth' ? 0.025 : this.paper === 'cotton' ? 0.18 : 0.065;
     for (let i = 0; i < 22000; i++) {
       const x = random() * w;
       const y = random() * h;
       ctx.fillStyle = `rgba(101,80,51,${random() * grain})`;
-      const fiber = this.paper === 'cotton' ? 1 + random() * 5 : 1 + random() * 2;
-      ctx.fillRect(x, y, fiber, 0.6 + random() * 1.2);
+      const fiber = this.paper === 'cotton' ? 3 + random() * 13 : 1 + random() * 2;
+      if (this.paper === 'cotton') {
+        const angle = random() * Math.PI * 2;
+        ctx.strokeStyle = random() > 0.5 ? `rgba(111,101,79,${random() * grain})` : 'rgba(255,255,244,.4)';
+        ctx.lineWidth = 0.6 + random() * 1.3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + fiber * 0.6, y - 2, x + Math.cos(angle) * fiber, y + Math.sin(angle) * fiber);
+        ctx.stroke();
+        height.strokeStyle = i % 2 ? 'rgba(244,244,244,.3)' : 'rgba(24,24,24,.18)';
+        height.lineWidth = 0.6;
+        height.beginPath();
+        height.moveTo(x / 2, y / 2);
+        height.lineTo((x + Math.cos(angle) * fiber) / 2, (y + Math.sin(angle) * fiber) / 2);
+        height.stroke();
+      } else ctx.fillRect(x, y, fiber, 0.6 + random() * 1.2);
     }
     const vignette = ctx.createRadialGradient(w / 2, h / 2, w / 3, w / 2, h / 2, h * 0.72);
     vignette.addColorStop(0, 'rgba(157,114,58,0)');
@@ -202,6 +244,7 @@ export class PaperSurface {
     ctx.font = 'italic 11px Georgia';
     ctx.fillText('a moment, kept.', PAGE.width - 80, PAGE.height - 65);
     ctx.restore();
+    this.heightTexture.needsUpdate = true;
   }
 
   private compose(): void {
@@ -221,5 +264,6 @@ export class PaperSurface {
 
   dispose(): void {
     this.texture.dispose();
+    this.heightTexture.dispose();
   }
 }

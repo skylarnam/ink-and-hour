@@ -58,6 +58,9 @@ export class RitualAudio {
   private writing: GainNode | null = null;
   private ambience: GainNode | null = null;
   private music: GainNode | null = null;
+  private recordingSource: MediaElementAudioSourceNode | null = null;
+  private recordingGain: GainNode | null = null;
+  private musicPaused = false;
   private friction: GainNode | null = null;
   private frictionBand: BiquadFilterNode | null = null;
   private frictionLowpass: BiquadFilterNode | null = null;
@@ -83,6 +86,28 @@ export class RitualAudio {
 
   constructor(onError: (message: string) => void) { this.onError = onError; }
   get enabled(): boolean { return this.userEnabled; }
+
+  connectRecording(media: HTMLAudioElement): void {
+    if (!this.context || !this.music || this.disposed) throw new Error('Enable sound before playing a recording.');
+    if (this.recordingSource) {
+      if (this.recordingSource.mediaElement !== media) throw new Error('This sound session already has a music player.');
+      return;
+    }
+    this.recordingSource = this.context.createMediaElementSource(media);
+    this.recordingGain = this.context.createGain();
+    this.recordingGain.gain.value = 0.18;
+    this.recordingSource.connect(this.recordingGain).connect(this.music);
+  }
+
+  pauseMusic(): void {
+    this.musicPaused = true;
+    this.stopMusic();
+  }
+
+  resumeMusic(): void {
+    this.musicPaused = false;
+    this.startMusic();
+  }
 
   async enable(): Promise<boolean> {
     if (this.disposed) {
@@ -250,7 +275,8 @@ export class RitualAudio {
     this.applyMixer();
     if (previous.weather !== this.settings.weather && this.settings.weather !== 'storm') this.stopVoices('thunder');
     if (previous.musicTrack !== this.settings.musicTrack) {
-      this.stopMusic();
+      this.musicPaused = false;
+      this.stopMusic(this.settings.musicTrack === 'lofi');
     }
     if (this.settings.musicVolume === 0 || this.settings.masterVolume === 0) this.stopMusic();
     else this.startMusic();
@@ -386,10 +412,10 @@ export class RitualAudio {
   }
 
   private startMusic(): void {
-    if (!this.ready() || this.settings.musicTrack === 'off' || this.settings.musicVolume === 0
+    if (!this.ready() || this.musicPaused || !['felt', 'glass'].includes(this.settings.musicTrack) || this.settings.musicVolume === 0
       || this.settings.masterVolume === 0 || this.musicTimer !== null || !this.music) return;
     const play = (): void => {
-      if (!this.ready() || !this.music || this.settings.musicTrack === 'off') return;
+      if (!this.ready() || !this.music || this.musicPaused || !['felt', 'glass'].includes(this.settings.musicTrack)) return;
       const felt = this.settings.musicTrack === 'felt';
       const notes = felt ? [130.81, 164.81, 196, 146.83, 174.61, 220, 164.81, 146.83]
         : [261.63, 329.63, 392, 293.66, 349.23, 440, 329.63, 293.66];
@@ -431,6 +457,7 @@ export class RitualAudio {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
       contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
       rainGain: this.rainTarget, musicTrack: this.settings.musicTrack,
+      musicPaused: this.musicPaused, recordingConnected: this.recordingSource !== null,
       activeMusicVoices: [...this.voices].filter((voice) => voice.kind === 'music' && !voice.releasing).length,
       musicTimerActive: this.musicTimer !== null, continuousSources: this.loops.size,
       contactSources: [...this.loops].filter((voice) => voice.kind === 'contact' && !voice.releasing).length,
@@ -448,6 +475,8 @@ export class RitualAudio {
     this.userEnabled = false;
     this.revision++;
     this.silence();
+    this.recordingSource?.disconnect();
+    this.recordingGain?.disconnect();
     if (this.context && this.context.state !== 'closed') {
       void this.context.close().catch((error: unknown) => {
         this.onError(`Audio could not close. ${error instanceof Error ? error.message : ''}`);

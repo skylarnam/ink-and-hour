@@ -110,6 +110,7 @@ class FakeContext {
   destination = new FakeNode();
   gains = [];
   sources = [];
+  mediaSources = [];
   resumeGate = null;
   failResume = false;
   constructor() { FakeContext.instances.push(this); }
@@ -128,6 +129,11 @@ class FakeContext {
   }
   createBufferSource() { const source = new FakeSource(this); this.sources.push(source); return source; }
   createOscillator() { return this.createBufferSource(); }
+  createMediaElementSource(mediaElement) {
+    const source = Object.assign(new FakeNode(), { mediaElement });
+    this.mediaSources.push(source);
+    return source;
+  }
   async resume() {
     if (this.resumeGate) await this.resumeGate;
     if (this.failResume) throw new Error('Audio device unavailable');
@@ -526,5 +532,45 @@ test('disposal while resume is pending cannot restart the graph or music', async
     assert.equal(audio.diagnostics.continuousSources, 0);
     assert.equal(audio.diagnostics.musicTimerActive, false);
     audio.dispose();
+  });
+});
+
+test('recordings connect once to the quiet music bus without creating synthesized music', async () => {
+  await withAudio(async (audio) => {
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'lofi' });
+    const media = {};
+    assert.throws(() => audio.connectRecording(media), /Enable sound/);
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    audio.connectRecording(media);
+    audio.connectRecording(media);
+    assert.equal(ctx.mediaSources.length, 1);
+    assert.equal(audio.recordingGain.gain.value, 0.18);
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+    assert.equal(audio.diagnostics.activeMusicVoices, 0);
+    await audio.disable();
+    await audio.enable();
+    audio.connectRecording(media);
+    assert.equal(ctx.mediaSources.length, 1);
+    assert.equal(ctx.mediaSources[0].connected, true);
+    assert.throws(() => audio.connectRecording({}), /already has a music player/);
+    audio.dispose();
+    assert.equal(ctx.mediaSources[0].connected, false);
+  });
+});
+
+test('the original soundscapes can pause and resume without restarting on unrelated settings changes', async () => {
+  await withAudio(async (audio) => {
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt' });
+    await audio.enable();
+    audio.pauseMusic();
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'felt', ink: 'forest' });
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+    audio.resumeMusic();
+    assert.equal(audio.diagnostics.musicTimerActive, true);
+    audio.configure({ ...DEFAULT_SETTINGS, musicTrack: 'lofi' });
+    assert.equal(audio.diagnostics.activeMusicVoices, 0);
+    assert.equal(audio.diagnostics.musicTimerActive, false);
   });
 });

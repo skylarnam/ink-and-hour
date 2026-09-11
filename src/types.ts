@@ -3,9 +3,10 @@ export type Weather = 'clear' | 'rain' | 'storm';
 export type PenKind = 'fountain' | 'dip';
 export type NibKind = 'fine' | 'broad' | 'flex';
 export type PaperKind = 'smooth' | 'parchment' | 'cotton';
-export type InkId = 'midnight' | 'sepia' | 'burgundy' | 'forest';
-export type WritingStyle = 'correspondence' | 'print';
-export type MusicTrack = 'off' | 'felt' | 'glass';
+export type PresetInkId = 'midnight' | 'sepia' | 'burgundy' | 'forest';
+export type InkId = PresetInkId | 'custom';
+export type WritingStyle = HandwritingId;
+export type MusicTrack = 'off' | 'felt' | 'glass' | 'lofi';
 export type CameraPreset = 'desk' | 'detail' | 'overhead';
 export type WritingStatus = 'idle' | 'writing' | 'paused' | 'complete';
 
@@ -17,6 +18,7 @@ export interface Settings {
   nib: NibKind;
   paper: PaperKind;
   ink: InkId;
+  customInk: string;
   style: WritingStyle;
   speed: number;
   masterVolume: number;
@@ -24,6 +26,7 @@ export interface Settings {
   ambienceVolume: number;
   musicVolume: number;
   musicTrack: MusicTrack;
+  lofiTrack: LofiTrackId;
 }
 
 export interface Point {
@@ -84,7 +87,7 @@ export type InteractionCue = 'cap' | 'leather' | 'paper' | 'ink';
 
 export const PAGE = { width: 780, height: 1040 } as const;
 
-export const INKS: Record<InkId, { label: string; color: string }> = {
+export const INKS: Record<PresetInkId, { label: string; color: string }> = {
   midnight: { label: 'Midnight blue', color: '#24384d' },
   sepia: { label: 'Warm sepia', color: '#76503b' },
   burgundy: { label: 'Oxblood', color: '#793e4b' },
@@ -94,5 +97,13 @@ export const INKS: Record<InkId, { label: string; color: string }> = {
 export const PAPER_COLORS: Record<PaperKind, string> = {
   smooth: '#f9f3e5',
   parchment: '#e9d5ac',
-  cotton: '#f0eadb',
+  cotton: '#e5decd',
 };
+
+export const PAPER_FINISH: Record<PaperKind, { roughness: number; bumpScale: number }> = {
+  smooth: { roughness: 0.76, bumpScale: 0.003 },
+  parchment: { roughness: 0.94, bumpScale: 0.012 },
+  cotton: { roughness: 0.99, bumpScale: 0.032 },
+};
+import type { LofiTrackId } from './music-library.ts';
+import type { HandwritingId } from './handwriting.ts';

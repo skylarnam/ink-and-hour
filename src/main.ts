@@ -2,10 +2,14 @@ import './style.css';
 import { RitualAudio } from './audio.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { DeskScene } from './scene.ts';
+import { inkColor, inkLabel, isInkColor } from './ink.ts';
+import { LOFI_TRACKS } from './music-library.ts';
+import { RecordedMusic } from './recorded-music.ts';
+import { handwritingStyle } from './handwriting.ts';
 import { loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
 import { PaperSurface } from './textures.ts';
 import { icon, renderUI } from './ui.ts';
-import { INKS, PAGE } from './types.ts';
+import { PAGE } from './types.ts';
 import type { CameraPreset, Settings, WritingStatus } from './types.ts';
 import { layoutText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
 
@@ -28,6 +32,12 @@ function notify(message: string): void {
 let settings = loadSettings(notify);
 const audio = new RitualAudio(notify);
 audio.configure(settings);
+const recordedMusic = new RecordedMusic(LOFI_TRACKS, settings.lofiTrack, {
+  connect: (media) => audio.connectRecording(media),
+  onChange: updateMusicUI,
+  onEnded: () => skipMusic(1),
+  onError: notify,
+});
 const textarea = element<HTMLTextAreaElement>('#message');
 const editorZoom = createEditorZoom(textarea, {
   smaller: element<HTMLButtonElement>('#smaller-editor-text'),
@@ -57,6 +67,68 @@ const rooms = {
   storybook: { name: 'Storybook Nook', description: 'A little wonder, tucked between the pages.' },
 };
 
+function musicRequested(): boolean {
+  return settings.musicTrack === 'lofi' ? recordedMusic.state.requested
+    : (settings.musicTrack === 'felt' || settings.musicTrack === 'glass') && !audio.diagnostics.musicPaused;
+}
+
+function updateMusicUI(): void {
+  const state = recordedMusic.state;
+  const synth = settings.musicTrack === 'felt' || settings.musicTrack === 'glass';
+  const requested = musicRequested();
+  const title = synth ? settings.musicTrack === 'felt' ? 'Felt notes' : 'Glass garden' : state.track.title;
+  const detail = !requested ? synth ? 'Original soundscape / paused' : `${state.track.artist} / paused`
+    : !audio.enabled ? 'Paused with sound'
+    : settings.musicVolume === 0 || settings.masterVolume === 0 ? 'Music volume is zero'
+    : state.loading && !synth ? 'Loading record...'
+    : document.hidden ? 'Paused in the background'
+    : synth ? 'Original soundscape' : state.track.artist;
+  element<HTMLElement>('#music-title').textContent = title;
+  element<HTMLElement>('#music-detail').textContent = detail;
+  element<HTMLButtonElement>('#music-credits').title = `${title} / ${detail}. Music details and credits.`;
+  const button = element<HTMLButtonElement>('#music-play');
+  const label = requested ? 'Pause music' : 'Play music';
+  button.innerHTML = icon(requested ? 'pause' : 'play');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-pressed', String(requested));
+  button.title = label;
+}
+
+function syncMusicAvailability(): void {
+  recordedMusic.setAvailable(settings.musicTrack === 'lofi' && audio.enabled
+    && audio.diagnostics.contextState === 'running' && !document.hidden
+    && settings.masterVolume > 0 && settings.musicVolume > 0);
+  updateMusicUI();
+}
+
+async function startRecordedMusic(): Promise<void> {
+  updateSettings({ ...settings, musicTrack: 'lofi' });
+  recordedMusic.play();
+  await audio.enable();
+  if (!disposed) updateAudioButtons();
+}
+
+async function toggleMusic(): Promise<void> {
+  if (musicRequested()) {
+    if (settings.musicTrack === 'lofi') recordedMusic.pause();
+    else audio.pauseMusic();
+    updateMusicUI();
+    return;
+  }
+  if (settings.musicTrack === 'felt' || settings.musicTrack === 'glass') {
+    audio.resumeMusic();
+    await audio.enable();
+    if (!disposed) updateAudioButtons();
+  } else await startRecordedMusic();
+}
+
+function skipMusic(direction: -1 | 1): void {
+  const requested = musicRequested();
+  updateSettings({ ...settings, musicTrack: 'lofi', lofiTrack: recordedMusic.adjacent(direction).id });
+  if (requested) recordedMusic.play();
+  syncMusicAvailability();
+}
+
 function updateAudioButtons(): void {
   const enabled = audio.enabled;
   const top = element<HTMLButtonElement>('#enable-sound');
@@ -70,6 +142,7 @@ function updateAudioButtons(): void {
       ? 'Sound is ready. Your first click, tap, or keypress starts it.'
       : 'Friction follows each stroke and falls quiet whenever the nib lifts.'
     : 'Sound is muted. Turn it on whenever you like.';
+  syncMusicAvailability();
 }
 
 function activateDefaultSound(event: PointerEvent | KeyboardEvent): void {
@@ -87,8 +160,12 @@ function activateDefaultSound(event: PointerEvent | KeyboardEvent): void {
 async function toggleSound(): Promise<void> {
   const buttons = [element<HTMLButtonElement>('#enable-sound'), element<HTMLButtonElement>('#panel-enable-sound')];
   buttons.forEach((button) => { button.disabled = true; });
-  if (audio.enabled) await audio.disable();
+  if (audio.enabled) {
+    recordedMusic.setAvailable(false);
+    await audio.disable();
+  }
   else await audio.enable();
+  if (disposed) return;
   buttons.forEach((button) => { button.disabled = false; });
   updateAudioButtons();
 }
@@ -105,12 +182,21 @@ function syncSettings(): void {
     if (output) output.value = `${Math.round(Number(settings[key]) * 100)}%`;
   }
   styleSelect.value = settings.style;
+  const handwriting = handwritingStyle(settings.style);
+  styleSelect.title = handwriting.notes;
   textarea.dataset.handwriting = settings.style;
+  textarea.style.setProperty('--editor-font', JSON.stringify(handwriting.family));
+  textarea.style.setProperty('--editor-size', `${handwriting.editorSize}px`);
+  textarea.style.setProperty('--editor-line-height', settings.style === 'print' ? '27.2px' : '27px');
+  element<HTMLElement>('#handwriting-note').hidden = settings.style === 'correspondence' || settings.style === 'print';
   element<HTMLOutputElement>('#speed-label').value = `${settings.speed.toFixed(1).replace('.0', '')}x`;
   const hours = Math.floor(settings.time) % 24;
   const minutes = Math.round((settings.time % 1) * 60);
   element<HTMLOutputElement>('#time-label').value = `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
-  element<HTMLElement>('#ink-name').textContent = INKS[settings.ink].label;
+  element<HTMLElement>('#ink-name').textContent = inkLabel(settings);
+  element<HTMLInputElement>('#custom-ink-color').value = settings.customInk;
+  element<HTMLOutputElement>('#custom-ink-value').value = settings.customInk.toUpperCase();
+  element<HTMLElement>('#custom-ink-controls').hidden = settings.ink !== 'custom';
   element<HTMLElement>('#room-title').textContent = rooms[settings.mood].name;
   element<HTMLElement>('#room-description').textContent = rooms[settings.mood].description;
   const capButton = element<HTMLButtonElement>('#toggle-cap');
@@ -118,11 +204,14 @@ function syncSettings(): void {
   capButton.textContent = capped ? 'Uncap pen' : 'Replace cap';
   capButton.setAttribute('aria-pressed', String(capped));
   document.documentElement.dataset.mood = settings.mood;
+  syncMusicAvailability();
 }
 
 function updateSettings(next: unknown): void {
   const previous = settings;
   settings = sanitizeSettings(next);
+  if (settings.musicTrack !== 'lofi') recordedMusic.pause();
+  recordedMusic.select(settings.lofiTrack);
   if (previous.pen !== settings.pen) {
     capped = settings.pen === 'fountain' && engine.status === 'idle';
     scene?.setCapped(capped);
@@ -159,7 +248,7 @@ function syncWriting(): void {
   textarea.readOnly = active || paused;
   styleSelect.disabled = active || paused;
   element<HTMLButtonElement>('#export-sheet').hidden = !complete;
-  element<HTMLElement>('#scene-status').textContent = active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'A little moment, kept.' : 'Take your time.';
+  element<HTMLElement>('#scene-status').textContent = active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
   element<HTMLElement>('#writing-note').textContent = active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep it, or begin again.' : 'No hurry. No right words.';
   element<HTMLButtonElement>('#toggle-cap').disabled = active;
   lastStatus = status;
@@ -197,7 +286,7 @@ function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
     syncSettings();
   } else if (action === 'ink') {
     audio.cue('ink');
-    notify(`${INKS[settings.ink].label}. A little glass, a little ink.`);
+    notify(`${inkLabel(settings)}. A little glass, a little ink.`);
   }
 }
 
@@ -257,7 +346,8 @@ styleSelect.addEventListener('change', () => {
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting]')) {
   button.addEventListener('click', () => {
     const key = button.dataset.setting;
-    if (key) updateSettings({ ...settings, [key]: button.dataset.value });
+    if (key === 'musicTrack' && button.dataset.value === 'lofi') void startRecordedMusic();
+    else if (key) updateSettings({ ...settings, [key]: button.dataset.value });
   });
 }
 for (const input of document.querySelectorAll<HTMLInputElement>('[data-range]')) {
@@ -266,6 +356,14 @@ for (const input of document.querySelectorAll<HTMLInputElement>('[data-range]'))
     if (key) updateSettings({ ...settings, [key]: input.valueAsNumber });
   });
 }
+
+const colorPicker = element<HTMLInputElement>('#custom-ink-color');
+element<HTMLButtonElement>('#custom-ink-swatch').addEventListener('click', () => colorPicker.click());
+colorPicker.addEventListener('input', () => {
+  const color = colorPicker.value;
+  if (!isInkColor(color)) { notify('Choose a six-digit hex ink color.'); return; }
+  updateSettings({ ...settings, ink: 'custom', customInk: color.toLowerCase() });
+});
 
 function setTab(id: string): void {
   for (const tab of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) {
@@ -319,18 +417,27 @@ element<HTMLButtonElement>('#toggle-roll').addEventListener('click', () => handl
 element<HTMLButtonElement>('#toggle-cap').addEventListener('click', () => handleInteraction('cap'));
 element<HTMLButtonElement>('#enable-sound').addEventListener('click', () => { void toggleSound(); });
 element<HTMLButtonElement>('#panel-enable-sound').addEventListener('click', () => { void toggleSound(); });
+element<HTMLButtonElement>('#music-play').addEventListener('click', () => { void toggleMusic(); });
+element<HTMLButtonElement>('#music-previous').addEventListener('click', () => skipMusic(-1));
+element<HTMLButtonElement>('#music-next').addEventListener('click', () => skipMusic(1));
 document.addEventListener('pointerdown', activateDefaultSound, { capture: true });
 document.addEventListener('keydown', activateDefaultSound, { capture: true });
 element<HTMLButtonElement>('#dismiss-notice').addEventListener('click', () => { element<HTMLDivElement>('#notice').hidden = true; });
 const dialog = element<HTMLDialogElement>('#about-dialog');
-element<HTMLButtonElement>('#about-button').addEventListener('click', () => dialog.showModal());
+element<HTMLButtonElement>('#about-button').addEventListener('click', () => { dialog.showModal(); dialog.scrollTop = 0; });
+element<HTMLButtonElement>('#music-credits').addEventListener('click', () => {
+  dialog.showModal();
+  element<HTMLElement>('#music-attribution').scrollIntoView({ block: 'start' });
+});
 element<HTMLButtonElement>('#close-about').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-document.addEventListener('visibilitychange', () => {
+function visibilityChanged(): void {
+  if (document.hidden) recordedMusic.setAvailable(false);
   if (document.hidden && engine.status === 'writing') { engine.pause(); syncWriting(); }
   lastTimestamp = 0;
-  void audio.setHidden(document.hidden).then(updateAudioButtons);
-});
+  void audio.setHidden(document.hidden).then(() => { if (!disposed) updateAudioButtons(); });
+}
+document.addEventListener('visibilitychange', visibilityChanged);
 element<HTMLCanvasElement>('#desk-canvas').addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
   engine.pause();
@@ -350,9 +457,9 @@ function frame(timestamp: number): void {
   if (!document.hidden && scene) {
     elapsed += delta;
     const result = engine.tick(delta);
-    paper.draw(result.segments, settings.ink);
+    paper.draw(result.segments, inkColor(settings));
     paper.flush();
-    scene.updatePen(result.pen);
+    scene.updatePen(result.pen, delta);
     audio.updateContact(result.pen);
     scene.update(delta, elapsed);
     if (engine.status !== lastStatus) syncWriting();
@@ -372,6 +479,7 @@ if (import.meta.env.DEV) {
     get: () => ({
       scene: scene?.diagnostics ?? null, writing: { ...engine.peek(), strokeCount: layout.strokes.length },
       audio: audio.diagnostics, settings: { ...settings }, validInput: layout.ok, inputError: layout.error,
+      music: recordedMusic.state,
       editor: { zoom: editorZoom.scale },
     }),
   });
@@ -384,7 +492,9 @@ function dispose(): void {
   clearTimeout(noticeTimer);
   document.removeEventListener('pointerdown', activateDefaultSound, { capture: true });
   document.removeEventListener('keydown', activateDefaultSound, { capture: true });
+  document.removeEventListener('visibilitychange', visibilityChanged);
   editorZoom.dispose();
+  recordedMusic.dispose();
   audio.dispose();
   scene?.dispose();
   paper.dispose();

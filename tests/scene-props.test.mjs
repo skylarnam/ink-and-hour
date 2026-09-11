@@ -8,7 +8,7 @@ function propRig(t) {
     scene: new THREE.Scene(), roll: new THREE.Group(),
     rollOpenGroup: new THREE.Group(), rollClosedGroup: new THREE.Group(),
     ...Object.fromEntries(['tableMaterial', 'leatherMaterial', 'brassMaterial', 'steelMaterial',
-      'penMaterial', 'bookMaterial', 'ceramicMaterial', 'leafMaterial'].map((key) => [key, new THREE.MeshStandardMaterial()])),
+      'penMaterial', 'bookMaterial', 'ceramicMaterial', 'leafMaterial', 'pageEdgeMaterial'].map((key) => [key, new THREE.MeshStandardMaterial()])),
   });
   rig.buildRoll();
   rig.buildProps();
@@ -46,4 +46,26 @@ test('the relocated cup also clears the books, paper, and desk edges', (t) => {
   assert.ok(cup.max.z + 0.25 < -(3.8 * 1040 / 780) / 2, 'the cup should not touch the paper');
   assert.ok(cup.min.x > -6.8 && cup.max.x < 6.8);
   assert.ok(cup.min.z > -5.3 && cup.max.z < 4.7);
+});
+
+test('the handle has open ends attached to the cup wall instead of a separate circular ring', (t) => {
+  const rig = propRig(t);
+  const cup = rig.scene.getObjectByName('coffee-cup');
+  const handle = cup.getObjectByName('cup-handle');
+  assert.ok(handle.geometry instanceof THREE.TubeGeometry);
+  assert.equal(handle.geometry.parameters.closed, false);
+  const top = handle.geometry.parameters.path.getPoint(0);
+  const bottom = handle.geometry.parameters.path.getPoint(1);
+  assert.ok(Math.abs(top.x + 0.386) < 0.015 && top.y > 0.55);
+  assert.ok(Math.abs(bottom.x + 0.323) < 0.015 && bottom.y < 0.23);
+  assert.equal(cup.children.filter((object) => object.name === 'handle-attachment').length, 2);
+  const midpoint = handle.geometry.parameters.path.getPoint(0.5);
+  assert.ok(midpoint.x < -0.73);
+});
+
+test('the books turn counterclockwise away from the roll alignment', (t) => {
+  const rig = propRig(t);
+  const books = rig.scene.getObjectByName('desk-books');
+  assert.ok(books.rotation.y > 0.15 && books.rotation.y < 0.35);
+  assert.ok(books.rotation.y - rig.roll.rotation.y > 0.3);
 });

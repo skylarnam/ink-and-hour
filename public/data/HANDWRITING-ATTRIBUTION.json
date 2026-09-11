@@ -1,0 +1,231 @@
+{
+  "method": "Unmodified source fonts; offline inferred centerlines with separately named stroke studies.",
+  "modified": "Stroke order is inferred. Short shared branches can be retraced; no glyph outlines are drawn.",
+  "tinyPunctuationFallbacks": [
+    "coming-soon:.",
+    "coming-soon::",
+    "schoolbell:."
+  ],
+  "fonts": [
+    {
+      "id": "caveat",
+      "sourceFamily": "Caveat",
+      "strokeStudy": "Ink Stroke Study 01",
+      "source": "https://github.com/google/fonts/tree/main/ofl/caveat",
+      "license": "OFL-1.1",
+      "font": "/fonts/caveat/Caveat[wght].ttf",
+      "fontSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+      "licenseFile": "/fonts/caveat/OFL.txt",
+      "licenseSha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b"
+    },
+    {
+      "id": "patrick-hand",
+      "sourceFamily": "Patrick Hand",
+      "strokeStudy": "Ink Stroke Study 02",
+      "source": "https://github.com/google/fonts/tree/main/ofl/patrickhand",
+      "license": "OFL-1.1",
+      "font": "/fonts/patrickhand/PatrickHand-Regular.ttf",
+      "fontSha256": "0f173b3e6cb6d1af25babf7f0057c5ac4ee11f9992b0469bb817e967ef4ad0fc",
+      "licenseFile": "/fonts/patrickhand/OFL.txt",
+      "licenseSha256": "377f4f9c19e935228552478eb68cc2ed82910988a60ba60e2ac73b09f32d02d1"
+    },
+    {
+      "id": "handlee",
+      "sourceFamily": "Handlee",
+      "strokeStudy": "Ink Stroke Study 03",
+      "source": "https://github.com/google/fonts/tree/main/ofl/handlee",
+      "license": "OFL-1.1",
+      "font": "/fonts/handlee/Handlee-Regular.ttf",
+      "fontSha256": "7b99c0f291b5d52e06c66498a1d0dd6dff45a32e32d13be089c60d2d8dc00445",
+      "licenseFile": "/fonts/handlee/OFL.txt",
+      "licenseSha256": "5f1f5510eff7922864bf326ffa1d4a62f01add5193e9367b542378e5a808b500"
+    },
+    {
+      "id": "indie-flower",
+      "sourceFamily": "Indie Flower",
+      "strokeStudy": "Ink Stroke Study 04",
+      "source": "https://github.com/google/fonts/tree/main/ofl/indieflower",
+      "license": "OFL-1.1",
+      "font": "/fonts/indieflower/IndieFlower-Regular.ttf",
+      "fontSha256": "ccc94b22b156e9c5dfe50fd051f01b097600b252c24473e624bb43a143140a94",
+      "licenseFile": "/fonts/indieflower/OFL.txt",
+      "licenseSha256": "d9cdb075679d15a99bab2a8541b9c4fdc71347502111fbe9affd1d462219d96b"
+    },
+    {
+      "id": "kalam",
+      "sourceFamily": "Kalam",
+      "strokeStudy": "Ink Stroke Study 05",
+      "source": "https://github.com/google/fonts/tree/main/ofl/kalam",
+      "license": "OFL-1.1",
+      "font": "/fonts/kalam/Kalam-Regular.ttf",
+      "fontSha256": "57cecb63d4608019371954274ae1d8c397764debd5b19d4a33c1efa4dc923c0b",
+      "licenseFile": "/fonts/kalam/OFL.txt",
+      "licenseSha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f"
+    },
+    {
+      "id": "shadows-into-light",
+      "sourceFamily": "Shadows Into Light",
+      "strokeStudy": "Ink Stroke Study 06",
+      "source": "https://github.com/google/fonts/tree/main/ofl/shadowsintolight",
+      "license": "OFL-1.1",
+      "font": "/fonts/shadowsintolight/ShadowsIntoLight.ttf",
+      "fontSha256": "1347863151acdc00fa281daaba1a3543dbce5870b55f9cf7479a15bb84007681",
+      "licenseFile": "/fonts/shadowsintolight/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "shadows-into-light-two",
+      "sourceFamily": "Shadows Into Light Two",
+      "strokeStudy": "Ink Stroke Study 07",
+      "source": "https://github.com/google/fonts/tree/main/ofl/shadowsintolighttwo",
+      "license": "OFL-1.1",
+      "font": "/fonts/shadowsintolighttwo/ShadowsIntoLightTwo-Regular.ttf",
+      "fontSha256": "d2540170b1b1df3094de433b4632755ba91ecb65626202a3c8affd2245e08405",
+      "licenseFile": "/fonts/shadowsintolighttwo/OFL.txt",
+      "licenseSha256": "6a28d4d5d8b4d1ea89ace5a047ac6e0de182acdb8bfa22897bf7702102094f69"
+    },
+    {
+      "id": "coming-soon",
+      "sourceFamily": "Coming Soon",
+      "strokeStudy": "Ink Stroke Study 08",
+      "source": "https://github.com/google/fonts/tree/main/apache/comingsoon",
+      "license": "Apache-2.0",
+      "font": "/fonts/comingsoon/ComingSoon-Regular.ttf",
+      "fontSha256": "cf81388f587ff6122de1a705d1070b8f00abccdba66108509908b5d10715068c",
+      "licenseFile": "/fonts/comingsoon/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "id": "schoolbell",
+      "sourceFamily": "Schoolbell",
+      "strokeStudy": "Ink Stroke Study 09",
+      "source": "https://github.com/google/fonts/tree/main/apache/schoolbell",
+      "license": "Apache-2.0",
+      "font": "/fonts/schoolbell/Schoolbell-Regular.ttf",
+      "fontSha256": "00ff6655a5eb1eb70d32f2b7351d1bcf3f45f3f9ca40fd5c0d25da79f7f82a50",
+      "licenseFile": "/fonts/schoolbell/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "id": "architects-daughter",
+      "sourceFamily": "Architects Daughter",
+      "strokeStudy": "Ink Stroke Study 10",
+      "source": "https://github.com/google/fonts/tree/main/ofl/architectsdaughter",
+      "license": "OFL-1.1",
+      "font": "/fonts/architectsdaughter/ArchitectsDaughter-Regular.ttf",
+      "fontSha256": "6159718a08898e34bc1cb7354086141a5f9a70b73e54dbec27ead0d59a697359",
+      "licenseFile": "/fonts/architectsdaughter/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "nothing-you-could-do",
+      "sourceFamily": "Nothing You Could Do",
+      "strokeStudy": "Ink Stroke Study 11",
+      "source": "https://github.com/google/fonts/tree/main/ofl/nothingyoucoulddo",
+      "license": "OFL-1.1",
+      "font": "/fonts/nothingyoucoulddo/NothingYouCouldDo.ttf",
+      "fontSha256": "1daf8cf79076bf59c5a9117b5efd6ecea35e57a05ef127fe4f95b072b8a5245d",
+      "licenseFile": "/fonts/nothingyoucoulddo/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "reenie-beanie",
+      "sourceFamily": "Reenie Beanie",
+      "strokeStudy": "Ink Stroke Study 12",
+      "source": "https://github.com/google/fonts/tree/main/ofl/reeniebeanie",
+      "license": "OFL-1.1",
+      "font": "/fonts/reeniebeanie/ReenieBeanie.ttf",
+      "fontSha256": "0ea608aa325bf9e11c9590cc0b63dcf7cd215e270784f1ebbe6fad4927b31ff8",
+      "licenseFile": "/fonts/reeniebeanie/OFL.txt",
+      "licenseSha256": "fbb941b371c6348ee2572ce8c78fb66128a61885f960dec1906c4e44ca4b4d3c"
+    },
+    {
+      "id": "homemade-apple",
+      "sourceFamily": "Homemade Apple",
+      "strokeStudy": "Ink Stroke Study 13",
+      "source": "https://github.com/google/fonts/tree/main/apache/homemadeapple",
+      "license": "Apache-2.0",
+      "font": "/fonts/homemadeapple/HomemadeApple-Regular.ttf",
+      "fontSha256": "dd1baaca3cde1b1f8415aed3b0aea6808655c9d9ca5a99c7282d9accc16c1a58",
+      "licenseFile": "/fonts/homemadeapple/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "id": "sue-ellen-francisco",
+      "sourceFamily": "Sue Ellen Francisco",
+      "strokeStudy": "Ink Stroke Study 14",
+      "source": "https://github.com/google/fonts/tree/main/ofl/sueellenfrancisco",
+      "license": "OFL-1.1",
+      "font": "/fonts/sueellenfrancisco/SueEllenFrancisco-Regular.ttf",
+      "fontSha256": "d6d72e046e8e92f659eacfb7457cf7e1f2142c112c3d8c43c0b5a3904a5c8621",
+      "licenseFile": "/fonts/sueellenfrancisco/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "just-another-hand",
+      "sourceFamily": "Just Another Hand",
+      "strokeStudy": "Ink Stroke Study 15",
+      "source": "https://github.com/google/fonts/tree/main/apache/justanotherhand",
+      "license": "Apache-2.0",
+      "font": "/fonts/justanotherhand/JustAnotherHand-Regular.ttf",
+      "fontSha256": "f1cd102ebacdb6388c879c9d481d63908ee0d5939a301415a78cdfdc752f79ea",
+      "licenseFile": "/fonts/justanotherhand/LICENSE.txt",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "id": "la-belle-aurore",
+      "sourceFamily": "La Belle Aurore",
+      "strokeStudy": "Ink Stroke Study 16",
+      "source": "https://github.com/google/fonts/tree/main/ofl/labelleaurore",
+      "license": "OFL-1.1",
+      "font": "/fonts/labelleaurore/LaBelleAurore.ttf",
+      "fontSha256": "ed67462999e05f0cdac92f686374661e4d68c56fdcd7d05725c6df7b41eabd2a",
+      "licenseFile": "/fonts/labelleaurore/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "cedarville-cursive",
+      "sourceFamily": "Cedarville Cursive",
+      "strokeStudy": "Ink Stroke Study 17",
+      "source": "https://github.com/google/fonts/tree/main/ofl/cedarvillecursive",
+      "license": "OFL-1.1",
+      "font": "/fonts/cedarvillecursive/Cedarville-Cursive.ttf",
+      "fontSha256": "5f86d71d08a68605d5912b9bcb639a060ce9c0debd7e0b715f5e268d4a4bc317",
+      "licenseFile": "/fonts/cedarvillecursive/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "dawning-of-a-new-day",
+      "sourceFamily": "Dawning of a New Day",
+      "strokeStudy": "Ink Stroke Study 18",
+      "source": "https://github.com/google/fonts/tree/main/ofl/dawningofanewday",
+      "license": "OFL-1.1",
+      "font": "/fonts/dawningofanewday/DawningofaNewDay.ttf",
+      "fontSha256": "2b2afa623dbb1926e3b026603287b4d15ee05778106e26a7b33ef94d4be29dcb",
+      "licenseFile": "/fonts/dawningofanewday/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "give-you-glory",
+      "sourceFamily": "Give You Glory",
+      "strokeStudy": "Ink Stroke Study 19",
+      "source": "https://github.com/google/fonts/tree/main/ofl/giveyouglory",
+      "license": "OFL-1.1",
+      "font": "/fonts/giveyouglory/GiveYouGlory.ttf",
+      "fontSha256": "fb71f9a46a3234c2d98dbbe44e711f65654368031c57b927bf7679a46e278c80",
+      "licenseFile": "/fonts/giveyouglory/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    },
+    {
+      "id": "waiting-for-the-sunrise",
+      "sourceFamily": "Waiting for the Sunrise",
+      "strokeStudy": "Ink Stroke Study 20",
+      "source": "https://github.com/google/fonts/tree/main/ofl/waitingforthesunrise",
+      "license": "OFL-1.1",
+      "font": "/fonts/waitingforthesunrise/WaitingfortheSunrise.ttf",
+      "fontSha256": "ac74e70390f5b1be6927c1e079bd6143821a362550b264c5eb7edde34f0899f4",
+      "licenseFile": "/fonts/waitingforthesunrise/OFL.txt",
+      "licenseSha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+    }
+  ]
+}

@@ -5,9 +5,10 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { makeLabelTexture, makeLeatherTexture, makeWoodTexture, randomSource } from './textures.ts';
 import { configureCameraDrag, createCameraControls, panCameraWithKey } from './camera-controls.ts';
 import { OutdoorView } from './outdoors.ts';
+import { inkColor } from './ink.ts';
 import type { CameraDragMode } from './camera-controls.ts';
 import type { PaperSurface } from './textures.ts';
-import { INKS, PAGE, PAPER_COLORS } from './types.ts';
+import { PAGE, PAPER_COLORS, PAPER_FINISH } from './types.ts';
 import type { CameraPreset, Mood, PenSample, Settings } from './types.ts';
 
 const PAPER_WIDTH = 3.8;
@@ -15,6 +16,9 @@ const PAPER_HEIGHT = PAPER_WIDTH * PAGE.height / PAGE.width;
 const PAPER_Y = 0.064;
 const CAP_SEAT_Y = 0.87;
 const CAP_REVERSE = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI);
+const PEN_REST_POSITION = new THREE.Vector3(2.08, 0.16, 1.4);
+const PEN_REST_ROTATION = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.35, 0.07, -0.95).normalize());
+const PEN_RETURN_DURATION = 1.8;
 
 const PALETTES: Record<Mood, {
   wood: string; wall: string; trim: string; leather: string; pen: string;
@@ -98,6 +102,7 @@ export class DeskScene {
   private readonly steelMaterial = material('#b9bdc1', 0.24, 0.88);
   private readonly inkMaterial = material('#24384d', 0.23);
   private readonly pageEdgeMaterial = material('#ece3d0', 0.95);
+  private readonly paperMaterial = new THREE.MeshStandardMaterial({ roughness: 0.76, side: THREE.DoubleSide });
   private readonly shadeMaterial = material('#ead7ae', 0.78);
   private readonly lampBulbMaterial = new THREE.MeshStandardMaterial({ color: '#ffe2a4', emissive: '#ffbe64', emissiveIntensity: 1.5 });
   private readonly outdoors = new OutdoorView();
@@ -138,6 +143,7 @@ export class DeskScene {
   private thunderAt: number | null = null;
   private reducedMotion = false;
   private lastTime = 0;
+  private penReturn: { elapsed: number; start: THREE.Vector3; rotation: THREE.Quaternion } | null = null;
   private readonly interaction: (action: 'roll' | 'cap' | 'ink') => void;
   private readonly onThunder: () => void;
 
@@ -265,8 +271,11 @@ export class DeskScene {
       const page = box(PAPER_WIDTH, 0.009, PAPER_HEIGHT, this.pageEdgeMaterial, this.scene, (i - 1) * 0.014, 0.028 + i * 0.008, -i * 0.014, 0.003);
       page.rotation.y = (i - 1) * 0.002;
     }
+    this.paperMaterial.map = paper.texture;
+    this.paperMaterial.bumpMap = paper.heightTexture;
     const surface = mesh(new THREE.PlaneGeometry(PAPER_WIDTH, PAPER_HEIGHT),
-      new THREE.MeshStandardMaterial({ map: paper.texture, roughness: 0.91, metalness: 0, side: THREE.DoubleSide }), this.scene, 0, PAPER_Y, 0);
+      this.paperMaterial, this.scene, 0, PAPER_Y, 0);
+    surface.name = 'writing-paper';
     surface.rotation.x = -Math.PI / 2;
     surface.castShadow = false;
   }
@@ -358,7 +367,7 @@ export class DeskScene {
     const books = new THREE.Group();
     books.name = 'desk-books';
     books.position.set(-3.05, 0.03, -3.42);
-    books.rotation.y = -0.11;
+    books.rotation.y = 0.23;
     this.scene.add(books);
     for (let i = 0; i < 2; i++) {
       const w = 2.1 - i * 0.13;
@@ -380,8 +389,19 @@ export class DeskScene {
       new THREE.Vector2(0.26, 0.15)];
     mesh(new THREE.LatheGeometry(profile, 48), this.ceramicMaterial, cup);
     cylinder(0.341, 0.341, 0.012, material('#573b27', 0.2), cup, 0, 0.535);
-    const handle = mesh(new THREE.TorusGeometry(0.21, 0.053, 12, 40), this.ceramicMaterial, cup, -0.6, 0.37);
-    handle.scale.set(0.88, 1.13, 1);
+    const handlePath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.381, 0.576, 0), new THREE.Vector3(-0.535, 0.596, 0),
+      new THREE.Vector3(-0.685, 0.542, 0), new THREE.Vector3(-0.758, 0.438, 0),
+      new THREE.Vector3(-0.755, 0.31, 0), new THREE.Vector3(-0.66, 0.208, 0),
+      new THREE.Vector3(-0.5, 0.183, 0), new THREE.Vector3(-0.319, 0.207, 0),
+    ]);
+    const handle = mesh(new THREE.TubeGeometry(handlePath, 48, 0.052, 16, false), this.ceramicMaterial, cup);
+    handle.name = 'cup-handle';
+    for (const [x, y] of [[-0.397, 0.576], [-0.337, 0.207]]) {
+      const joint = mesh(new THREE.SphereGeometry(1, 20, 12), this.ceramicMaterial, cup, x, y);
+      joint.name = 'handle-attachment';
+      joint.scale.set(0.028, 0.062, 0.06);
+    }
     const plant = new THREE.Group();
     plant.position.set(4.97, 0, -3.83);
     this.scene.add(plant);
@@ -483,8 +503,10 @@ export class DeskScene {
     this.ceramicMaterial.color.set(palette.ceramic);
     this.bookMaterial.color.set(palette.book);
     this.leafMaterial.color.set(palette.foliage);
-    this.inkMaterial.color.set(INKS[settings.ink].color);
+    this.inkMaterial.color.set(inkColor(settings));
     this.pageEdgeMaterial.color.set(PAPER_COLORS[settings.paper]);
+    this.paperMaterial.roughness = PAPER_FINISH[settings.paper].roughness;
+    this.paperMaterial.bumpScale = PAPER_FINISH[settings.paper].bumpScale;
     this.shadeMaterial.color.set(settings.mood === 'storybook' ? '#e3beaf' : settings.mood === 'atelier' ? '#f4ead5' : '#e4c997');
     this.storyStars.visible = settings.mood === 'storybook';
     const daylight = Math.max(0, Math.sin((settings.time - 6) / 12 * Math.PI));
@@ -589,13 +611,39 @@ export class DeskScene {
     if (this.reducedMotion) this.capAmount = capped ? 1 : 0;
   }
 
-  updatePen(sample: PenSample): void {
+  updatePen(sample: PenSample, delta = 0): void {
     const x = (sample.x / PAGE.width - 0.5) * PAPER_WIDTH;
     const z = (sample.y / PAGE.height - 0.5) * PAPER_HEIGHT;
     const idle = sample.status === 'idle';
+    if (sample.status !== 'complete') this.penReturn = null;
     if (idle) {
-      this.pen.position.set(2.08, 0.16, 1.4);
-      this.pen.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.35, 0.07, -0.95).normalize());
+      this.pen.position.copy(PEN_REST_POSITION);
+      this.pen.quaternion.copy(PEN_REST_ROTATION);
+    } else if (sample.status === 'complete') {
+      if (!this.penReturn) {
+        this.penReturn = {
+          elapsed: 0,
+          start: new THREE.Vector3(x, PAPER_Y + 0.018 + (this.capped ? this.capAmount * 0.11 : 0), z),
+          rotation: this.pen.quaternion.clone(),
+        };
+        this.followNib = false;
+      }
+      const motion = this.penReturn;
+      motion.elapsed = this.reducedMotion ? PEN_RETURN_DURATION
+        : Math.min(PEN_RETURN_DURATION, motion.elapsed + (Number.isFinite(delta) ? Math.max(0, delta) : 0));
+      const lift = THREE.MathUtils.smoothstep(motion.elapsed, 0.18, 0.5);
+      const travel = THREE.MathUtils.smoothstep(motion.elapsed, 0.5, 1.45);
+      const lower = THREE.MathUtils.smoothstep(motion.elapsed, 1.45, PEN_RETURN_DURATION);
+      this.pen.position.copy(motion.start).lerp(PEN_REST_POSITION, travel);
+      const startHeight = Math.max(motion.start.y, PAPER_Y + 0.018 + (this.capped ? this.capAmount * 0.11 : 0));
+      this.pen.position.y = THREE.MathUtils.lerp(
+        THREE.MathUtils.lerp(startHeight, 1.32, lift),
+        PEN_REST_POSITION.y, lower);
+      this.pen.quaternion.copy(motion.rotation).slerp(PEN_REST_ROTATION, travel);
+      if (motion.elapsed === PEN_RETURN_DURATION) {
+        this.pen.position.copy(PEN_REST_POSITION);
+        this.pen.quaternion.copy(PEN_REST_ROTATION);
+      }
     } else {
       const capClearance = this.capped && !sample.contact ? this.capAmount * 0.11 : 0;
       this.pen.position.set(x, PAPER_Y + (sample.contact ? 0.004 : Math.max(0.018, sample.lift * 0.48)) + capClearance, z);
@@ -671,6 +719,9 @@ export class DeskScene {
       cameraTarget: this.controls.target.toArray(), panAnchor: this.controls.cursor.toArray(),
       panRadius: this.controls.maxTargetRadius, followingNib: this.followNib,
       cameraTransitioning: this.movingCamera,
+      penPosition: this.pen.position.toArray(),
+      penReturning: this.penReturn !== null && this.penReturn.elapsed < PEN_RETURN_DURATION,
+      penResting: this.pen.position.distanceTo(PEN_REST_POSITION) < 0.001,
       reducedMotion: this.reducedMotion, lightningIntensity: this.flashLight.intensity,
       canvas: { width: this.renderer.domElement.width, height: this.renderer.domElement.height },
       drawCalls: this.renderer.info.render.calls,
