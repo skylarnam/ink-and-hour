@@ -367,7 +367,7 @@ export class DeskScene {
     const books = new THREE.Group();
     books.name = 'desk-books';
     books.position.set(-3.05, 0.03, -3.42);
-    books.rotation.y = 0.23;
+    books.rotation.y = 0.23 + THREE.MathUtils.degToRad(20);
     this.scene.add(books);
     for (let i = 0; i < 2; i++) {
       const w = 2.1 - i * 0.13;
@@ -389,18 +389,20 @@ export class DeskScene {
       new THREE.Vector2(0.26, 0.15)];
     mesh(new THREE.LatheGeometry(profile, 48), this.ceramicMaterial, cup);
     cylinder(0.341, 0.341, 0.012, material('#573b27', 0.2), cup, 0, 0.535);
+    const handleAnchor = new THREE.Vector3(-0.35, 0.3915, 0);
     const handlePath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-0.381, 0.576, 0), new THREE.Vector3(-0.535, 0.596, 0),
       new THREE.Vector3(-0.685, 0.542, 0), new THREE.Vector3(-0.758, 0.438, 0),
       new THREE.Vector3(-0.755, 0.31, 0), new THREE.Vector3(-0.66, 0.208, 0),
       new THREE.Vector3(-0.5, 0.183, 0), new THREE.Vector3(-0.319, 0.207, 0),
-    ]);
-    const handle = mesh(new THREE.TubeGeometry(handlePath, 48, 0.052, 16, false), this.ceramicMaterial, cup);
+    ].map((point) => point.lerp(handleAnchor, 0.1)));
+    const handle = mesh(new THREE.TubeGeometry(handlePath, 48, 0.052 * 0.9, 16, false), this.ceramicMaterial, cup);
     handle.name = 'cup-handle';
     for (const [x, y] of [[-0.397, 0.576], [-0.337, 0.207]]) {
       const joint = mesh(new THREE.SphereGeometry(1, 20, 12), this.ceramicMaterial, cup, x, y);
       joint.name = 'handle-attachment';
-      joint.scale.set(0.028, 0.062, 0.06);
+      joint.position.lerp(handleAnchor, 0.1);
+      joint.scale.set(0.028, 0.062, 0.06).multiplyScalar(0.9);
     }
     const plant = new THREE.Group();
     plant.position.set(4.97, 0, -3.83);

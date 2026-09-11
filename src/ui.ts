@@ -97,8 +97,7 @@ export function renderUI(): string {
               <button type="button" class="ink-swatch" style="--ink:#793e4b" data-setting="ink" data-value="burgundy" aria-label="Oxblood ink" aria-pressed="false"></button>
               <button type="button" class="ink-swatch" style="--ink:#3f5947" data-setting="ink" data-value="forest" aria-label="Deep moss ink" aria-pressed="false"></button>
               <button type="button" id="custom-ink-swatch" class="ink-swatch rainbow-swatch" data-setting="ink" data-value="custom" aria-label="Choose a custom ink color" aria-controls="custom-ink-controls" aria-pressed="false" title="Choose your own ink color"></button>
-              <span class="ink-note">A color to linger in.</span>
-            </div><div id="custom-ink-controls" class="custom-ink-controls" hidden><label for="custom-ink-color">Your shade</label><input type="color" id="custom-ink-color" value="#6752a0" aria-label="Custom ink color"><output id="custom-ink-value" for="custom-ink-color">#6752A0</output><span>New strokes only.</span></div></fieldset>
+            </div><div id="custom-ink-controls" class="custom-ink-controls" hidden><label for="custom-ink-color">Your shade</label><input type="color" id="custom-ink-color" value="#6752a0" aria-label="Custom ink color"><output id="custom-ink-value" for="custom-ink-color">#6752A0</output></div></fieldset>
             <fieldset><legend>THE PAPER</legend><div class="choices paper-choices">
               ${choice('paper', 'smooth', '<span class="paper-sample smooth"></span>Smooth')}
               ${choice('paper', 'parchment', '<span class="paper-sample parchment"></span>Parchment')}

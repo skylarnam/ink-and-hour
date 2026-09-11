@@ -22,6 +22,8 @@ test('the ink choices retain four presets and add an accessible rainbow color pi
   assert.match(html, /class="ink-swatch rainbow-swatch"/);
   assert.match(html, /type="color" id="custom-ink-color"/);
   assert.match(html, /aria-label="Custom ink color"/);
+  assert.equal(html.includes('A color to linger in'), false);
+  assert.equal(html.includes('New strokes only'), false);
 });
 
 test('the mini-player is before the sound switch and includes transport labels and recording credits', () => {

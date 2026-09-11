@@ -5,13 +5,13 @@ import { DeskScene } from './scene.ts';
 import { inkColor, inkLabel, isInkColor } from './ink.ts';
 import { LOFI_TRACKS } from './music-library.ts';
 import { RecordedMusic } from './recorded-music.ts';
-import { handwritingStyle } from './handwriting.ts';
+import { handwritingStyle, isHandwritingId } from './handwriting.ts';
 import { loadSettings, sanitizeSettings, saveSettings } from './settings.ts';
 import { PaperSurface } from './textures.ts';
 import { icon, renderUI } from './ui.ts';
 import { PAGE } from './types.ts';
 import type { CameraPreset, Settings, WritingStatus } from './types.ts';
-import { layoutText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
+import { layoutText, restyleRemainingText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
 
 function element<T extends Element>(selector: string): T {
   const found = document.querySelector<T>(selector);
@@ -249,7 +249,7 @@ function syncWriting(): void {
   const label = active ? 'Pause for a moment' : paused ? 'Resume writing' : complete ? 'Write it again' : 'Begin writing';
   beginButton.innerHTML = `${icon(buttonIcon)}<span>${label}</span>${icon('arrow', 'begin-arrow')}`;
   textarea.readOnly = active || paused;
-  styleSelect.disabled = active || paused;
+  styleSelect.disabled = active;
   element<HTMLButtonElement>('#export-sheet').hidden = !complete;
   element<HTMLElement>('#scene-status').textContent = active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
   element<HTMLElement>('#writing-note').textContent = active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep it, or begin again.' : 'No hurry. No right words.';
@@ -342,7 +342,35 @@ textarea.addEventListener('input', () => {
 });
 
 styleSelect.addEventListener('change', () => {
-  updateSettings({ ...settings, style: styleSelect.value });
+  const style = styleSelect.value;
+  if (!isHandwritingId(style)) {
+    notify('Choose one of the available handwriting styles.');
+    syncSettings();
+    return;
+  }
+  if (engine.status === 'writing') {
+    notify('Pause the pen before changing handwriting.');
+    syncSettings();
+    return;
+  }
+  if (engine.status === 'paused') {
+    const revised = restyleRemainingText(textarea.value, layout, { ...PAGE, style }, engine.startedStrokeCount);
+    if (!revised.layout.ok) {
+      notify(`The remaining words do not fit in that handwriting. Your ink is unchanged. ${revised.layout.error}`);
+      syncSettings();
+      return;
+    }
+    const hasNewLetters = revised.fromStroke < layout.strokes.length;
+    if (hasNewLetters) engine.replaceUnwrittenStrokes(revised.fromStroke, revised.layout.strokes.slice(revised.fromStroke));
+    layout = revised.layout;
+    updateSettings({ ...settings, style });
+    syncWriting();
+    notify(hasNewLetters
+      ? 'The current letter will keep its shape. New handwriting starts with the next letter.'
+      : 'This is the last letter. Your new handwriting is ready for the next sheet.');
+    return;
+  }
+  updateSettings({ ...settings, style });
   newSheet(false);
 });
 

@@ -71,6 +71,21 @@ font/license SHA-256 checksums, the study-name mapping, and the three explicit
 tiny-punctuation approximations are in
 [HANDWRITING-ATTRIBUTION.json](public/data/HANDWRITING-ATTRIBUTION.json).
 
+## Local font-review candidates
+
+The local `font-review/index.html` checklist includes the 22 current styles and
+78 additional unmodified Google Fonts candidates. The complete review contains
+86 OFL-1.1 faces, 12 Apache-2.0 faces, and the two existing public-domain
+Hershey-derived editor faces. These candidates are for selection only; they are
+not automatically added to the website's writing collection or runtime assets.
+
+[font-review/catalog.json](font-review/catalog.json) records each candidate's
+official source, exact font and license SHA-256 checksums, and local asset paths.
+Original additional fonts and copyright/license texts are in `font-review/fonts/`
+and `font-review/licenses/`. The standalone comparison HTML embeds the original
+font bytes and all corresponding copyright/license notices. No designer
+endorsement is implied.
+
 ## Recorded music: CC0 1.0
 
 The three local MP3 recordings are shared under explicit CC0 declarations on

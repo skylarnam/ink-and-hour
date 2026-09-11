@@ -63,12 +63,28 @@ export interface LayoutOptions {
   height: number;
 }
 
+export interface LayoutCursor {
+  x: number;
+  y: number;
+  line: number;
+  lineHeight: number;
+  style: WritingStyle;
+}
+
+export interface LayoutCharacter {
+  index: number;
+  strokeStart: number;
+  strokeEnd: number;
+  after: LayoutCursor;
+}
+
 export interface LayoutResult {
   ok: boolean;
   error: string | null;
   strokes: Point[][];
   lineCount: number;
   characterCount: number;
+  characters: LayoutCharacter[];
 }
 
 export interface EngineOptions {

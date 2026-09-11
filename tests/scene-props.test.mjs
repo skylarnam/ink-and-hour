@@ -56,16 +56,21 @@ test('the handle has open ends attached to the cup wall instead of a separate ci
   assert.equal(handle.geometry.parameters.closed, false);
   const top = handle.geometry.parameters.path.getPoint(0);
   const bottom = handle.geometry.parameters.path.getPoint(1);
-  assert.ok(Math.abs(top.x + 0.386) < 0.015 && top.y > 0.55);
-  assert.ok(Math.abs(bottom.x + 0.323) < 0.015 && bottom.y < 0.23);
+  assert.ok(Math.abs(top.x + 0.3779) < 1e-8 && Math.abs(top.y - 0.55755) < 1e-8);
+  assert.ok(Math.abs(bottom.x + 0.3221) < 1e-8 && Math.abs(bottom.y - 0.22545) < 1e-8);
   assert.equal(cup.children.filter((object) => object.name === 'handle-attachment').length, 2);
   const midpoint = handle.geometry.parameters.path.getPoint(0.5);
-  assert.ok(midpoint.x < -0.73);
+  assert.ok(midpoint.x < -0.69 && midpoint.x > -0.74);
+  assert.ok(Math.abs(handle.geometry.parameters.radius - 0.052 * 0.9) < 1e-8);
+  for (const joint of cup.children.filter((object) => object.name === 'handle-attachment')) {
+    assert.ok(Math.abs(joint.scale.x - 0.028 * 0.9) < 1e-8);
+    assert.ok(Math.abs(joint.scale.y - 0.062 * 0.9) < 1e-8);
+  }
 });
 
 test('the books turn counterclockwise away from the roll alignment', (t) => {
   const rig = propRig(t);
   const books = rig.scene.getObjectByName('desk-books');
-  assert.ok(books.rotation.y > 0.15 && books.rotation.y < 0.35);
+  assert.ok(Math.abs(books.rotation.y - 0.23 - THREE.MathUtils.degToRad(20)) < 1e-8);
   assert.ok(books.rotation.y - rig.roll.rotation.y > 0.3);
 });

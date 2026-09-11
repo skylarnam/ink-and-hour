@@ -1,4 +1,4 @@
-import type { LayoutOptions, LayoutResult, Point } from '../types.ts';
+import type { LayoutCharacter, LayoutCursor, LayoutOptions, LayoutResult, Point } from '../types.ts';
 import { isHandwritingId, type HandwritingId } from '../handwriting.ts';
 import { handwritingFontData } from './font-data.ts';
 import { parseStrokePath, smoothStroke } from './paths.ts';
@@ -11,6 +11,7 @@ export type LayoutTextOptions = LayoutOptions;
 interface Glyph {
   strokes: Point[][];
   advance: number;
+  minX: number;
   maxX: number;
 }
 
@@ -42,17 +43,20 @@ function getFont(style: HandwritingId): Font {
   for (let index = 0; index < 94; index++) {
     const character = source.chars[index];
     const paths = parseStrokePath(character.d);
+    let minX = Infinity;
     let maxX = -Infinity;
     for (const point of paths.flat()) {
       font.minX = Math.min(font.minX, point.x);
       font.minY = Math.min(font.minY, point.y);
       font.maxY = Math.max(font.maxY, point.y);
+      minX = Math.min(minX, point.x);
       maxX = Math.max(maxX, point.x);
     }
     const advance = Math.max(character.o * 1.68, maxX + source.terminalPadding);
     font.glyphs.set(String.fromCharCode(index + 33), {
       strokes: paths.map((path) => smoothStroke(path, source.script)),
       advance,
+      minX,
       maxX,
     });
   }
@@ -60,7 +64,12 @@ function getFont(style: HandwritingId): Font {
   return font;
 }
 
-export function layoutText(input: string, options: LayoutTextOptions): LayoutResult {
+interface Continuation {
+  index: number;
+  cursor: LayoutCursor;
+}
+
+export function layoutText(input: string, options: LayoutTextOptions, continuation?: Continuation): LayoutResult {
   const text = input.replace(/\r\n?/g, '\n');
   const error = (message: string): LayoutResult => ({
     ok: false,
@@ -68,6 +77,7 @@ export function layoutText(input: string, options: LayoutTextOptions): LayoutRes
     strokes: [],
     lineCount: 0,
     characterCount: text.length,
+    characters: [],
   });
   const style = String(options.style);
   if (!isHandwritingId(style)) {
@@ -88,6 +98,13 @@ export function layoutText(input: string, options: LayoutTextOptions): LayoutRes
     return error(`This sheet accepts up to ${MAX_CHARACTERS} characters. Your note has ${text.length}.`);
   }
   if (!/[!-~]/.test(text)) return error('A word, a thought, a little hello. Add something to write.');
+  if (continuation && (!Number.isInteger(continuation.index) || continuation.index < 0 || continuation.index > text.length
+    || !Number.isFinite(continuation.cursor.x) || !Number.isFinite(continuation.cursor.y)
+    || !Number.isInteger(continuation.cursor.line) || continuation.cursor.line < 1
+    || !Number.isFinite(continuation.cursor.lineHeight) || continuation.cursor.lineHeight <= 0
+    || !isHandwritingId(continuation.cursor.style))) {
+    return error('The remaining handwriting needs a valid position on the sheet.');
+  }
 
   const font = getFont(style);
   const scale = font.scale;
@@ -117,20 +134,32 @@ export function layoutText(input: string, options: LayoutTextOptions): LayoutRes
     }
     return extent;
   };
-  const fullMessage = `This note reaches the end of the sheet (${maxLines} lines). `
-    + 'Shorten it or remove a few line breaks; nothing has been left out.';
+  const fullMessage = continuation
+    ? 'The selected handwriting needs more room than remains on this sheet.'
+    : `This note reaches the end of the sheet (${maxLines} lines). `
+      + 'Shorten it or remove a few line breaks; nothing has been left out.';
   const strokes: Point[][] = [];
-  let x = originX;
-  let lineCount = 1;
+  const characters: LayoutCharacter[] = [];
+  let x = continuation?.cursor.x ?? originX;
+  let lineCount = continuation?.cursor.line ?? 1;
+  let lineTop = continuation?.cursor.y ?? top;
+  let linePitch = Math.max(continuation?.cursor.lineHeight ?? lineHeight, lineHeight);
+  let characterIndex = continuation?.index ?? 0;
+  let protectPreviousInk = continuation !== undefined && continuation.cursor.style !== style;
+  if (lineTop < top || lineTop + fontHeight > bottom) return error(fullMessage);
   const newline = (): boolean => {
     x = originX;
+    lineTop += linePitch;
+    linePitch = lineHeight;
+    protectPreviousInk = false;
     lineCount++;
-    return lineCount <= maxLines;
+    return lineTop + fontHeight <= bottom;
   };
 
-  for (const token of text.match(/\n| +|[^ \n]+/g) ?? []) {
+  for (const token of text.slice(characterIndex).match(/\n| +|[^ \n]+/g) ?? []) {
     if (token === '\n') {
       if (!newline()) return error(fullMessage);
+      characterIndex++;
       continue;
     }
     if (token[0] === ' ') {
@@ -141,7 +170,12 @@ export function layoutText(input: string, options: LayoutTextOptions): LayoutRes
           x += font.space * scale;
         }
       }
+      characterIndex += token.length;
       continue;
+    }
+    if (protectPreviousInk) {
+      x -= Math.min(0, glyph(token[0]).minX) * scale;
+      protectPreviousInk = false;
     }
     if (x > originX && wordRight(token, x) > right && wordRight(token, originX) <= right) {
       if (!newline()) return error(fullMessage);
@@ -153,12 +187,44 @@ export function layoutText(input: string, options: LayoutTextOptions): LayoutRes
         if (!newline()) return error(fullMessage);
         if (x + letter.maxX * scale > right) return error('This sheet is too narrow for the selected handwriting.');
       }
-      const y = top - font.minY * scale + (lineCount - 1) * lineHeight;
+      const y = lineTop - font.minY * scale;
+      const strokeStart = strokes.length;
       for (const path of letter.strokes) {
         strokes.push(path.map((point) => ({ x: x + point.x * scale, y: y + point.y * scale })));
       }
       x += letter.advance * scale;
+      characters.push({
+        index: characterIndex++, strokeStart, strokeEnd: strokes.length,
+        after: { x, y: lineTop, line: lineCount, lineHeight: linePitch, style },
+      });
     }
   }
-  return { ok: true, error: null, strokes, lineCount, characterCount: text.length };
+  return { ok: true, error: null, strokes, lineCount, characterCount: text.length, characters };
+}
+
+export function restyleRemainingText(
+  input: string, previous: LayoutResult, options: LayoutTextOptions, startedStrokes: number,
+): { layout: LayoutResult; fromStroke: number } {
+  const text = input.replace(/\r\n?/g, '\n');
+  if (!previous.ok || !Number.isInteger(startedStrokes) || startedStrokes < 0 || startedStrokes > previous.strokes.length) {
+    throw new Error('Only an existing sheet with a valid writing position can change handwriting.');
+  }
+  const retained = previous.characters.filter((character) => character.strokeStart < startedStrokes);
+  const last = retained.at(-1);
+  const fromStroke = last?.strokeEnd ?? 0;
+  const index = last ? last.index + 1 : 0;
+  if (!/[!-~]/.test(text.slice(index))) return { layout: previous, fromStroke: previous.strokes.length };
+  // Anchor to the retained letter, never to a future wrap from an earlier preview.
+  const tail = layoutText(text, options, last ? { index, cursor: last.after } : undefined);
+  if (!tail.ok) return { layout: tail, fromStroke };
+  return {
+    fromStroke,
+    layout: {
+      ...tail,
+      strokes: [...previous.strokes.slice(0, fromStroke), ...tail.strokes],
+      characters: [...retained, ...tail.characters.map((character) => ({
+        ...character, strokeStart: character.strokeStart + fromStroke, strokeEnd: character.strokeEnd + fromStroke,
+      }))],
+    },
+  };
 }

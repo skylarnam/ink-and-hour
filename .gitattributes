@@ -2,3 +2,6 @@
 public/fonts/** -text
 public/fonts/**/OFL.txt -whitespace
 public/fonts/**/LICENSE.txt -whitespace
+font-review/fonts/** -text
+font-review/licenses/** -text -whitespace
+font-review/index.html linguist-generated=true -whitespace

@@ -97,8 +97,8 @@ function relax(current: number, target: number, slope: number, step: number, res
 }
 
 export class WritingEngine {
-  private readonly strokes: Stroke[];
-  private readonly totalLength: number;
+  private strokes: Stroke[];
+  private totalLength: number;
   private options: EngineOptions;
   private state: WritingStatus = 'idle';
   private strokeIndex = 0;
@@ -116,6 +116,8 @@ export class WritingEngine {
   private contactSpeed = 0;
   private resumeProgress: number | null = null;
   private suspendedLift = REST_LIFT;
+  private progressFloor = 0;
+  private progressStartLength = 0;
 
   constructor(layout: LayoutResult, options: EngineOptions) {
     if (!layout.ok || !layout.strokes.length) throw new Error(layout.error ?? 'There is no handwriting to play.');
@@ -127,7 +129,13 @@ export class WritingEngine {
   }
 
   get status(): WritingStatus { return this.state; }
-  get progress(): number { return this.state === 'complete' ? 1 : clamp(this.drawnLength / this.totalLength); }
+  get progress(): number {
+    return this.state === 'complete' ? 1 : this.progressFloor + (1 - this.progressFloor)
+      * clamp((this.drawnLength - this.progressStartLength) / (this.totalLength - this.progressStartLength));
+  }
+  get startedStrokeCount(): number {
+    return this.strokeIndex + (this.phase === 'draw' && (this.edgeIndex > 0 || this.edgeOffset > 0) ? 1 : 0);
+  }
 
   start(): void {
     if (this.state === 'idle') this.state = 'writing';
@@ -152,6 +160,7 @@ export class WritingEngine {
     this.phase = 'settle';
     this.resumeProgress = null;
     this.suspendedLift = REST_LIFT;
+    this.progressFloor = this.progressStartLength = 0;
     const first = this.strokes[0].edges[0];
     this.position = { ...first.from };
     this.travelFrom = { ...first.from };
@@ -163,6 +172,28 @@ export class WritingEngine {
 
   updateOptions(options: EngineOptions): void {
     this.options = normalizeOptions(options);
+  }
+
+  replaceUnwrittenStrokes(from: number, points: Point[][]): void {
+    if (this.state !== 'paused' || !Number.isInteger(from) || from < this.startedStrokeCount || from > this.strokes.length) {
+      throw new Error('Pause the pen before replacing only its unwritten strokes.');
+    }
+    const next = [...this.strokes.slice(0, from), ...points.map((path, index) => compileStroke(path, from + index))];
+    const totalLength = next.reduce((sum, stroke) => sum + stroke.length, 0);
+    if (!Number.isFinite(totalLength) || totalLength <= this.drawnLength) {
+      throw new Error('The sheet must retain its ink and at least one remaining stroke.');
+    }
+    const progress = this.progress;
+    this.strokes = next;
+    this.totalLength = totalLength;
+    this.progressFloor = progress;
+    this.progressStartLength = this.drawnLength;
+    if (from === this.strokeIndex) {
+      this.phase = 'travel';
+      this.phaseProgress = this.edgeIndex = this.edgeOffset = 0;
+      this.travelFrom = { ...this.position };
+      this.travelTo = { ...this.strokes[this.strokeIndex].edges[0].from };
+    }
   }
 
   private activeLift(): number {

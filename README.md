@@ -54,6 +54,11 @@ it in a terminal separates its lifetime from the agent's completed work.
 
 - Write an English note, choose one of **22 handwritings**, and
   select **Begin writing**. Pause/resume preserves the exact writing position.
+  While paused, handwriting can change for the unwritten letters. A partially
+  written letter finishes in its original style; existing ink is never erased
+  or moved. The remaining text reflows within the page, and a choice that would
+  overflow is rejected without changing the sheet. Live style switching stays
+  locked while the pen is moving.
   Correspondence and Everyday print are joined by 20 locally bundled Google
   Fonts families. The editable text uses the selected handwriting's source font;
   the additional pen styles are interpreted centerline studies of those faces.
@@ -79,7 +84,8 @@ it in a terminal separates its lifetime from the agent's completed work.
   characters (fine, broad edge, soft flex), three paper surfaces, four preset inks,
   and a **rainbow color picker** for a custom shade.
   Nib, ink, paper, and pace can change during writing. Existing ink keeps its
-  color; new strokes use the new color. Text and style are locked during a run.
+  color; new strokes use the new color. Text stays read-only during a run;
+  handwriting unlocks when paused.
   The custom shade persists. Cotton has warmer cellulose mottling, longer
   fibers, more matte relief, and slightly softer/wider absorbed ink; Smooth
   stays fine-grained and lightly finished.
@@ -119,6 +125,33 @@ it in a terminal separates its lifetime from the agent's completed work.
   return, audio can resume if previously enabled, but writing waits for Resume.
   Reduced-motion preferences remove storm flashes and floating dust, freeze
   cloud/leaf motion, and make camera/case/cap/pen-return transitions immediate.
+
+## Font shortlisting
+
+`font-review/index.html` is a self-contained, 100-row font comparison using
+"The quick brown fox jumps over the lazy dog." It includes the current 22
+styles and 78 additional licensed candidates. Every checkbox starts unchecked,
+including the current styles. Original font bytes, source links, checksums,
+and licenses are retained alongside `font-review/catalog.json`; the HTML also
+embeds the fonts and copyright/license notices.
+
+Open the **Handwriting shortlist** canvas in Copilot to review it. The project
+extension saves each checkbox directly to `font-review/selection.json`.
+Selections survive panel and app reloads, and the agent can read that file or
+the canvas's `read_selection` action after the user says they are done.
+Checking a font does **not** apply it to the website. The live collection stays
+unchanged until that confirmation, when only the checked candidates should be
+integrated.
+
+The standalone HTML file also offers **Download selections**, since an ordinary
+browser tab cannot automatically write its sibling JSON file. Automatic saving
+is available in the app canvas; it does not require the website's dev server.
+The review assets are local project files, not additional Vercel site assets.
+Rebuild the review without downloading fonts or resetting selections with:
+
+```sh
+node scripts/build-font-review.mjs
+```
 
 ## How the writing works
 

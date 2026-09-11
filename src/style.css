@@ -106,8 +106,6 @@ legend span { float: right; font-size: 9px; letter-spacing: 0; color: #888675; t
 .custom-ink-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; font-size: 9px; color: var(--muted); }
 .custom-ink-controls input { width: 32px; height: 25px; border: 1px solid var(--line); padding: 2px; border-radius: 3px; cursor: pointer; background: var(--paper); }
 .custom-ink-controls output { font-variant-numeric: tabular-nums; color: var(--ink); }
-.custom-ink-controls > span { font-size: 8px; margin-left: auto; }
-.ink-note { font: italic 10px var(--serif); color: #92917f; margin-left: auto; }
 .paper-choices .choice { border: 0; background: transparent; padding: 0; display: grid; gap: 6px; color: #7c7d6c; }
 .paper-sample { display: block; height: 26px; margin: 0 1px; border-radius: 2px; border: 1px solid #dedbcc; background: #f5eddc; box-shadow: 0 2px 2px #3f30150a; }
 .paper-sample.parchment { background-color: #e5cea1; background-image: repeating-linear-gradient(30deg, transparent 0 2px, #a8894210 3px 4px); }
@@ -210,7 +208,6 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .settings-content, .writing-editor { padding-left: 20px; padding-right: 20px; }
   .camera-controls { top: auto; bottom: 61px; right: 19px; }
   .camera-hint { display: none; }
-  .ink-note { font-size: 9px; }
 }
 @media (max-width: 720px) {
   .site-header { height: auto; min-height: 123px; padding: 12px 20px; gap: 10px; flex-wrap: wrap; }
