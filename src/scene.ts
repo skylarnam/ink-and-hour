@@ -6,6 +6,7 @@ import { makeLabelTexture, makeLeatherTexture, makeWoodTexture, randomSource } f
 import { configureCameraDrag, createCameraControls, panCameraWithKey } from './camera-controls.ts';
 import { OutdoorView } from './outdoors.ts';
 import { inkColor } from './ink.ts';
+import { cameraRelativePan } from './spatial-audio.ts';
 import type { CameraDragMode } from './camera-controls.ts';
 import type { PaperSurface } from './textures.ts';
 import { PAGE, PAPER_COLORS, PAPER_FINISH } from './types.ts';
@@ -19,6 +20,7 @@ const CAP_REVERSE = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,
 const PEN_REST_POSITION = new THREE.Vector3(2.08, 0.16, 1.4);
 const PEN_REST_ROTATION = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.35, 0.07, -0.95).normalize());
 const PEN_RETURN_DURATION = 1.8;
+const WINDOW_SOUND_POSITION = new THREE.Vector3(0, 3.94, -5.38);
 
 export function writingPenOrientation(): THREE.Quaternion {
   const elevation = THREE.MathUtils.degToRad(42);
@@ -136,6 +138,9 @@ export class DeskScene {
   private readonly targetPosition = new THREE.Vector3();
   private readonly targetLook = new THREE.Vector3();
   private readonly penOrientation = new THREE.Quaternion();
+  private readonly soundListener = new THREE.Vector3();
+  private readonly soundRight = new THREE.Vector3();
+  private readonly soundPen = new THREE.Vector3();
   private readonly environmentTarget: THREE.WebGLRenderTarget;
   private settings: Settings;
   private movingCamera = false;
@@ -598,6 +603,16 @@ export class DeskScene {
     this.followNib = false;
   }
 
+  get soundPlacement(): { pen: number; window: number } {
+    this.camera.getWorldPosition(this.soundListener);
+    this.soundRight.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this.pen.getWorldPosition(this.soundPen);
+    return {
+      pen: cameraRelativePan(this.soundPen, this.soundListener, this.soundRight),
+      window: cameraRelativePan(WINDOW_SOUND_POSITION, this.soundListener, this.soundRight),
+    };
+  }
+
   adjustCamera(key: string, pan = false): boolean {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(key)) return false;
     this.movingCamera = false;
@@ -743,6 +758,7 @@ export class DeskScene {
       reducedMotion: this.reducedMotion, lightningIntensity: this.flashLight.intensity,
       paperRoughnessMapped: this.paperMaterial.roughnessMap !== null,
       paperRoughnessVersion: this.paperMaterial.roughnessMap?.version ?? 0,
+      soundPlacement: this.soundPlacement,
       canvas: { width: this.renderer.domElement.width, height: this.renderer.domElement.height },
       drawCalls: this.renderer.info.render.calls,
     };

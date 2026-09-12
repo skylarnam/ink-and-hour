@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MOUSE, TOUCH, PerspectiveCamera, Vector3 } from 'three';
+import { Group, MOUSE, TOUCH, PerspectiveCamera, Vector3 } from 'three';
 import { DeskScene } from '../src/scene.ts';
 import {
   CAMERA_PAN_RADIUS, configureCameraDrag, createCameraControls, panCameraWithKey,
@@ -34,6 +34,32 @@ test('holding the Quiet view camera cancels automatic movement without changing 
   assert.ok(controls.target.equals(target));
   assert.equal(controls.enablePan, true);
   assert.equal(controls.enableRotate, true);
+});
+
+test('sound placement uses the actual pen position and camera right axis, with a fixed window source', () => {
+  const { camera } = cameraRig(new Vector3(), new Vector3(0, 5, 10));
+  const pen = new Group();
+  const scene = Object.assign(Object.create(DeskScene.prototype), {
+    camera, pen, soundListener: new Vector3(), soundRight: new Vector3(), soundPen: new Vector3(),
+  });
+  const cameraBefore = camera.position.clone();
+  pen.position.set(-2, 0, 0);
+  const left = scene.soundPlacement;
+  pen.position.x = 2;
+  const right = scene.soundPlacement;
+  assert.ok(left.pen < 0 && right.pen > 0);
+  close(left.window, right.window);
+  close(left.window, 0);
+  assert.ok(camera.position.equals(cameraBefore), 'sampling sound cannot move the camera');
+  camera.position.set(10, 5, 0);
+  camera.lookAt(0, 0, 0);
+  pen.position.set(0, 0, 2);
+  const side = scene.soundPlacement;
+  assert.ok(side.pen < 0, 'world Z becomes screen-left in the side view');
+  assert.ok(side.window > 0, 'the window stays in its world location when the camera rotates');
+  for (const placement of [left, right, side]) {
+    assert.ok(Object.values(placement).every((pan) => Number.isFinite(pan) && Math.abs(pan) <= 0.35));
+  }
 });
 
 test('orbit remains the default while mouse and touch panning are enabled and bounded', () => {

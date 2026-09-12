@@ -64,6 +64,16 @@ test('initial sound UI says ready, not playing, before the browser has a user ge
   assert.ok(html.includes('Your browser waits for a first click, tap, or keypress'));
 });
 
+test('spatial sound has a separately labeled opt-in choice without adding pen textures', () => {
+  const html = renderUI();
+  assert.equal((html.match(/data-setting="spatialSound"/g) ?? []).length, 2);
+  assert.match(html, /<fieldset aria-describedby="spatial-sound-note"><legend>SPATIAL SOUND<\/legend>/);
+  for (const value of ['off', 'gentle']) assert.ok(html.includes(`data-setting="spatialSound" data-value="${value}"`));
+  assert.ok(html.includes('Gentle stereo'));
+  assert.ok(html.includes('Best with headphones; music is unchanged.'));
+  assert.equal((html.match(/data-setting="writingSound"/g) ?? []).length, 4);
+});
+
 test('Quiet view has an accessible entry and a hidden compact writing, mute and exit bar', () => {
   const html = renderUI();
   assert.match(html, /id="enter-quiet-view"[^>]+aria-pressed="false"[^>]+aria-controls="quiet-toolbar"/);

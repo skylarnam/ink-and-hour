@@ -561,6 +561,7 @@ function frame(timestamp: number): void {
     scene.updatePen(result.pen, delta);
     audio.updateContact(result.pen);
     scene.update(delta, elapsed);
+    audio.updateSpatial(scene.soundPlacement);
     if (result.pen.status !== lastStatus) syncWriting();
   }
   animationId = requestAnimationFrame(frame);

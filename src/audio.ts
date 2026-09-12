@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings.ts';
 import { contactTextureParameters, createContactTextures } from './contact-texture.ts';
+import { clampSpatialPan } from './spatial-audio.ts';
 import type { AudioContact, InteractionCue, Settings } from './types.ts';
 import type { WritingSoundId } from './writing-sounds.ts';
 
@@ -44,12 +45,24 @@ interface ContactLayer {
   voice: LoopVoice | null;
 }
 
+interface SpatialRoute {
+  input: GainNode;
+  dry: GainNode;
+  panner: StereoPannerNode | null;
+  wet: GainNode | null;
+  pan: number;
+}
+
 export class RitualAudio {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private writing: GainNode | null = null;
   private ambience: GainNode | null = null;
   private music: GainNode | null = null;
+  private spatial: { pen: SpatialRoute; window: SpatialRoute } | null = null;
+  private spatialEnabled = false;
+  private spatialUnavailable = false;
+  private placement = { pen: 0, window: 0 };
   private recordingSource: MediaElementAudioSourceNode | null = null;
   private recordingGain: GainNode | null = null;
   private musicPaused = false;
@@ -189,8 +202,13 @@ export class RitualAudio {
     limiter.attack.value = 0.006;
     limiter.release.value = 0.2;
     this.master.connect(limiter).connect(ctx.destination);
-    this.writing.connect(this.master);
-    this.ambience.connect(this.master);
+    const spatialRoute = (input: GainNode): SpatialRoute => {
+      const dry = ctx.createGain();
+      dry.gain.value = 1;
+      input.connect(dry).connect(this.master!);
+      return { input, dry, panner: null, wet: null, pan: 0 };
+    };
+    this.spatial = { pen: spatialRoute(this.writing), window: spatialRoute(this.ambience) };
     this.music.connect(this.master);
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 9, ctx.sampleRate);
     const samples = this.noise.getChannelData(0);
@@ -208,6 +226,87 @@ export class RitualAudio {
     this.rain = ctx.createGain();
     this.rain.gain.value = 0;
     this.rainFilter.connect(this.rain).connect(this.ambience);
+  }
+
+  private prepareSpatial(): boolean {
+    const ctx = this.context;
+    if (!ctx || !this.master || !this.spatial || this.spatialUnavailable) return false;
+    if (this.spatial.pen.panner && this.spatial.window.panner) return true;
+    const pending: { route: SpatialRoute; panner: StereoPannerNode; wet: GainNode }[] = [];
+    const connectedInputs: { input: GainNode; panner: StereoPannerNode }[] = [];
+    const nodes: AudioNode[] = [];
+    try {
+      if (typeof ctx.createStereoPanner !== 'function') throw new Error('StereoPannerNode is not supported.');
+      for (const [key, route] of Object.entries(this.spatial) as ['pen' | 'window', SpatialRoute][]) {
+        const panner = ctx.createStereoPanner();
+        nodes.push(panner);
+        // These two buses contain only mono sources. Compensate the panner's equal-power center law
+        // at its output, while the unity dry path retains the original dual-mono level when off.
+        panner.channelCount = 1;
+        panner.channelCountMode = 'explicit';
+        panner.pan.value = this.placement[key];
+        const wet = ctx.createGain();
+        nodes.push(wet);
+        wet.gain.value = 0;
+        pending.push({ route, panner, wet });
+      }
+      for (const { route, panner, wet } of pending) {
+        route.input.connect(panner);
+        connectedInputs.push({ input: route.input, panner });
+        panner.connect(wet).connect(this.master);
+      }
+      for (const { route, panner, wet } of pending) {
+        route.panner = panner;
+        route.wet = wet;
+        route.pan = panner.pan.value;
+      }
+      return true;
+    } catch (error) {
+      for (const { input, panner } of connectedInputs) input.disconnect(panner);
+      for (const node of nodes) node.disconnect();
+      this.spatialUnavailable = true;
+      this.onError(`Spatial sound is unavailable; your sounds will play without spatial placement. ${error instanceof Error ? error.message : ''}`.trim());
+      return false;
+    }
+  }
+
+  private applySpatial(): void {
+    const ctx = this.context;
+    if (!ctx || !this.spatial || !this.ready()) return;
+    const enabled = this.settings.spatialSound === 'gentle' && this.prepareSpatial();
+    if (enabled !== this.spatialEnabled) {
+      this.spatialEnabled = enabled;
+      for (const route of Object.values(this.spatial)) {
+        for (const [parameter, value] of [
+          [route.dry.gain, enabled ? 0 : 1],
+          [route.wet?.gain, enabled ? Math.SQRT2 : 0],
+        ] as const) {
+          if (!parameter) continue;
+          const now = ctx.currentTime;
+          if (typeof parameter.cancelAndHoldAtTime === 'function') parameter.cancelAndHoldAtTime(now);
+          else {
+            const current = parameter.value;
+            parameter.cancelScheduledValues(now);
+            parameter.setValueAtTime(current, now);
+          }
+          parameter.linearRampToValueAtTime(value, now + 0.06);
+        }
+      }
+    }
+    this.updateSpatial(this.placement);
+  }
+
+  updateSpatial(placement: { pen: number; window: number }): void {
+    this.placement = { pen: clampSpatialPan(placement.pen), window: clampSpatialPan(placement.window) };
+    if (!this.context || !this.spatial || !this.spatialEnabled || !this.ready()) return;
+    for (const key of ['pen', 'window'] as const) {
+      const route = this.spatial[key];
+      const pan = this.placement[key];
+      if (route.panner && route.pan !== pan) {
+        target(route.panner.pan, pan, this.context.currentTime, 0.045);
+        route.pan = pan;
+      }
+    }
   }
 
   private startLoop(kind: LoopVoice['kind'], buffer: AudioBuffer, destination: AudioNode): LoopVoice {
@@ -321,6 +420,7 @@ export class RitualAudio {
     target(this.writing.gain, settings.writingVolume, now);
     target(this.ambience.gain, settings.ambienceVolume, now);
     target(this.music.gain, settings.musicVolume, now);
+    this.applySpatial();
     this.rainTarget = this.ready() && settings.ambienceVolume > 0 && settings.masterVolume > 0 ? weatherGain(settings) : 0;
     target(this.rain.gain, this.rainTarget, now, this.rainTarget === 0 ? 0.008 : 0.7);
     target(this.rainFilter.frequency, settings.weather === 'storm' ? 2100 : 3400, now, 0.4);
@@ -513,6 +613,9 @@ export class RitualAudio {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
       contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
       writingSound: this.settings.writingSound,
+      spatialSound: this.settings.spatialSound, spatialActive: this.spatialEnabled && this.ready(),
+      spatialUnavailable: this.spatialUnavailable,
+      spatialPan: { pen: this.spatial?.pen.pan ?? 0, window: this.spatial?.window.pan ?? 0 },
       contactBufferPairs: this.contactBuffers.size, preparedContactSound: this.preparedContactSound,
       rainGain: this.rainTarget, musicTrack: this.settings.musicTrack,
       musicPaused: this.musicPaused, recordingConnected: this.recordingSource !== null,
@@ -546,6 +649,16 @@ export class RitualAudio {
     this.preparedContactSound = null;
     this.recordingSource?.disconnect();
     this.recordingGain?.disconnect();
+    if (this.spatial) {
+      for (const route of Object.values(this.spatial)) {
+        route.input.disconnect();
+        route.dry.disconnect();
+        route.panner?.disconnect();
+        route.wet?.disconnect();
+      }
+    }
+    this.spatial = null;
+    this.spatialEnabled = false;
     if (this.context && this.context.state !== 'closed') {
       void this.context.close().catch((error: unknown) => {
         this.onError(`Audio could not close. ${error instanceof Error ? error.message : ''}`);

@@ -58,8 +58,15 @@ class FakeParam {
 
 class FakeNode {
   connected = true;
-  connect(destination) { return destination; }
-  disconnect() { this.connected = false; }
+  connections = new Set();
+  connect(destination) { this.connected = true; this.connections.add(destination); return destination; }
+  disconnect(destination) {
+    if (destination) {
+      assert.ok(this.connections.has(destination), 'disconnect only edges which actually connected');
+      this.connections.delete(destination);
+    }
+    else { this.connected = false; this.connections.clear(); }
+  }
 }
 
 class FakeSource extends FakeNode {
@@ -89,6 +96,8 @@ class FakeContext {
   gains = [];
   sources = [];
   mediaSources = [];
+  panners = [];
+  filters = [];
   resumeGate = null;
   failResume = false;
   constructor() { FakeContext.instances.push(this); }
@@ -97,7 +106,16 @@ class FakeContext {
     this.gains.push(gain);
     return gain;
   }
-  createBiquadFilter() { return Object.assign(new FakeNode(), { frequency: new FakeParam(), Q: new FakeParam() }); }
+  createBiquadFilter() {
+    const filter = Object.assign(new FakeNode(), { frequency: new FakeParam(), Q: new FakeParam() });
+    this.filters.push(filter);
+    return filter;
+  }
+  createStereoPanner() {
+    const panner = Object.assign(new FakeNode(), { pan: Object.assign(new FakeParam(), { value: 0 }) });
+    this.panners.push(panner);
+    return panner;
+  }
   createDynamicsCompressor() {
     return Object.assign(new FakeNode(), Object.fromEntries(['threshold', 'knee', 'ratio', 'attack', 'release'].map((key) => [key, new FakeParam()])));
   }
@@ -866,4 +884,338 @@ test('the original soundscapes can pause and resume without restarting on unrela
     assert.equal(audio.diagnostics.activeMusicVoices, 0);
     assert.equal(audio.diagnostics.musicTimerActive, false);
   });
+});
+
+test('spatial off retains unity unpanned routing without panners, source allocation or early startup', async () => {
+  await withAudio(async (audio) => {
+    audio.updateSpatial({ pen: 0.35, window: -0.35 });
+    assert.equal(FakeContext.instances.length, 0);
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    assert.equal(ctx.panners.length, 0);
+    assert.equal(ctx.sources.length, 0);
+    for (const [key, bus] of [['pen', audio.writing], ['window', audio.ambience]]) {
+      const route = audio.spatial[key];
+      assert.deepEqual([...bus.connections], [route.dry]);
+      assert.deepEqual([...route.dry.connections], [audio.master]);
+      assert.equal(route.dry.gain.value, 1, 'off must not pass mono audio through a center panner');
+      assert.equal(route.panner, null);
+    }
+    for (let frame = 0; frame < 120; frame++) audio.updateSpatial({ pen: frame, window: -frame });
+    assert.equal(ctx.panners.length, 0);
+    assert.equal(ctx.sources.length, 0);
+    assert.deepEqual([...audio.music.connections], [audio.master]);
+    assert.deepEqual(audio.diagnostics.mixer, { master: 0.7, pen: 0.3, ambience: 0, music: 0 });
+  }, { ...TEXTURED_SETTINGS, spatialSound: 'off' });
+});
+
+function assertSpatialFade(audio, enabled, now) {
+  for (const route of Object.values(audio.spatial)) {
+    for (const [parameter, value] of [[route.dry.gain, enabled ? 0 : 1], [route.wet.gain, enabled ? Math.SQRT2 : 0]]) {
+      assert.deepEqual(parameter.events.at(-2), ['hold', now]);
+      assert.deepEqual(parameter.events.at(-1), ['linear', value, now + 0.06]);
+    }
+  }
+}
+
+test('gentle routing places every pen palette and page cue together, weather at the window, and no music', async () => {
+  const settings = { ...DEFAULT_SETTINGS, spatialSound: 'gentle', weather: 'storm', musicTrack: 'felt' };
+  await withAudio(async (audio, errors) => {
+    audio.updateSpatial({ pen: 0.23, window: -0.31 });
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    assert.equal(ctx.panners.length, 2);
+    assert.equal(audio.diagnostics.spatialActive, true);
+    assert.deepEqual(audio.diagnostics.spatialPan, { pen: 0.23, window: -0.31 });
+    assertSpatialFade(audio, true, ctx.currentTime);
+    for (const route of Object.values(audio.spatial)) {
+      assert.deepEqual([...route.input.connections], [route.dry, route.panner]);
+      assert.deepEqual([...route.panner.connections], [route.wet]);
+      assert.deepEqual([...route.wet.connections], [audio.master]);
+      assert.equal(route.panner.channelCount, 1);
+      assert.equal(route.panner.channelCountMode, 'explicit');
+      const left = Math.SQRT2 * Math.cos((route.pan + 1) * Math.PI / 4);
+      const right = Math.SQRT2 * Math.sin((route.pan + 1) * Math.PI / 4);
+      assert.ok(Math.abs(left * left + right * right - 2) < 1e-12, 'gentle placement retains original total mono power');
+    }
+    assert.deepEqual(audio.diagnostics.mixer, { master: 0.7, pen: 0.3, ambience: 0.2, music: 0.2 });
+    for (const writingSound of WRITING_SOUND_IDS) {
+      audio.configure({ ...settings, writingSound });
+      audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+      for (const layer of Object.values(audio.texturedLayers)) {
+        assert.deepEqual([...layer.gain.connections], [audio.writing]);
+        assert.equal(layer.voice.source.playbackRate.value, 1);
+      }
+    }
+    for (const kind of ['paper', 'ink', 'cap', 'leather']) audio.cue(kind);
+    audio.thunder();
+    for (const voice of audio.voices) {
+      const expected = voice.kind === 'music' ? audio.music : voice.kind === 'thunder' ? audio.ambience : audio.writing;
+      assert.deepEqual([...voice.gain.connections], [expected]);
+    }
+    assert.deepEqual([...audio.rain.connections], [audio.ambience]);
+    const musicTimer = audio.musicTimer;
+    const musicVoices = [...audio.voices].filter((voice) => voice.kind === 'music');
+    audio.connectRecording({});
+    assert.deepEqual([...audio.recordingSource.connections], [audio.recordingGain]);
+    assert.deepEqual([...audio.recordingGain.connections], [audio.music]);
+    assert.deepEqual([...audio.music.connections], [audio.master]);
+    for (const spatialSound of ['off', 'gentle', 'off']) audio.configure({ ...settings, spatialSound });
+    assert.equal(audio.musicTimer, musicTimer);
+    assert.deepEqual([...audio.voices].filter((voice) => voice.kind === 'music'), musicVoices);
+    assert.equal(audio.recordingGain.gain.value, 0.18);
+    assert.deepEqual([...audio.music.connections], [audio.master]);
+    assert.deepEqual(errors, []);
+  }, settings);
+});
+
+test('spatial switching crossfades finite endpoints and reuses two routes without restarting contact or weather', async () => {
+  const settings = { ...DEFAULT_SETTINGS, spatialSound: 'off' };
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+    audio.cue('paper');
+    const sources = [...ctx.sources];
+    const filters = [...ctx.filters];
+    const mixer = audio.diagnostics.mixer;
+    audio.configure({ ...settings, spatialSound: 'gentle' });
+    const gains = [...ctx.gains];
+    const panners = [...ctx.panners];
+    for (let step = 0; step < 80; step++) {
+      const enabled = step % 2 === 1;
+      ctx.advance(0.001);
+      audio.configure({ ...settings, spatialSound: enabled ? 'gentle' : 'off' });
+      assertSpatialFade(audio, enabled, ctx.currentTime);
+      assert.deepEqual(audio.diagnostics.mixer, mixer);
+      assert.equal(audio.diagnostics.contactSources, 2);
+      assert.equal(audio.diagnostics.weatherSources, 1);
+      assert.equal(audio.diagnostics.activeCues, 1);
+    }
+    assert.deepEqual(ctx.panners, panners);
+    assert.deepEqual(ctx.gains, gains);
+    assert.deepEqual(ctx.sources, sources);
+    assert.deepEqual(ctx.filters, filters);
+    for (const spatialSound of ['off', 'gentle']) {
+      audio.configure({ ...settings, spatialSound });
+      const counts = Object.values(audio.spatial).map((route) => [route.dry.gain.events.length, route.wet.gain.events.length]);
+      for (let frame = 0; frame < 100; frame++) {
+        audio.updateSpatial({ pen: 0.21, window: -0.3 });
+        audio.configure({ ...settings, spatialSound });
+      }
+      assert.deepEqual(Object.values(audio.spatial).map((route) => [route.dry.gain.events.length, route.wet.gain.events.length]), counts,
+        'repeated frames and unchanged settings must not postpone crossfades');
+    }
+  }, settings);
+});
+
+test('moving spatial placement changes only bounded pan parameters, with smoothing and no redundant stationary events', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+    const sources = [...ctx.sources];
+    const filters = ctx.filters.map((filter) => [filter.frequency.value, filter.frequency.events.length, filter.Q.value]);
+    const gains = ctx.gains.map((gain) => gain.gain.events.length);
+    for (const [placement, expected] of [
+      [{ pen: 40, window: -20 }, { pen: 0.35, window: -0.35 }],
+      [{ pen: -0.2, window: 0.27 }, { pen: -0.2, window: 0.27 }],
+      [{ pen: NaN, window: Infinity }, { pen: 0, window: 0 }],
+      [{ pen: -Infinity, window: undefined }, { pen: 0, window: 0 }],
+    ]) {
+      audio.updateSpatial(placement);
+      assert.deepEqual(audio.diagnostics.spatialPan, expected);
+    }
+    for (const panner of ctx.panners) {
+      assert.ok(panner.pan.events.some((event) => event[0] === 'hold'));
+      assert.ok(panner.pan.events.some((event) => event[0] === 'target' && event[3] === 0.045));
+      for (const event of panner.pan.events) {
+        assert.ok(event.slice(1).every(Number.isFinite));
+        if (['target', 'linear', 'set'].includes(event[0])) assert.ok(Math.abs(event[1]) <= 0.35);
+      }
+    }
+    const panEvents = ctx.panners.map((panner) => panner.pan.events.length);
+    for (let frame = 0; frame < 120; frame++) audio.updateSpatial({ pen: 0, window: 0 });
+    assert.deepEqual(ctx.panners.map((panner) => panner.pan.events.length), panEvents);
+    assert.deepEqual(ctx.sources, sources);
+    assert.deepEqual(ctx.filters.map((filter) => [filter.frequency.value, filter.frequency.events.length, filter.Q.value]), filters);
+    assert.deepEqual(ctx.gains.map((gain) => gain.gain.events.length), gains);
+    for (const source of ctx.sources) {
+      assert.equal(source.playbackRate.value, 1);
+      assert.equal(source.playbackRate.events.length, 0);
+    }
+  }, { ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
+});
+
+test('spatial routing preserves the seven millisecond contact zero and twelve millisecond source stop for all palettes', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    for (const writingSound of WRITING_SOUND_IDS) {
+      audio.configure({ ...TEXTURED_SETTINGS, writingSound, spatialSound: 'gentle' });
+      audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+      const sources = Object.values(audio.texturedLayers).map((layer) => layer.voice.source);
+      audio.updateContact({ contact: false, speed: 0, pressure: 0 });
+      for (const layer of Object.values(audio.texturedLayers)) {
+        assert.deepEqual(layer.gain.gain.events.at(-1).slice(0, 2), ['set', 0]);
+        assert.ok(layer.gain.gain.events.at(-1)[2] - ctx.currentTime <= 0.0071);
+      }
+      for (const source of sources) assert.ok(Math.abs(source.stopTime - ctx.currentTime - 0.012) < 1e-12);
+      const count = ctx.sources.length;
+      for (let frame = 0; frame < 90; frame++) audio.updateSpatial({ pen: frame / 100, window: -frame / 100 });
+      assert.equal(ctx.sources.length, count);
+      ctx.advance(0.02);
+      assert.ok(sources.every((source) => !source.connected));
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.ok(audio.diagnostics.contactBufferPairs <= 3);
+    }
+  }, { ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
+});
+
+test('spatial toggles cannot resurrect sources while muted, hidden, master-zero or all source buses are zero', async () => {
+  for (const action of ['mute', 'hidden', 'master-zero', 'buses-zero']) {
+    await withAudio(async (audio) => {
+      await audio.enable();
+      const ctx = FakeContext.instances[0];
+      audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+      audio.thunder();
+      let settings = { ...DEFAULT_SETTINGS, weather: 'storm', spatialSound: 'gentle' };
+      if (action === 'mute') await audio.disable();
+      else if (action === 'hidden') await audio.setHidden(true);
+      else {
+        settings = { ...settings, ...(action === 'master-zero' ? { masterVolume: 0 } : { writingVolume: 0, ambienceVolume: 0, musicVolume: 0 }) };
+        audio.configure(settings);
+      }
+      ctx.advance(6);
+      const sourceCount = ctx.sources.length;
+      for (let step = 0; step < 60; step++) {
+        audio.configure({ ...settings, spatialSound: step % 2 ? 'gentle' : 'off' });
+        audio.updateSpatial({ pen: step, window: -step });
+      }
+      assert.equal(ctx.sources.length, sourceCount);
+      assert.equal(audio.diagnostics.contactSources, 0);
+      assert.equal(audio.diagnostics.weatherSources, 0);
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(audio.diagnostics.allocatedVoices, 0);
+    }, { ...DEFAULT_SETTINGS, weather: 'storm', spatialSound: 'gentle' });
+  }
+});
+
+test('spatial preferences and frame updates respect delayed resume, later mute and fresh-contact startup', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    await audio.disable();
+    const ctx = FakeContext.instances[0];
+    let release;
+    ctx.resumeGate = new Promise((resolve) => { release = resolve; });
+    audio.configure({ ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
+    const enabling = audio.enable();
+    await Promise.resolve();
+    audio.updateSpatial({ pen: 0.3, window: -0.3 });
+    const disabling = audio.disable();
+    release();
+    assert.equal(await enabling, false);
+    await disabling;
+    assert.equal(ctx.state, 'suspended');
+    assert.equal(ctx.panners.length, 0, 'pending resume and later mute should not even allocate spatial paths');
+    assert.equal(ctx.sources.length, 0);
+    ctx.resumeGate = null;
+    assert.equal(await audio.enable(), true);
+    assert.equal(ctx.panners.length, 2);
+    assert.equal(ctx.sources.length, 0);
+    assert.deepEqual(audio.diagnostics.spatialPan, { pen: 0.3, window: -0.3 });
+    audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+    assert.equal(audio.diagnostics.contactSources, 2);
+  }, { ...TEXTURED_SETTINGS, spatialSound: 'off' });
+});
+
+test('missing or failing StereoPannerNode support explicitly reports once and preserves existing sound and dry routing', async () => {
+  for (const failure of ['missing', 'first', 'second', 'first-output', 'second-input', 'second-output']) {
+    await withAudio(async (audio, errors) => {
+      await audio.enable();
+      const ctx = FakeContext.instances[0];
+      const createPanner = ctx.createStereoPanner.bind(ctx);
+      let attempts = 0;
+      ctx.createStereoPanner = failure === 'missing' ? undefined : () => {
+        if (++attempts === (failure === 'second' ? 2 : 1)) throw new Error('Panner creation failed');
+        return createPanner();
+      };
+      if (failure.endsWith('output') || failure === 'second-input') {
+        ctx.createStereoPanner = () => {
+          const panner = createPanner();
+          const index = ++attempts;
+          if (failure === `${index === 1 ? 'first' : 'second'}-output`) {
+            panner.connect = () => { throw new Error('Panner output connection failed'); };
+          }
+          return panner;
+        };
+        if (failure === 'second-input') {
+          const input = audio.spatial.window.input;
+          const connect = input.connect.bind(input);
+          input.connect = (destination) => {
+            if (ctx.panners.includes(destination)) throw new Error('Panner input connection failed');
+            return connect(destination);
+          };
+        }
+      }
+      for (let step = 0; step < 30; step++) {
+        audio.configure({ ...TEXTURED_SETTINGS, spatialSound: step % 2 ? 'off' : 'gentle' });
+        audio.updateSpatial({ pen: 0.3, window: -0.3 });
+      }
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /Spatial sound is unavailable; your sounds will play without spatial placement/);
+      assert.equal(audio.enabled, true);
+      assert.equal(audio.diagnostics.spatialUnavailable, true);
+      assert.equal(audio.diagnostics.spatialActive, false);
+      for (const route of Object.values(audio.spatial)) {
+        assert.deepEqual([...route.input.connections], [route.dry]);
+        assert.equal(route.dry.gain.value, 1);
+        assert.equal(route.wet, null);
+        assert.equal(route.panner, null);
+      }
+      assert.ok(ctx.panners.every((panner) => !panner.connected), 'partial spatial construction must disconnect unused nodes');
+      audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+      assert.equal(audio.diagnostics.contactSources, 2);
+      assert.ok(audio.diagnostics.writingGain > 0);
+      assert.equal(FakeContext.instances.length, 1);
+    }, { ...TEXTURED_SETTINGS, spatialSound: 'off' });
+  }
+});
+
+test('spatial fades work without cancelAndHoldAtTime and disposal disconnects their bounded graph', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    const routes = Object.values(audio.spatial);
+    for (const route of routes) {
+      route.dry.gain.cancelAndHoldAtTime = undefined;
+      route.wet.gain.cancelAndHoldAtTime = undefined;
+      route.panner.pan.cancelAndHoldAtTime = undefined;
+    }
+    audio.updateSpatial({ pen: 0.3, window: -0.3 });
+    audio.configure({ ...TEXTURED_SETTINGS, spatialSound: 'off' });
+    for (const route of routes) {
+      for (const parameter of [route.dry.gain, route.wet.gain, route.panner.pan]) {
+        const events = parameter.events.slice(-3);
+        assert.equal(events[0][0], 'cancel');
+        assert.equal(events[1][0], 'set');
+        assert.equal(events[0][1], ctx.currentTime);
+        assert.ok(events.flatMap((event) => event.slice(1)).every(Number.isFinite));
+      }
+    }
+    audio.dispose();
+    const gainCounts = ctx.gains.map((gain) => gain.gain.events.length);
+    const panCounts = ctx.panners.map((panner) => panner.pan.events.length);
+    audio.updateSpatial({ pen: -0.3, window: 0.3 });
+    audio.configure({ ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
+    assert.equal(ctx.state, 'closed');
+    assert.equal(audio.diagnostics.spatialActive, false);
+    assert.equal(ctx.panners.length, 2);
+    assert.deepEqual(ctx.panners.map((panner) => panner.pan.events.length), panCounts);
+    assert.ok(routes.every((route) => [route.dry, route.wet, route.panner, route.input].every((node) => !node.connected)));
+    for (const route of routes) {
+      assert.equal(route.dry.gain.events.length, gainCounts[ctx.gains.indexOf(route.dry)]);
+      assert.equal(route.wet.gain.events.length, gainCounts[ctx.gains.indexOf(route.wet)]);
+    }
+  }, { ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
 });

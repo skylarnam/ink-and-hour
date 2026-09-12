@@ -96,6 +96,31 @@ test('new audio defaults do not overwrite saved levels or Music Off', () => {
   });
 });
 
+test('spatial sound is opt-in, validates its choices, and preserves older mixer preferences', () => {
+  assert.equal(DEFAULT_SETTINGS.spatialSound, 'off');
+  assert.equal(sanitizeSettings({ spatialSound: 'gentle' }).spatialSound, 'gentle');
+  for (const spatialSound of [undefined, null, true, 1, 'full', '']) {
+    assert.equal(sanitizeSettings({ spatialSound }).spatialSound, 'off');
+  }
+  const { spatialSound: _missing, ...legacy } = {
+    ...DEFAULT_SETTINGS, musicTrack: 'off', masterVolume: 0.41, writingVolume: 0.8,
+  };
+  withStorage({ getItem: () => JSON.stringify(legacy) }, () => {
+    assert.deepEqual(loadSettings(assert.fail), { ...legacy, spatialSound: 'off' });
+  });
+  const values = new Map();
+  withStorage({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  }, () => {
+    for (const spatialSound of ['gentle', 'off']) {
+      const chosen = { ...legacy, spatialSound };
+      saveSettings(chosen, assert.fail);
+      assert.deepEqual(loadSettings(assert.fail), chosen);
+    }
+  });
+});
+
 test('Textured is the default without overwriting legacy mixer or music choices', () => {
   assert.equal(DEFAULT_SETTINGS.writingSound, 'textured');
   const { writingSound: _previouslyAbsent, ...legacy } = {

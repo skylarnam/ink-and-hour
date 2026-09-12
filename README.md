@@ -143,6 +143,11 @@ it in a terminal separates its lifetime from the agent's completed work.
   visits. Saved choices among these four are preserved; missing or retired
   choices use Textured. This choice affects only writing friction, not the mixer levels,
   rain, music, cap, leather, paper, or bottle sounds.
+  **Spatial sound > Gentle stereo** adds optional, restrained left/right placement
+  for the pen/materials and window as you move the camera. It starts **Off** and
+  remembers your choice. It does not change the four sound textures or music,
+  add pitch effects, or attenuate volume with distance. Returning to Off restores
+  the normal centered sound.
   The ambience slider controls rain and thunder together. Recordings share
   the music/master mixer and pause when muted, hidden, or set to zero volume.
   No remote music API, streaming account, key, or runtime third-party request

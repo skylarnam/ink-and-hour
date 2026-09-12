@@ -28,6 +28,7 @@ export interface Settings {
   masterVolume: number;
   writingVolume: number;
   writingSound: WritingSound;
+  spatialSound: 'off' | 'gentle';
   ambienceVolume: number;
   musicVolume: number;
   musicTrack: MusicTrack;

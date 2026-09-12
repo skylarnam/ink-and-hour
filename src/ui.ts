@@ -131,6 +131,9 @@ export function renderUI(): string {
             <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices writing-sound-choices">
               ${WRITING_SOUNDS.map((sound) => choice('writingSound', sound.id, sound.label)).join('')}
             </div><p class="small-note" id="writing-sound-note"><span id="writing-sound-description">${writingSoundDescriptor(DEFAULT_WRITING_SOUND).description}</span> Compare while writing. Your choice is saved.</p></fieldset>
+            <fieldset aria-describedby="spatial-sound-note"><legend>SPATIAL SOUND</legend><div class="choices compact">
+              ${choice('spatialSound', 'off', 'Off')}${choice('spatialSound', 'gentle', 'Gentle stereo')}
+            </div><p class="small-note" id="spatial-sound-note">Soft left/right placement follows your view of the pen and window. Best with headphones; music is unchanged.</p></fieldset>
             <div class="volume-controls">
               ${volume('masterVolume', 'Overall volume', 'Keep it gentle.')}
               ${volume('writingVolume', 'Pen & materials', 'Nib friction, paper, cap and leather.')}
