@@ -35,6 +35,7 @@ interface LoopVoice {
   gate: GainNode;
   kind: 'body' | 'grain' | 'rain';
   releasing: boolean;
+  contactDeadline?: number;
 }
 
 interface ContactLayer {
@@ -79,16 +80,25 @@ export class RitualAudio {
   private settings: Settings = { ...DEFAULT_SETTINGS };
   private userEnabled = true;
   private hidden = false;
+  private background = false;
+  private contactDeadline: number | null = null;
   private contact = false;
   private writingTarget = 0;
   private musicTimer: ReturnType<typeof setInterval> | null = null;
   private musicStep = 0;
-  private lifecycle: Promise<void> = Promise.resolve();
+  private autoplayAttempted = false;
+  private browserBlocked = false;
+  private activationRevision = 0;
+  private readonly activationWaiters = new Set<(enabled: boolean) => void>();
   private revision = 0;
   private disposed = false;
   private readonly onError: (message: string) => void;
+  private readonly onStateChange: () => void;
 
-  constructor(onError: (message: string) => void) { this.onError = onError; }
+  constructor(onError: (message: string) => void, onStateChange: () => void = () => {}) {
+    this.onError = onError;
+    this.onStateChange = onStateChange;
+  }
   get enabled(): boolean { return this.userEnabled; }
 
   connectRecording(media: HTMLAudioElement): void {
@@ -113,74 +123,136 @@ export class RitualAudio {
     this.startMusic();
   }
 
-  async enable(): Promise<boolean> {
+  tryAutoplay(retry = false): Promise<boolean> {
+    if (this.disposed || !this.userEnabled || this.hidden || this.autoplayAttempted && !retry) {
+      return Promise.resolve(this.ready());
+    }
+    this.autoplayAttempted = true;
+    return this.requestActivation();
+  }
+
+  enable(): Promise<boolean> {
     if (this.disposed) {
       this.onError('This sound session has closed. Reload the page to start a new one.');
-      return false;
+      return Promise.resolve(false);
     }
+    if (!this.userEnabled) this.revision++;
+    this.userEnabled = true;
+    return this.requestActivation();
+  }
+
+  private requestActivation(): Promise<boolean> {
+    const revision = this.revision;
+    const request = ++this.activationRevision;
+    this.browserBlocked = false;
     try {
-      this.userEnabled = true;
-      this.revision++;
       if (!this.context) this.createGraph();
-      await this.queueLifecycle();
-      return this.userEnabled && !this.disposed;
+      const ctx = this.context!;
+      if (this.hidden) return Promise.resolve(false);
+      // Call resume in this turn: an earlier browser-gated promise must never consume a gesture.
+      const resumed = ctx.state === 'running' ? Promise.resolve() : ctx.resume();
+      return new Promise<boolean>((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const finish = (enabled: boolean): void => {
+          if (!this.activationWaiters.delete(finish)) return;
+          if (timer !== null) clearTimeout(timer);
+          resolve(enabled && revision === this.revision && this.ready());
+          if (!this.disposed) this.onStateChange();
+        };
+        this.activationWaiters.add(finish);
+        timer = setTimeout(() => {
+          if (!this.ready() && revision === this.revision && request === this.activationRevision) {
+            this.browserBlocked = true;
+          }
+          finish(this.ready());
+        }, 800);
+        void resumed.then(() => {
+          if (!this.disposed) this.synchronizeContext();
+          finish(this.ready());
+        }, (error: unknown) => {
+          if (!this.disposed && revision === this.revision && request === this.activationRevision) this.activationFailed(error);
+          finish(false);
+        });
+        if (this.ready()) {
+          this.synchronizeContext();
+          finish(true);
+        } else this.onStateChange();
+      });
     } catch (error) {
-      if (!this.disposed) this.fail('Sound could not start. Try Enable sound again.', error);
-      return false;
+      if (!this.disposed) this.activationFailed(error);
+      return Promise.resolve(false);
     }
   }
 
+  private activationFailed(error: unknown): void {
+    if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'NotAllowedError') {
+      this.browserBlocked = true;
+      this.silence();
+      this.settleActivations(false);
+      this.onStateChange();
+    } else this.fail('Sound could not start. Try Enable sound again.', error);
+  }
+
+  private settleActivations(enabled: boolean): void {
+    for (const finish of this.activationWaiters) finish(enabled);
+  }
+
   async disable(): Promise<void> {
+    if (this.disposed) return;
     this.userEnabled = false;
     this.revision++;
     this.silence();
-    try {
-      await this.queueLifecycle();
-    } catch (error) {
-      if (!this.disposed) this.fail('Sound could not be suspended.', error);
-    }
+    this.settleActivations(false);
+    this.onStateChange();
+    await this.suspendContext();
   }
 
   async setHidden(hidden: boolean): Promise<void> {
     this.hidden = hidden;
     this.revision++;
-    if (hidden) this.silence();
-    try {
-      await this.queueLifecycle();
-    } catch (error) {
-      if (!this.disposed) this.fail('Sound needs another click to resume.', error);
+    if (hidden) {
+      this.silence();
+      this.settleActivations(false);
     }
+    if (!this.context || this.disposed) return;
+    if (this.userEnabled && !hidden) await this.requestActivation();
+    else await this.suspendContext();
+    if (!this.disposed) this.onStateChange();
   }
 
-  private queueLifecycle(): Promise<void> {
-    // Serialize browser promises, then recheck intent after each await so a late resume cannot undo mute.
-    const operation = this.lifecycle.then(() => this.reconcileContext(), () => this.reconcileContext());
-    this.lifecycle = operation;
-    return operation;
-  }
-
-  private async reconcileContext(): Promise<void> {
+  private async suspendContext(): Promise<void> {
     const ctx = this.context;
-    if (!ctx || this.disposed) return;
-    let version: number;
-    do {
-      version = this.revision;
-      if (this.userEnabled && !this.hidden) {
-        if (ctx.state !== 'running') await ctx.resume();
-      } else if (ctx.state === 'running') await ctx.suspend();
-      if (this.disposed) return;
-    } while (version !== this.revision);
+    if (!ctx || this.disposed || ctx.state !== 'running') return;
+    try { await ctx.suspend(); }
+    catch (error) { if (!this.disposed) this.fail('Sound could not be suspended.', error); }
+  }
+
+  private synchronizeContext(): void {
+    if (this.disposed) return;
     if (this.ready()) {
+      this.browserBlocked = false;
       this.applyMixer();
       this.startMusic();
+    } else {
+      this.silence();
+      if (!this.userEnabled || this.hidden) void this.suspendContext();
     }
+    this.onStateChange();
   }
+
+  private onContextStateChange = (): void => {
+    if (this.disposed) return;
+    this.synchronizeContext();
+    if (this.ready()) this.settleActivations(true);
+  };
 
   private fail(message: string, error: unknown): void {
     this.userEnabled = false;
     this.revision++;
     this.silence();
+    this.settleActivations(false);
     this.onError(`${message} ${error instanceof Error ? error.message : ''}`.trim());
+    this.onStateChange();
   }
 
   private createGraph(): void {
@@ -226,6 +298,7 @@ export class RitualAudio {
     this.rain = ctx.createGain();
     this.rain.gain.value = 0;
     this.rainFilter.connect(this.rain).connect(this.ambience);
+    ctx.addEventListener('statechange', this.onContextStateChange);
   }
 
   private prepareSpatial(): boolean {
@@ -448,11 +521,44 @@ export class RitualAudio {
     this.updateTexturedContact(parameters, sound);
   }
 
+  setBackground(background: boolean): void {
+    if (this.disposed || this.background === background) return;
+    this.background = background;
+    // Returning foreground leaves the deadline intact until a fresh contact sample arrives.
+    if (background && this.ready() && this.contact && this.context
+      && (this.contactDeadline === null || this.contactDeadline > this.context.currentTime)) {
+      this.contactDeadline = this.context.currentTime + 0.3;
+      for (const voice of this.loops) {
+        if (voice.kind !== 'rain' && !voice.releasing) this.renewContactGate(voice);
+      }
+    }
+  }
+
+  private renewContactGate(voice: LoopVoice): void {
+    if (!this.context || !this.background && voice.contactDeadline === undefined) return;
+    const now = this.context.currentTime;
+    const gain = voice.gate.gain;
+    if (typeof gain.cancelAndHoldAtTime === 'function') gain.cancelAndHoldAtTime(now);
+    else {
+      const current = gain.value;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(current, now);
+    }
+    gain.linearRampToValueAtTime(1, now + 0.004);
+    if (this.background) {
+      gain.setValueAtTime(1, now + 0.28);
+      gain.linearRampToValueAtTime(0, now + 0.3);
+      gain.setValueAtTime(0, now + 0.3);
+      voice.contactDeadline = now + 0.3;
+    } else delete voice.contactDeadline;
+  }
+
   private updateTexturedContact(parameters: ReturnType<typeof contactTextureParameters>, profile: WritingSoundId): void {
     const ctx = this.context;
     if (!ctx) return;
     const layers = parameters.gain > 0 ? this.prepareTexturedLayers(profile) : this.texturedLayers;
     if (!layers) return;
+    this.contactDeadline = parameters.gain > 0 && this.background ? ctx.currentTime + 0.3 : null;
     for (const kind of ['body', 'grain'] as const) {
       const layer = layers[kind];
       const gain = parameters.gain * (kind === 'body' ? parameters.bodyMix : parameters.grainMix);
@@ -464,6 +570,7 @@ export class RitualAudio {
         target(layer.lowpass.frequency, Math.min(ctx.sampleRate * 0.45,
           kind === 'body' ? parameters.bodyLowpass : parameters.grainLowpass), ctx.currentTime, 0.035);
         if (!layer.voice) layer.voice = this.startLoop(kind, layer.buffer, layer.input);
+        this.renewContactGate(layer.voice);
       }
     }
   }
@@ -478,11 +585,13 @@ export class RitualAudio {
     }
     for (const voice of this.loops) if (voice.kind !== 'rain') this.stopLoop(voice);
     this.contact = false;
+    this.contactDeadline = null;
     this.writingTarget = 0;
   }
 
   private silence(): void {
     this.contact = false;
+    this.contactDeadline = null;
     this.writingTarget = 0;
     this.rainTarget = 0;
     const now = this.context?.currentTime ?? 0;
@@ -609,9 +718,13 @@ export class RitualAudio {
   }
 
   get diagnostics(): Record<string, unknown> {
+    const expired = this.contactDeadline !== null && (this.context?.currentTime ?? 0) >= this.contactDeadline;
     return {
       contextState: this.context?.state ?? 'not-created', enabled: this.userEnabled,
-      contact: this.contact, writingGain: this.writingTarget, weather: this.settings.weather,
+      autoplayAttempted: this.autoplayAttempted, browserBlocked: this.browserBlocked,
+      activationPending: this.activationWaiters.size > 0,
+      background: this.background, contactDeadline: this.contactDeadline,
+      contact: this.contact && !expired, writingGain: expired ? 0 : this.writingTarget, weather: this.settings.weather,
       writingSound: this.settings.writingSound,
       spatialSound: this.settings.spatialSound, spatialActive: this.spatialEnabled && this.ready(),
       spatialUnavailable: this.spatialUnavailable,
@@ -636,6 +749,8 @@ export class RitualAudio {
     this.disposed = true;
     this.userEnabled = false;
     this.revision++;
+    this.context?.removeEventListener('statechange', this.onContextStateChange);
+    this.settleActivations(false);
     this.silence();
     this.contactBuffers.clear();
     if (this.texturedLayers) {

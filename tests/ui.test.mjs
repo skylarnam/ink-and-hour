@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { renderUI } from '../src/ui.ts';
 import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, writingSoundDescriptor } from '../src/writing-sounds.ts';
 import { READINGS } from '../src/readings.ts';
+import { soundPresentation } from '../src/sound-startup.ts';
 
 test('the footer no longer duplicates the completed scene caption or retired gallery', () => {
   const html = renderUI();
@@ -57,12 +58,12 @@ test('the sound panel offers only the four approved sounds and describes Texture
   assert.ok(panel.includes('Your choice is saved'));
 });
 
-test('initial sound UI says ready, not playing, before the browser has a user gesture', () => {
+test('initial sound UI offers the browser-permission fallback without falsely claiming playback', () => {
   const html = renderUI();
   assert.ok(html.includes('data-sound-state="ready"'));
-  assert.ok(html.includes('Sound ready'));
+  assert.ok(html.includes(soundPresentation(true, false).label));
   assert.equal(html.includes('Sound is on'), false);
-  assert.ok(html.includes('Your browser waits for a first click, tap, or keypress'));
+  assert.ok(html.includes(soundPresentation(true, false).note));
 });
 
 test('spatial sound has a separately labeled opt-in choice without adding pen textures', () => {
@@ -81,7 +82,7 @@ test('Quiet view has an accessible entry and a hidden compact writing, mute and 
   assert.match(html, /id="quiet-toolbar"[^>]+role="group"[^>]+aria-label="Quiet view controls"[^>]+hidden/);
   for (const id of ['quiet-play', 'quiet-sound', 'exit-quiet-view']) assert.ok(html.includes(`id="${id}"`));
   assert.ok(html.includes('Press Escape or Show controls'));
-  assert.match(html, /id="quiet-sound"[^>]+aria-label="Sound ready\./);
+  assert.ok(html.includes(`aria-label="${soundPresentation(true, false).label}.`));
 });
 
 test('all 34 approved handwriting choices expose their source licenses and the inferred-order limitation', () => {

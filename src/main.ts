@@ -3,6 +3,8 @@ import { RitualAudio } from './audio.ts';
 import { createSoundStartup, soundPresentation } from './sound-startup.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { createQuietView } from './quiet-view.ts';
+import { createPlaybackClock } from './playback-clock.ts';
+import type { PlaybackFrame } from './playback-clock.ts';
 import { PageHistory } from './page-history.ts';
 import { READINGS } from './readings.ts';
 import { DeskScene } from './scene.ts';
@@ -35,7 +37,7 @@ function notify(message: string): void {
 }
 
 let settings = loadSettings(notify);
-const audio = new RitualAudio(notify);
+const audio = new RitualAudio(notify, () => { if (!disposed) updateAudioButtons(); });
 audio.configure(settings);
 const recordedMusic = new RecordedMusic(LOFI_TRACKS, settings.lofiTrack, {
   connect: (media) => audio.connectRecording(media),
@@ -72,7 +74,7 @@ let disposed = false;
 let lastTimestamp = 0;
 let lastInkTimestamp: number | undefined;
 let elapsed = 0;
-let animationId = 0;
+let playbackFailed = false;
 let disposeMotionPreference = (): void => {};
 
 function letteringOptions(next = settings): LayoutOptions {
@@ -172,28 +174,31 @@ function updateMusicUI(): void {
   const state = recordedMusic.state;
   const synth = settings.musicTrack === 'felt' || settings.musicTrack === 'glass';
   const requested = musicRequested();
+  const blocked = !synth && state.blocked;
   const title = synth ? settings.musicTrack === 'felt' ? 'Felt notes' : 'Glass garden' : state.track.title;
   const detail = !requested ? synth ? 'Original soundscape / paused' : `${state.track.artist} / paused`
     : !audio.enabled ? 'Paused with sound'
     : settings.musicVolume === 0 || settings.masterVolume === 0 ? 'Music volume is zero'
-    : audio.diagnostics.contextState !== 'running' ? 'Ready for your first interaction'
+    : audio.diagnostics.contextState !== 'running' ? 'Waiting for audio to start'
+    : blocked ? 'Click Play music to allow playback'
     : state.loading && !synth ? 'Loading record...'
-    : document.hidden ? 'Paused in the background'
+    : document.hidden && (synth || state.playing) ? 'Playing in the background'
     : synth ? 'Original soundscape' : state.track.artist;
   element<HTMLElement>('#music-title').textContent = title;
   element<HTMLElement>('#music-detail').textContent = detail;
   element<HTMLButtonElement>('#music-credits').title = `${title} / ${detail}. Music details and credits.`;
   const button = element<HTMLButtonElement>('#music-play');
-  const label = requested ? 'Pause music' : 'Play music';
-  button.innerHTML = icon(requested ? 'pause' : 'play');
+  const canPause = requested && !blocked;
+  const label = canPause ? 'Pause music' : 'Play music';
+  button.innerHTML = icon(canPause ? 'pause' : 'play');
   button.setAttribute('aria-label', label);
-  button.setAttribute('aria-pressed', String(requested));
+  button.setAttribute('aria-pressed', String(canPause));
   button.title = label;
 }
 
 function syncMusicAvailability(): void {
   recordedMusic.setAvailable(settings.musicTrack === 'lofi' && audio.enabled
-    && audio.diagnostics.contextState === 'running' && !document.hidden
+    && audio.diagnostics.contextState === 'running'
     && settings.masterVolume > 0 && settings.musicVolume > 0);
   updateMusicUI();
 }
@@ -206,6 +211,12 @@ async function startRecordedMusic(): Promise<void> {
 }
 
 async function toggleMusic(): Promise<void> {
+  if (settings.musicTrack === 'lofi' && recordedMusic.state.blocked) {
+    recordedMusic.retryBlocked();
+    await audio.enable();
+    if (!disposed) updateAudioButtons();
+    return;
+  }
   if (musicRequested()) {
     if (settings.musicTrack === 'lofi') recordedMusic.pause();
     else audio.pauseMusic();
@@ -248,7 +259,7 @@ function updateAudioButtons(): void {
 async function toggleSound(): Promise<void> {
   const buttons = ['#enable-sound', '#panel-enable-sound', '#quiet-sound'].map((selector) => element<HTMLButtonElement>(selector));
   buttons.forEach((button) => { button.disabled = true; });
-  if (audio.enabled) {
+  if (audio.enabled && audio.diagnostics.contextState === 'running') {
     recordedMusic.setAvailable(false);
     await audio.disable();
   }
@@ -336,7 +347,7 @@ function validateDraft(): void {
   element<HTMLElement>('#character-count').textContent = `${textarea.value.length.toLocaleString()} characters`;
   element<HTMLElement>('#character-count').title = `Up to ${MAX_CHARACTERS.toLocaleString()} characters and ${MAX_PAGES} physical pages.`;
   if (randomWriting) syncReadingPreview();
-  beginButton.disabled = !scene || !layout.ok;
+  beginButton.disabled = !scene || !layout.ok || playbackFailed;
   element<HTMLButtonElement>('#quiet-play').disabled = beginButton.disabled;
   syncPageControls();
 }
@@ -350,7 +361,7 @@ function syncWriting(): void {
   const earlier = viewingEarlierPage();
   const turning = engine?.turnProgress != null;
   const letteringLocked = active || loadingPage || earlier;
-  beginButton.disabled = !scene || loadingPage || (!active && !paused && !layout.ok);
+  beginButton.disabled = !scene || playbackFailed || loadingPage || (!active && !paused && !layout.ok);
   const buttonIcon = active ? 'pause' : complete ? 'reset' : 'play';
   const label = active ? 'Pause for a moment' : paused ? 'Resume writing' : complete ? 'Write it again' : 'Begin writing';
   beginButton.innerHTML = `${icon(buttonIcon)}<span>${label}</span>${icon('arrow', 'begin-arrow')}`;
@@ -515,7 +526,7 @@ beginButton.addEventListener('click', async () => {
   if (engine?.status === 'paused' && viewingEarlierPage()) {
     const resumingBook = engine;
     await showPage(resumingBook.activePageIndex);
-    if (disposed || document.hidden || engine !== resumingBook || loadingPage || viewingEarlierPage()) return;
+    if (disposed || engine !== resumingBook || loadingPage || viewingEarlierPage()) return;
   }
   if (engine?.status === 'writing') {
     engine.pause();
@@ -699,6 +710,7 @@ const soundStartup = createSoundStartup(document, {
   running: () => audio.diagnostics.contextState === 'running',
   musicRequested,
   enable: () => audio.enable(),
+  onGesture: () => recordedMusic.retryBlocked(),
   onSettled: updateAudioButtons,
 });
 element<HTMLButtonElement>('#dismiss-notice').addEventListener('click', () => { element<HTMLDivElement>('#notice').hidden = true; });
@@ -715,10 +727,7 @@ element<HTMLButtonElement>('#reading-credits').addEventListener('click', () => {
 element<HTMLButtonElement>('#close-about').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
 function visibilityChanged(): void {
-  if (document.hidden) recordedMusic.setAvailable(false);
-  if (document.hidden && engine?.status === 'writing') { engine.pause(); syncWriting(); }
-  lastTimestamp = 0;
-  void audio.setHidden(document.hidden).then(() => { if (!disposed) updateAudioButtons(); });
+  updateAudioButtons();
 }
 document.addEventListener('visibilitychange', visibilityChanged);
 element<HTMLCanvasElement>('#desk-canvas').addEventListener('webglcontextlost', (event) => {
@@ -733,11 +742,18 @@ element<HTMLCanvasElement>('#desk-canvas').addEventListener('keydown', (event) =
   else if (scene?.adjustCamera(event.key, event.shiftKey)) event.preventDefault();
 });
 
-function frame(timestamp: number): void {
+function frame(timestamp: number, clock: PlaybackFrame): void {
   if (disposed) return;
+  if (clock.stalled && engine?.status === 'writing') {
+    engine.pause();
+    audio.updateContact(currentPen());
+    syncWriting();
+    notify('Your browser slowed the background writing clock, so the pen paused safely. Music and ambience can keep playing.');
+  }
+  audio.setBackground(clock.background);
   const delta = lastTimestamp ? Math.min(0.06, (timestamp - lastTimestamp) / 1000) : 0;
   lastTimestamp = timestamp;
-  if (!document.hidden && scene) {
+  if (scene) {
     elapsed += delta;
     // Ink still dries while the tab is hidden; age old marks before adding a new frame.
     paper.flush(lastInkTimestamp === undefined ? 0 : Math.max(0, (timestamp - lastInkTimestamp) / 1000));
@@ -765,19 +781,29 @@ function frame(timestamp: number): void {
       ? { ...result.pen, status: 'idle', contact: false, pressure: 0, speed: 0, lift: 0.42 } : result.pen;
     scene.updatePen(shownPen, delta);
     audio.updateContact(shownPen);
-    scene.update(delta, elapsed);
+    scene.update(delta, elapsed, !clock.background);
     audio.updateSpatial(scene.soundPlacement);
     if (result.pen.status !== lastStatus || result.pageChanged || wasTurning !== (engine?.turnProgress != null)) syncWriting();
   }
-  animationId = requestAnimationFrame(frame);
 }
 
+const playbackClock = createPlaybackClock({
+  document, onFrame: frame,
+  onError(error) {
+    playbackFailed = true;
+    engine?.pause();
+    audio.updateContact(currentPen());
+    syncWriting();
+    notify(`The writing clock stopped. Reload to restore it. ${error instanceof Error ? error.message : ''}`);
+  },
+});
 if (settings.musicTrack === 'lofi') recordedMusic.play();
 syncSettings();
 validateDraft();
 syncWriting();
 updateAudioButtons();
-animationId = requestAnimationFrame(frame);
+void audio.tryAutoplay();
+playbackClock.start();
 
 if (import.meta.env.DEV) {
   Object.defineProperty(window, '__inkAndHour', {
@@ -807,7 +833,7 @@ function dispose(): void {
   if (disposed) return;
   disposed = true;
   pageRevision++;
-  cancelAnimationFrame(animationId);
+  playbackClock.dispose();
   clearTimeout(noticeTimer);
   soundStartup.dispose();
   quietView.dispose();

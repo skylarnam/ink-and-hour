@@ -42,9 +42,9 @@ function setup(t, overrides = {}) {
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 test('ready, running and muted are distinct; ready never falsely claims sound is on', () => {
-  assert.equal(soundPresentation(true, false).label, 'Sound ready');
-  assert.match(soundPresentation(true, false).note, /first click, tap, or keypress/);
-  assert.match(soundPresentation(true, false).action, /muted before it starts/);
+  assert.equal(soundPresentation(true, false).label, 'Start sound');
+  assert.match(soundPresentation(true, false).note, /blocks automatic playback/);
+  assert.equal(soundPresentation(true, false).action, 'Start sound');
   assert.equal(soundPresentation(true, true).label, 'Sound is on');
   assert.equal(soundPresentation(false, true).label, 'Enable sound');
   assert.equal(soundPresentation(false, false).state, 'muted');
@@ -159,4 +159,104 @@ test('a failed start settles its status and permits an explicit retry', async (t
   await settle();
   assert.equal(starts, 2);
   assert.equal(state.settled, 2);
+});
+
+test('eligible gestures can retry media while the AudioContext is already running', (t) => {
+  let gestures = 0;
+  const { document, state } = setup(t, { onGesture: () => gestures++ });
+  state.running = true;
+  document.send('click', { target: new FakeElement('tab-room') });
+  assert.equal(gestures, 1, 'media retry runs synchronously in the trusted event turn');
+  document.send('keydown', { key: 'a' });
+  assert.equal(gestures, 2);
+  assert.equal(state.starts, 0);
+  document.send('click', { isTrusted: false });
+  document.send('keydown', { key: 'Shift' });
+  assert.equal(gestures, 2);
+});
+
+test('all parent-owned sound and music transports bypass automatic audio and media retry handlers', (t) => {
+  let gestures = 0;
+  const { document, state } = setup(t, { onGesture: () => gestures++ });
+  for (const requested of [false, true]) {
+    state.requested = requested;
+    for (const id of ['enable-sound', 'panel-enable-sound', 'quiet-sound', 'music-play', 'music-previous', 'music-next']) {
+      document.send('click', { target: new FakeElement(id) });
+      document.send('keydown', { key: 'Enter', target: new FakeElement(id) });
+    }
+  }
+  assert.equal(gestures, 0);
+  assert.equal(state.starts, 0);
+  state.enabled = false;
+  document.send('click');
+  assert.equal(gestures, 0);
+});
+
+test('running background sound permits fresh material cues, but never muted or disposed cues', (t) => {
+  let cues = 0;
+  const { document, state, afterActivation, dispose } = setup(t);
+  state.running = true;
+  document.hidden = true;
+  afterActivation(() => cues++);
+  assert.equal(cues, 1);
+  state.enabled = false;
+  afterActivation(() => cues++);
+  assert.equal(cues, 1);
+  state.enabled = true;
+  dispose();
+  afterActivation(() => cues++);
+  assert.equal(cues, 1);
+});
+
+test('a queued startup cue cannot survive a hide/show cycle while new running background cues remain valid', async (t) => {
+  let finish;
+  let cues = 0;
+  const { document, state, afterActivation } = setup(t, {
+    enable: () => new Promise((resolve) => { finish = resolve; }),
+  });
+  document.send('pointerup', { target: new FakeElement('desk-canvas') });
+  afterActivation(() => cues++);
+  document.hidden = true;
+  document.send('visibilitychange');
+  document.hidden = false;
+  document.send('visibilitychange');
+  state.running = true;
+  finish(true);
+  await settle();
+  assert.equal(cues, 0);
+  document.hidden = true;
+  afterActivation(() => cues++);
+  assert.equal(cues, 1);
+});
+
+test('an old activation result does not replay a stale material cue', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 10000 });
+  let finish;
+  let cues = 0;
+  const { document, state, afterActivation } = setup(t, {
+    enable: () => new Promise((resolve) => { finish = resolve; }),
+  });
+  document.send('pointerup', { target: new FakeElement('desk-canvas') });
+  afterActivation(() => cues++);
+  t.mock.timers.tick(1001);
+  state.running = true;
+  finish(true);
+  await settle();
+  assert.equal(cues, 0);
+});
+
+test('a rejected activation clears the gesture gate without an unhandled rejection or stale cue', async (t) => {
+  let attempts = 0;
+  let cues = 0;
+  const { document, state, afterActivation } = setup(t, {
+    enable: () => { attempts++; return Promise.reject(new Error('Unexpected activation failure')); },
+  });
+  document.send('pointerup', { target: new FakeElement('desk-canvas') });
+  afterActivation(() => cues++);
+  await settle();
+  document.send('click');
+  await settle();
+  assert.equal(attempts, 2);
+  assert.equal(state.settled, 2);
+  assert.equal(cues, 0);
 });

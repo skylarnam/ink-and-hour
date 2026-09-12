@@ -5,9 +5,9 @@ export function soundPresentation(enabled: boolean, running: boolean) {
     note: 'Sound is muted. Turn it on whenever you like.',
   };
   if (!running) return {
-    state: 'ready', label: 'Sound ready', action: 'Keep sound muted before it starts',
-    panelLabel: 'Sound ready - tap to keep muted',
-    note: 'Your browser waits for a first click, tap, or keypress. Sound then starts automatically.',
+    state: 'ready', label: 'Start sound', action: 'Start sound',
+    panelLabel: 'Start sound - your browser may need a tap',
+    note: 'Sound is requested. If your browser blocks automatic playback, click, tap, or type to start it.',
   };
   return {
     state: 'running', label: 'Sound is on', action: 'Mute sound',
@@ -22,6 +22,7 @@ interface SoundStartupOptions {
   musicRequested: () => boolean;
   enable: () => Promise<boolean>;
   onSettled: () => void;
+  onGesture?: () => void;
 }
 
 export function createSoundStartup(document: Document, options: SoundStartupOptions): {
@@ -30,38 +31,51 @@ export function createSoundStartup(document: Document, options: SoundStartupOpti
 } {
   let pending: Promise<boolean> | null = null;
   let disposed = false;
+  let cueRevision = 0;
   const activate = (event: Event): void => {
-    if (!event.isTrusted || document.hidden || disposed || pending || !options.enabled() || options.running()) return;
+    if (!event.isTrusted || document.hidden || disposed || !options.enabled()) return;
     if (event.type === 'pointerup' && !(event.target instanceof Element && event.target.closest('#desk-canvas'))) return;
     if (event.target instanceof Element
-      && (event.target.closest('#enable-sound, #panel-enable-sound, #quiet-sound')
-        || event.target.closest('#music-play') && options.musicRequested())) return;
+      && event.target.closest('#enable-sound, #panel-enable-sound, #quiet-sound, #music-play, #music-previous, #music-next')) return;
     if (event.type === 'keydown' && 'key' in event && typeof event.key === 'string'
       && ['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
+    options.onGesture?.();
+    if (pending || options.running()) return;
+    cueRevision++;
     pending = options.enable();
-    void pending.finally(() => {
+    const settled = (): void => {
       pending = null;
       if (!disposed) options.onSettled();
-    });
+    };
+    void pending.then(settled, settled);
   };
+  const onVisibility = (): void => { if (document.hidden) cueRevision++; };
   // A touch pointerdown is not an audio-unlocking gesture in every browser; its click is.
   document.addEventListener('click', activate, { capture: true });
   // Desk materials react on pointerup, before the later click arrives.
   document.addEventListener('pointerup', activate, { capture: true });
   document.addEventListener('keydown', activate, { capture: true });
+  document.addEventListener('visibilitychange', onVisibility, { capture: true });
   return {
     afterActivation(action) {
-      if (disposed || document.hidden || !options.enabled()) return;
+      if (disposed || !options.enabled()) return;
       if (options.running()) action();
-      else if (pending) void pending.then((enabled) => {
-        if (enabled && !disposed && !document.hidden && options.enabled() && options.running()) action();
-      });
+      else if (pending && !document.hidden) {
+        const revision = cueRevision;
+        const requestedAt = Date.now();
+        void pending.then((enabled) => {
+          if (enabled && revision === cueRevision && Date.now() - requestedAt < 1000
+            && !disposed && !document.hidden && options.enabled() && options.running()) action();
+        }, () => {});
+      }
     },
     dispose() {
       disposed = true;
+      cueRevision++;
       document.removeEventListener('click', activate, { capture: true });
       document.removeEventListener('pointerup', activate, { capture: true });
       document.removeEventListener('keydown', activate, { capture: true });
+      document.removeEventListener('visibilitychange', onVisibility, { capture: true });
     },
   };
 }

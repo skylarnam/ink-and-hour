@@ -6,6 +6,8 @@ import { DEFAULT_SETTINGS as APP_DEFAULTS } from '../src/settings.ts';
 import { layoutText, WritingEngine } from '../src/writing/index.ts';
 import { PAGE } from '../src/types.ts';
 import { WRITING_SOUND_IDS } from '../src/writing-sounds.ts';
+import { createSoundStartup } from '../src/sound-startup.ts';
+import { RecordedMusic } from '../src/recorded-music.ts';
 
 const DEFAULT_SETTINGS = APP_DEFAULTS;
 const TEXTURED_SETTINGS = { ...APP_DEFAULTS, writingSound: 'textured', ambienceVolume: 0, musicVolume: 0, musicTrack: 'off' };
@@ -87,8 +89,9 @@ class FakeSource extends FakeNode {
   }
 }
 
-class FakeContext {
+class FakeContext extends EventTarget {
   static instances = [];
+  static onCreate = null;
   state = 'suspended';
   currentTime = 1;
   sampleRate = 8000;
@@ -100,7 +103,24 @@ class FakeContext {
   filters = [];
   resumeGate = null;
   failResume = false;
-  constructor() { FakeContext.instances.push(this); }
+  resumeError = null;
+  resumeCalls = 0;
+  suspendCalls = 0;
+  stateListeners = new Set();
+  constructor() { super(); FakeContext.instances.push(this); FakeContext.onCreate?.(this); }
+  addEventListener(type, listener, options) {
+    if (type === 'statechange') this.stateListeners.add(listener);
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener(type, listener, options) {
+    if (type === 'statechange') this.stateListeners.delete(listener);
+    super.removeEventListener(type, listener, options);
+  }
+  setState(state) {
+    if (this.state === state) return;
+    this.state = state;
+    this.dispatchEvent(new Event('statechange'));
+  }
   createGain() {
     const gain = Object.assign(new FakeNode(), { gain: new FakeParam() });
     this.gains.push(gain);
@@ -131,12 +151,14 @@ class FakeContext {
     return source;
   }
   async resume() {
+    this.resumeCalls++;
     if (this.resumeGate) await this.resumeGate;
+    if (this.resumeError) throw this.resumeError;
     if (this.failResume) throw new Error('Audio device unavailable');
-    if (this.state !== 'closed') this.state = 'running';
+    if (this.state !== 'closed') this.setState('running');
   }
-  async suspend() { if (this.state !== 'closed') this.state = 'suspended'; }
-  async close() { this.state = 'closed'; }
+  async suspend() { this.suspendCalls++; if (this.state !== 'closed') this.setState('suspended'); }
+  async close() { this.setState('closed'); }
   advance(seconds) {
     this.currentTime += seconds;
     for (const source of this.sources) {
@@ -145,17 +167,19 @@ class FakeContext {
   }
 }
 
-async function withAudio(run, settings = DEFAULT_SETTINGS) {
+async function withAudio(run, settings = DEFAULT_SETTINGS, onStateChange = () => {}) {
   const priorWindow = globalThis.window;
   globalThis.window = { AudioContext: FakeContext };
   FakeContext.instances.length = 0;
+  FakeContext.onCreate = null;
   const errors = [];
-  const audio = new RitualAudio((message) => errors.push(message));
+  const audio = new RitualAudio((message) => errors.push(message), onStateChange);
   try {
     audio.configure(settings);
     await run(audio, errors);
   } finally {
     audio.dispose();
+    FakeContext.onCreate = null;
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;
   }
@@ -1218,4 +1242,443 @@ test('spatial fades work without cancelAndHoldAtTime and disposal disconnects th
       assert.equal(route.wet.gain.events.length, gainCounts[ctx.gains.indexOf(route.wet)]);
     }
   }, { ...TEXTURED_SETTINGS, spatialSound: 'gentle' });
+});
+
+const flushAudio = () => new Promise((resolve) => setImmediate(resolve));
+
+test('autoplay immediately creates one real graph and starts allowed ambience and synth without a gesture', async () => {
+  await withAudio(async (audio, errors) => {
+    assert.equal(FakeContext.instances.length, 0);
+    const starting = audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    assert.ok(ctx, 'the initial attempt must not wait for an interaction');
+    assert.equal(ctx.resumeCalls, 1, 'native resume must run in the calling turn');
+    assert.equal(await starting, true);
+    assert.equal(audio.diagnostics.weatherSources, 1);
+    assert.equal(audio.diagnostics.musicTimerActive, true);
+    assert.equal(audio.diagnostics.contactSources, 0);
+    assert.equal(audio.diagnostics.browserBlocked, false);
+    assert.equal(audio.diagnostics.activationPending, false);
+    assert.equal(await audio.tryAutoplay(), true);
+    assert.equal(ctx.resumeCalls, 1);
+    assert.deepEqual(errors, []);
+  }, { ...DEFAULT_SETTINGS, musicTrack: 'felt' });
+});
+
+test('a context which is already running at creation starts its mixer without unnecessary native retries', async () => {
+  await withAudio(async (audio) => {
+    FakeContext.onCreate = (ctx) => { ctx.state = 'running'; };
+    assert.equal(await audio.tryAutoplay(), true);
+    const ctx = FakeContext.instances[0];
+    assert.equal(ctx.resumeCalls, 0);
+    assert.equal(audio.diagnostics.weatherSources, 1);
+    assert.equal(audio.master.gain.value, DEFAULT_SETTINGS.masterVolume);
+  });
+});
+
+test('NotAllowedError is browser-gated sound intent, not mute or a reported device failure', async () => {
+  await withAudio(async (audio, errors) => {
+    FakeContext.onCreate = (ctx) => { ctx.resumeError = new DOMException('User activation required', 'NotAllowedError'); };
+    assert.equal(await audio.tryAutoplay(), false);
+    const ctx = FakeContext.instances[0];
+    assert.equal(audio.enabled, true);
+    assert.equal(audio.diagnostics.browserBlocked, true);
+    assert.equal(audio.diagnostics.activationPending, false);
+    assert.equal(audio.master.gain.value, 0);
+    assert.equal(ctx.sources.length, 0);
+    for (let step = 0; step < 20; step++) await audio.tryAutoplay();
+    assert.equal(ctx.resumeCalls, 1, 'blocked autoplay is not a retry loop');
+    await audio.tryAutoplay(true);
+    assert.equal(ctx.resumeCalls, 2, 'an explicit autoplay retry may request once more');
+    ctx.resumeError = null;
+    const enabling = audio.enable();
+    assert.equal(ctx.resumeCalls, 3, 'trusted enable must call native resume before yielding');
+    assert.equal(await enabling, true);
+    assert.equal(audio.diagnostics.browserBlocked, false);
+    assert.deepEqual(errors, []);
+  });
+});
+
+test('a never-settling autoplay request has bounded UI pending state and cannot occupy a later trusted retry', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await withAudio(async (audio, errors) => {
+    let release;
+    FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise((resolve) => { release = resolve; }); };
+    const autoplay = audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    assert.equal(audio.diagnostics.activationPending, true);
+    t.mock.timers.tick(800);
+    assert.equal(await autoplay, false);
+    assert.equal(audio.enabled, true);
+    assert.equal(audio.diagnostics.browserBlocked, true);
+    assert.equal(audio.diagnostics.activationPending, false);
+    ctx.resumeGate = null;
+    const trusted = audio.enable();
+    assert.equal(ctx.resumeCalls, 2);
+    assert.equal(await trusted, true);
+    release();
+    await flushAudio();
+    assert.equal(FakeContext.instances.length, 1);
+    assert.equal(audio.diagnostics.weatherSources, 1);
+    assert.deepEqual(errors, []);
+  });
+});
+
+test('a trusted resume which remains pending also settles false without discarding enabled intent', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await withAudio(async (audio) => {
+    FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise(() => {}); };
+    const first = audio.enable();
+    t.mock.timers.tick(800);
+    assert.equal(await first, false);
+    assert.equal(audio.enabled, true);
+    assert.equal(audio.diagnostics.activationPending, false);
+    const ctx = FakeContext.instances[0];
+    ctx.resumeGate = null;
+    const retry = audio.enable();
+    assert.equal(ctx.resumeCalls, 2);
+    assert.equal(await retry, true);
+  }, TEXTURED_SETTINGS);
+});
+
+test('mute and disposal immediately settle pending startup and cannot be undone by its late native resume', async () => {
+  for (const action of ['mute', 'dispose']) {
+    let notifications = 0;
+    await withAudio(async (audio, errors) => {
+      let release;
+      FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise((resolve) => { release = resolve; }); };
+      const autoplay = audio.tryAutoplay();
+      const ctx = FakeContext.instances[0];
+      if (action === 'mute') await audio.disable();
+      else audio.dispose();
+      const count = notifications;
+      assert.equal(await autoplay, false);
+      assert.equal(audio.diagnostics.activationPending, false);
+      release();
+      await flushAudio();
+      assert.equal(audio.enabled, false);
+      assert.equal(ctx.state, action === 'mute' ? 'suspended' : 'closed');
+      assert.equal(ctx.sources.length, 0);
+      assert.equal(audio.master.gain.value, 0);
+      if (action === 'dispose') {
+        assert.equal(ctx.stateListeners.size, 0);
+        assert.equal(notifications, count, 'disposed native promises cannot update the UI');
+      }
+      assert.deepEqual(errors, []);
+    }, DEFAULT_SETTINGS, () => notifications++);
+  }
+});
+
+test('a trusted activation does not wait behind pending autoplay, and its success survives an obsolete rejection', async () => {
+  await withAudio(async (audio, errors) => {
+    let reject;
+    FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise((_, failure) => { reject = failure; }); };
+    const first = audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    ctx.resumeGate = null;
+    const retry = audio.enable();
+    assert.equal(ctx.resumeCalls, 2, 'the second native resume happens before the first promise settles');
+    assert.equal(await retry, true);
+    reject(new Error('Obsolete attempt failed'));
+    await first;
+    await flushAudio();
+    assert.equal(audio.enabled, true);
+    assert.equal(ctx.state, 'running');
+    assert.deepEqual(errors, []);
+  });
+});
+
+test('native state changes notify availability, clear stalled contact, and resume only intended ambient music', async () => {
+  const states = [];
+  let instance;
+  await withAudio(async (audio) => {
+    instance = audio;
+    await audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    assert.equal(ctx.stateListeners.size, 1);
+    audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+    ctx.setState('suspended');
+    assert.equal(audio.enabled, true);
+    assert.equal(audio.diagnostics.contactSources, 0);
+    assert.equal(audio.diagnostics.continuousSources, 0);
+    ctx.setState('running');
+    assert.equal(audio.diagnostics.weatherSources, 1);
+    assert.equal(audio.diagnostics.musicTimerActive, true);
+    assert.equal(audio.diagnostics.contactSources, 0, 'native resume must not replay old contact');
+    assert.ok(states.includes('suspended') && states.includes('running'));
+    await audio.disable();
+    ctx.setState('running');
+    assert.equal(ctx.state, 'suspended');
+    assert.equal(audio.diagnostics.continuousSources, 0);
+    audio.dispose();
+    const notifications = states.length;
+    ctx.dispatchEvent(new Event('statechange'));
+    assert.equal(states.length, notifications);
+    assert.equal(ctx.stateListeners.size, 0);
+  }, { ...DEFAULT_SETTINGS, musicTrack: 'felt' }, () => { if (instance) states.push(instance.diagnostics.contextState); });
+});
+
+test('native running state can settle a resume whose promise is still pending, without retrying it', async () => {
+  await withAudio(async (audio) => {
+    FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise(() => {}); };
+    const pending = audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    ctx.setState('running');
+    assert.equal(await pending, true);
+    assert.equal(audio.diagnostics.activationPending, false);
+    assert.equal(ctx.resumeCalls, 1);
+    assert.equal(audio.diagnostics.weatherSources, 1);
+  });
+});
+
+test('autoplay respects explicit mute, paused music and every saved zero bus', async () => {
+  await withAudio(async (audio) => {
+    await audio.disable();
+    assert.equal(await audio.tryAutoplay(), false);
+    assert.equal(await audio.tryAutoplay(true), false);
+    assert.equal(FakeContext.instances.length, 0);
+  });
+  for (const settings of [
+    { ...DEFAULT_SETTINGS, masterVolume: 0, musicTrack: 'felt' },
+    { ...DEFAULT_SETTINGS, writingVolume: 0, ambienceVolume: 0, musicVolume: 0, musicTrack: 'glass' },
+  ]) {
+    await withAudio(async (audio) => {
+      await audio.tryAutoplay();
+      assert.equal(FakeContext.instances[0].sources.length, 0);
+      assert.equal(audio.diagnostics.musicTimerActive, false);
+    }, settings);
+  }
+  await withAudio(async (audio) => {
+    audio.pauseMusic();
+    await audio.tryAutoplay();
+    assert.equal(audio.diagnostics.musicPaused, true);
+    assert.equal(audio.diagnostics.musicTimerActive, false);
+  }, { ...DEFAULT_SETTINGS, musicTrack: 'felt' });
+});
+
+test('real automatic startup errors remain explicit and can be retried after device recovery', async () => {
+  await withAudio(async (audio, errors) => {
+    FakeContext.onCreate = (ctx) => { ctx.failResume = true; };
+    assert.equal(await audio.tryAutoplay(), false);
+    assert.match(errors[0], /Audio device unavailable/);
+    assert.equal(audio.enabled, false);
+    FakeContext.instances[0].failResume = false;
+    assert.equal(await audio.enable(), true);
+    assert.equal(FakeContext.instances.length, 1);
+  });
+});
+
+test('background contact uses renewable native gate deadlines without changing timbres or churning sources', async () => {
+  for (const writingSound of WRITING_SOUND_IDS) {
+    await withAudio(async (audio) => {
+      await audio.enable();
+      const ctx = FakeContext.instances[0];
+      const sample = { contact: true, speed: 132, pressure: 0.7 };
+      audio.updateContact(sample);
+      const voices = Object.values(audio.texturedLayers).map((layer) => layer.voice);
+      const sources = voices.map((voice) => voice.source);
+      const foregroundGates = voices.map((voice) => voice.gate.gain.events.length);
+      for (let frame = 0; frame < 10; frame++) audio.updateContact(sample);
+      assert.deepEqual(voices.map((voice) => voice.gate.gain.events.length), foregroundGates, 'foreground gates are untouched');
+      const layerGains = Object.values(audio.texturedLayers).map((layer) => layer.gain.gain.value);
+      audio.setBackground(true);
+      for (let frame = 0; frame < 20; frame++) {
+        ctx.advance(1 / 30);
+        audio.updateContact(sample);
+        const deadline = ctx.currentTime + 0.3;
+        assert.equal(audio.diagnostics.contactDeadline, deadline);
+        for (const voice of voices) {
+          const events = voice.gate.gain.events;
+          assert.deepEqual(events.at(-3), ['set', 1, ctx.currentTime + 0.28]);
+          assert.deepEqual(events.at(-2), ['linear', 0, deadline]);
+          assert.deepEqual(events.at(-1), ['set', 0, deadline]);
+          assert.equal(voice.source.stopTime, Infinity, 'the watchdog fades native gain, not per-frame source restarts');
+          assert.equal(voice.source.playbackRate.value, 1);
+        }
+      }
+      assert.deepEqual(Object.values(audio.texturedLayers).map((layer) => layer.voice.source), sources);
+      assert.deepEqual(Object.values(audio.texturedLayers).map((layer) => layer.gain.gain.value), layerGains);
+      const eventsBeforeStall = voices.map((voice) => voice.gate.gain.events.length);
+      ctx.advance(0.31);
+      assert.equal(audio.diagnostics.writingGain, 0);
+      assert.equal(audio.diagnostics.contact, false);
+      assert.deepEqual(voices.map((voice) => voice.gate.gain.events.length), eventsBeforeStall, 'expiry requires no JS callback');
+      audio.setBackground(false);
+      audio.setBackground(true);
+      audio.setBackground(false);
+      assert.deepEqual(voices.map((voice) => voice.gate.gain.events.length), eventsBeforeStall, 'visibility alone cannot reopen an expired gate');
+      audio.updateContact(sample);
+      assert.equal(audio.diagnostics.contactDeadline, null);
+      assert.ok(audio.diagnostics.writingGain > 0);
+      for (const voice of voices) {
+        assert.equal(voice.contactDeadline, undefined);
+        assert.deepEqual(voice.gate.gain.events.at(-1), ['linear', 1, ctx.currentTime + 0.004]);
+      }
+      assert.equal(ctx.sources.length, 2);
+    }, { ...TEXTURED_SETTINGS, writingSound, spatialSound: 'gentle' });
+  }
+});
+
+test('background lifts retain seven millisecond silence and twelve millisecond source stops', async () => {
+  await withAudio(async (audio) => {
+    audio.setBackground(true);
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+    const voices = Object.values(audio.texturedLayers).map((layer) => layer.voice);
+    audio.updateContact({ contact: false, speed: 0, pressure: 0 });
+    for (const voice of voices) {
+      assert.deepEqual(voice.gate.gain.events.at(-1).slice(0, 2), ['set', 0]);
+      assert.ok(voice.gate.gain.events.at(-1)[2] - ctx.currentTime <= 0.0071);
+      assert.ok(Math.abs(voice.source.stopTime - ctx.currentTime - 0.012) < 1e-12);
+    }
+    assert.equal(audio.diagnostics.contactDeadline, null);
+    ctx.advance(0.03);
+    assert.equal(audio.diagnostics.continuousSources, 0);
+  }, TEXTURED_SETTINGS);
+});
+
+test('background policy keeps weather, music and material cues alive without arming their gains', async () => {
+  await withAudio(async (audio) => {
+    await audio.enable();
+    const ctx = FakeContext.instances[0];
+    const rain = audio.rainVoice;
+    const rainEvents = rain.gate.gain.events.length;
+    const musicTimer = audio.musicTimer;
+    audio.setBackground(true);
+    audio.cue('paper');
+    audio.thunder();
+    assert.equal(audio.diagnostics.activeCues, 2);
+    assert.equal(audio.diagnostics.musicTimerActive, true);
+    assert.equal(audio.musicTimer, musicTimer);
+    assert.equal(audio.rainVoice, rain);
+    assert.equal(rain.contactDeadline, undefined);
+    assert.equal(rain.gate.gain.events.length, rainEvents);
+    assert.equal(audio.diagnostics.contactDeadline, null);
+    assert.equal(ctx.suspendCalls, 0);
+    assert.equal(ctx.state, 'running');
+  }, { ...DEFAULT_SETTINGS, weather: 'storm', musicTrack: 'felt' });
+});
+
+test('background watchdogs cannot resurrect muted, paused, zero-bus or disposed contact', async () => {
+  for (const action of ['mute', 'lift', 'master-zero', 'writing-zero', 'dispose']) {
+    await withAudio(async (audio) => {
+      await audio.enable();
+      const ctx = FakeContext.instances[0];
+      audio.setBackground(true);
+      audio.updateContact({ contact: true, speed: 132, pressure: 0.7 });
+      if (action === 'mute') await audio.disable();
+      else if (action === 'lift') audio.updateContact({ contact: false, speed: 0, pressure: 0 });
+      else if (action === 'dispose') audio.dispose();
+      else audio.configure({ ...TEXTURED_SETTINGS, [action === 'master-zero' ? 'masterVolume' : 'writingVolume']: 0 });
+      ctx.advance(1);
+      const count = ctx.sources.length;
+      audio.setBackground(false);
+      audio.setBackground(true);
+      audio.updateContact(action === 'lift' ? { contact: false, speed: 0, pressure: 0 } : { contact: true, speed: 132, pressure: 0.7 });
+      assert.equal(audio.diagnostics.writingGain, 0);
+      assert.equal(audio.diagnostics.contactDeadline, null);
+      assert.equal(audio.diagnostics.continuousSources, 0);
+      assert.equal(ctx.sources.length, count);
+    }, TEXTURED_SETTINGS);
+  }
+});
+
+test('pending autoplay does not occupy the first trusted desk release or lose its material cue', async () => {
+  await withAudio(async (audio) => {
+    let release;
+    FakeContext.onCreate = (ctx) => { ctx.resumeGate = new Promise((resolve) => { release = resolve; }); };
+    const autoplay = audio.tryAutoplay();
+    const ctx = FakeContext.instances[0];
+    const previousElement = globalThis.Element;
+    class DeskElement {
+      closest(selector) { return selector === '#desk-canvas' ? this : null; }
+    }
+    globalThis.Element = DeskElement;
+    const listeners = new Map();
+    const document = { hidden: false,
+      addEventListener: (type, callback) => listeners.set(type, callback),
+      removeEventListener: (type) => listeners.delete(type) };
+    const startup = createSoundStartup(document, {
+      enabled: () => audio.enabled, running: () => ctx.state === 'running', musicRequested: () => false,
+      enable: () => audio.enable(), onSettled: () => {},
+    });
+    try {
+      ctx.resumeGate = null;
+      listeners.get('pointerup')({ type: 'pointerup', target: new DeskElement(), isTrusted: true });
+      assert.equal(ctx.resumeCalls, 2);
+      startup.afterActivation(() => audio.cue('paper'));
+      await flushAudio();
+      assert.equal(audio.diagnostics.activeCues, 1);
+      release();
+      await autoplay;
+      assert.equal(audio.diagnostics.activeCues, 1, 'the older autoplay completion cannot repeat the cue');
+    } finally {
+      startup.dispose();
+      assert.equal(listeners.size, 0);
+      if (previousElement === undefined) delete globalThis.Element;
+      else globalThis.Element = previousElement;
+    }
+  }, TEXTURED_SETTINGS);
+});
+
+test('media-only autoplay blocking leaves room audio running and retries through an ordinary trusted gesture', async () => {
+  let player;
+  let instance;
+  await withAudio(async (audio, errors) => {
+    instance = audio;
+    let permitted = false;
+    let plays = 0;
+    const media = Object.assign(new EventTarget(), {
+      currentTime: 0, paused: true,
+      load() {},
+      removeAttribute() {},
+      pause() { this.paused = true; },
+      play() {
+        plays++;
+        this.paused = !permitted;
+        return permitted ? Promise.resolve() : Promise.reject(new DOMException('Media needs its own gesture', 'NotAllowedError'));
+      },
+    });
+    player = new RecordedMusic([{ id: 'one', title: 'One', artist: 'Test', file: '/one.mp3', source: '', license: '' }], 'one', {
+      connect: (element) => audio.connectRecording(element), createMedia: () => media,
+      onChange: () => {}, onEnded: () => {}, onError: (error) => errors.push(error),
+    });
+    const previousElement = globalThis.Element;
+    class RoomElement { closest() { return null; } }
+    globalThis.Element = RoomElement;
+    const listeners = new Map();
+    const document = { hidden: false,
+      addEventListener: (type, callback) => listeners.set(type, callback),
+      removeEventListener: (type) => listeners.delete(type) };
+    const startup = createSoundStartup(document, {
+      enabled: () => audio.enabled, running: () => audio.diagnostics.contextState === 'running',
+      musicRequested: () => player.state.requested, enable: () => audio.enable(), onSettled: () => {},
+      onGesture: () => player.retryBlocked(),
+    });
+    try {
+      player.play();
+      assert.equal(await audio.tryAutoplay(), true);
+      await flushAudio();
+      assert.equal(audio.enabled, true);
+      assert.equal(audio.diagnostics.browserBlocked, false);
+      assert.equal(audio.diagnostics.weatherSources, 1);
+      assert.equal(player.state.blocked, true);
+      assert.equal(player.state.requested, true);
+      assert.equal(plays, 1);
+      permitted = true;
+      listeners.get('click')({ type: 'click', isTrusted: true, target: new RoomElement() });
+      assert.equal(plays, 2, 'retry must happen before the trusted handler returns');
+      await flushAudio();
+      assert.equal(player.state.playing, true);
+      assert.equal(player.state.blocked, false);
+      assert.equal(FakeContext.instances[0].resumeCalls, 1, 'media blocking must not restart the running AudioContext');
+      assert.deepEqual(errors, []);
+    } finally {
+      startup.dispose();
+      player.dispose();
+      if (previousElement === undefined) delete globalThis.Element;
+      else globalThis.Element = previousElement;
+    }
+  }, DEFAULT_SETTINGS, () => player?.setAvailable(Boolean(instance?.enabled && instance.diagnostics.contextState === 'running')));
 });

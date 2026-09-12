@@ -30,8 +30,9 @@ npm run preview
 The runtime requires WebGL 2 and a modern browser. Everything is bundled locally;
 there is no backend, account, analytics, paid key, runtime CDN, or remote asset
 request. Preferences are stored in validated, versioned local storage. Sound
-defaults to on for each visit, but browser autoplay rules are honored: the
-AudioContext starts with the first click, tap, or meaningful keypress.
+defaults to on for each visit and attempts playback on load. Browser autoplay
+rules still apply: if playback is blocked, Start sound or an ordinary eligible
+interaction retries it. The app does not deliberately wait for that interaction.
 
 ## Hosting
 
@@ -81,7 +82,7 @@ it in a terminal separates its lifetime from the agent's completed work.
   and Shelley. Titles and authors are written too. Readings are shuffled
   without immediate repeats at a cycle boundary and share a sheet when there
   is room; a work ending does not force a page turn. This mode continues beyond
-  page ten until you pause, switch modes, or leave the tab. Only the latest
+  page ten until you pause, switch modes, or close the page. Only the latest
   ten physical pages, including the current one, stay available for browsing
   and individual export. Unshaped text is bounded and only one active page
   layout/engine is retained, so the transcript does not grow indefinitely.
@@ -148,19 +149,21 @@ it in a terminal separates its lifetime from the agent's completed work.
   Storms have isolated, gentle light pulses with delayed thunder, not repeated
   rapid flashes. The coffee cup has a joined, open-D ceramic handle and sits
   behind the paper, clear of both roll states. Books angle away from the roll.
-- Sound is armed by default, with **Sound ready** shown until the browser allows
-  playback. An ordinary click, tap, or typing key starts it; opening the Sound
-  tab is not required. Touch activation uses release/click gestures rather than
-  an early pointerdown. A first tap on a desk material waits for the context to
-  be ready before its cue. Click **Sound ready** to keep it muted before starting,
-  or **Sound is on** to mute afterward. A chosen mute remains in force for the current visit.
+- Sound attempts to start automatically on load. If browser policy blocks it,
+  **Start sound** or an ordinary click, tap, or typing key retries playback;
+  opening the Sound tab is not required. The blocked state is not a user mute.
+  Touch activation uses release/click gestures rather than an early pointerdown.
+  A first tap on a desk material waits for the context to be ready before its cue.
+  **Sound is on** mutes playback; a chosen mute remains in force for the visit.
   Writing/materials, ambience, music, and overall volume have independent controls.
   Fresh settings use **70% overall, 30% Pen & materials, 20% Outside the window,
-  and 20% Background music**. **Lo-fi** is selected by default and starts with
-  that first interaction, never before it. The mini-player immediately left of the sound switch offers previous,
+  and 20% Background music**. **Lo-fi** is selected by default and also attempts
+  playback automatically. If media autoplay is separately blocked, Play music
+  or another eligible interaction retries without losing the selected track.
+  The mini-player immediately left of the sound switch offers previous,
   play/pause, and next for three real **CC0 lo-fi recordings**. Click its title
   for artist/source/license credits. The selected track persists; a new visit
-  with lo-fi selected queues it behind the first-interaction sound gate.
+  with lo-fi selected requests playback as soon as the audio context is available.
   Tracks load only when needed and advance
   when they end. **Felt notes** and **Glass garden** remain optional original
   synthesized beds, with the same play/pause control; skipping selects a lo-fi record.
@@ -178,11 +181,15 @@ it in a terminal separates its lifetime from the agent's completed work.
   add pitch effects, or attenuate volume with distance. Returning to Off restores
   the normal centered sound.
   The ambience slider controls rain and thunder together. Recordings share
-  the music/master mixer and pause when muted, hidden, or set to zero volume.
+  the music/master mixer and pause when explicitly paused, muted, or set to zero volume.
   No remote music API, streaming account, key, or runtime third-party request
   is needed. The audio assets have separate licensing in the notices below.
-- Leaving the tab pauses writing, silences friction, and suspends audio. On
-  return, audio can resume if previously enabled, but writing waits for Resume.
+- Switching tabs does not mute music or ambience. Writing uses a bounded
+  background clock without rendering WebGL frames. If the browser stalls that
+  clock, the pen pauses instead of leaving a stale friction loop sounding;
+  music and weather can keep playing. Browser/OS background restrictions,
+  especially on mobile, cannot be overridden by the site. Explicit Pause,
+  mute, and Music Off remain authoritative.
   Reduced-motion preferences remove storm flashes and floating dust, freeze
   cloud/leaf motion, and make camera/case/cap/pen-return transitions immediate.
 
@@ -311,9 +318,10 @@ AudioContext has writing, ambience, and music buses behind a bounded
 master/compressor. Mixer mutes reach exact zero within 21 ms, not an asymptotic
 noise floor. Clear weather or zero ambience volume stops the rain source;
 changing away from storm also stops a pending thunder voice. Zero music volume
-or Music Off stops the music timer and releases its voices. Enable, mute, and
-tab-visibility transitions are serialized so a delayed resume cannot override
-a newer mute request.
+or Music Off stops the music timer and releases its voices. Autoplay, gesture
+retries and explicit mute preserve current intent, so a delayed resume cannot
+override a newer mute request. Hidden-tab contact has a native gain-expiry
+watchdog; browser timer suspension cannot leave a stale pen hiss.
 The recording transport separately invalidates stale play promises, pauses its
 single reusable media element when unavailable, and routes through the same
 music bus at a restrained pre-gain. Loading failures are visible, not silent

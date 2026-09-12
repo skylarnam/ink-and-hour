@@ -25,6 +25,7 @@ export class RecordedMusic {
   private available = false;
   private playing = false;
   private loading = false;
+  private blocked = false;
   private pending: number | null = null;
   private revision = 0;
   private disposed = false;
@@ -43,7 +44,7 @@ export class RecordedMusic {
   get state() {
     return {
       track: { ...this.track }, requested: this.requested, available: this.available,
-      playing: this.playing, loading: this.loading, error: this.error,
+      playing: this.playing, loading: this.loading, blocked: this.blocked, error: this.error,
       position: this.media?.currentTime ?? 0,
     };
   }
@@ -59,6 +60,7 @@ export class RecordedMusic {
     this.index = index;
     this.loadedId = null;
     this.error = null;
+    this.blocked = false;
     if (this.media) {
       this.media.removeAttribute('src');
       this.media.load();
@@ -69,14 +71,20 @@ export class RecordedMusic {
   play(): void {
     if (this.disposed) return;
     this.requested = true;
+    this.blocked = false;
     this.error = null;
     this.reconcile();
   }
 
   pause(): void {
     this.requested = false;
+    this.blocked = false;
     this.stopMedia();
     this.emit();
+  }
+
+  retryBlocked(): void {
+    if (!this.disposed && this.blocked && this.requested && this.available) this.play();
   }
 
   setAvailable(available: boolean): void {
@@ -111,6 +119,7 @@ export class RecordedMusic {
       this.emit();
       return;
     }
+    if (this.blocked) { this.emit(); return; }
     if (this.playing || this.pending !== null) return;
     const revision = ++this.revision;
     this.pending = revision;
@@ -127,7 +136,7 @@ export class RecordedMusic {
       void media.play().then(() => {
         // A replaced request must not pause a newer track or revive a later user pause.
         if (revision !== this.revision) {
-          if (!this.requested || !this.available) media.pause();
+          if (!this.requested || !this.available || this.blocked || this.disposed) media.pause();
           return;
         }
         this.pending = null;
@@ -136,10 +145,10 @@ export class RecordedMusic {
         this.clearLoadTimeout();
         this.emit();
       }, (error: unknown) => {
-        if (revision === this.revision) this.fail(error);
+        if (revision === this.revision) this.playFailed(error);
       });
     } catch (error) {
-      this.fail(error);
+      this.playFailed(error);
     }
   }
 
@@ -152,8 +161,18 @@ export class RecordedMusic {
     this.media?.pause();
   }
 
+  private playFailed(error: unknown): void {
+    if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'NotAllowedError') {
+      this.stopMedia();
+      this.blocked = true;
+      this.error = null;
+      this.emit();
+    } else this.fail(error);
+  }
+
   private fail(error: unknown): void {
     this.requested = false;
+    this.blocked = false;
     this.loadedId = null;
     this.stopMedia();
     this.error = error instanceof Error ? error.message : 'The recording could not be played.';
@@ -176,7 +195,7 @@ export class RecordedMusic {
   }
 
   private onPlaying = (): void => {
-    if (!this.requested || !this.available || this.disposed) {
+    if (!this.requested || !this.available || this.blocked || this.disposed) {
       this.media?.pause();
       return;
     }
@@ -187,7 +206,7 @@ export class RecordedMusic {
   };
 
   private onWaiting = (): void => {
-    if (!this.requested || !this.available || this.disposed) return;
+    if (!this.requested || !this.available || this.blocked || this.disposed) return;
     this.playing = false;
     this.loading = true;
     this.startLoadTimeout();
@@ -201,7 +220,7 @@ export class RecordedMusic {
   };
 
   private onEnded = (): void => {
-    if (this.requested && this.available && !this.disposed && this.media?.ended) this.options.onEnded();
+    if (this.requested && this.available && !this.blocked && !this.disposed && this.media?.ended) this.options.onEnded();
   };
 
   private onMediaError = (): void => {
@@ -216,6 +235,7 @@ export class RecordedMusic {
     if (this.disposed) return;
     this.disposed = true;
     this.requested = false;
+    this.blocked = false;
     this.available = false;
     this.stopMedia();
     if (!this.media) return;

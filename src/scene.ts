@@ -746,7 +746,7 @@ export class DeskScene {
     }
   }
 
-  update(delta: number, elapsed: number): void {
+  update(delta: number, elapsed: number, render = true): void {
     this.lastTime = elapsed;
     const factor = this.reducedMotion ? 1 : 1 - Math.exp(-delta * 6);
     this.rollAmount = THREE.MathUtils.lerp(this.rollAmount, this.rollOpen ? 1 : 0, factor);
@@ -780,7 +780,7 @@ export class DeskScene {
       this.dust.position.y = Math.sin(elapsed * 0.08) * 0.08;
       this.dust.rotation.y = Math.sin(elapsed * 0.025) * 0.025;
     }
-    this.renderer.render(this.scene, this.camera);
+    if (render) this.renderer.render(this.scene, this.camera);
   }
 
   get diagnostics(): Record<string, unknown> {
