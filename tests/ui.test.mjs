@@ -5,6 +5,7 @@ import { HANDWRITING_STYLES } from '../src/handwriting.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { renderUI } from '../src/ui.ts';
 import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, writingSoundDescriptor } from '../src/writing-sounds.ts';
+import { READINGS } from '../src/readings.ts';
 
 test('the footer no longer duplicates the completed scene caption or retired gallery', () => {
   const html = renderUI();
@@ -117,6 +118,22 @@ test('multi-page writing exposes capacity, accessible page navigation and a clea
   assert.ok(html.includes('Start over'));
   assert.equal(html.includes('Long notes wrap within one finite sheet'), false);
   assert.equal(html.includes('maxlength="420"'), false);
+});
+
+test('continuous reading has an explicit action and complete linked source attribution', () => {
+  const html = renderUI();
+  assert.ok(html.includes('id="random-writing"'));
+  assert.ok(html.includes('Write something random'));
+  assert.match(html, /id="reading-status"[^>]+hidden/);
+  assert.ok(html.includes('id="reading-credits"'));
+  assert.ok(html.includes('id="reading-attribution"'));
+  assert.ok(html.includes('Only the latest ten pages'));
+  for (const reading of READINGS) {
+    assert.ok(html.includes(`href="${reading.source}"`));
+    assert.ok(html.includes(reading.title));
+    assert.ok(html.includes(reading.author));
+  }
+  assert.ok(html.includes('href="/texts/CREDITS.md"'));
 });
 
 test('retired design pages and preview assets are removed, while shared editor fonts remain', () => {

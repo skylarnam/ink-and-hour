@@ -76,6 +76,24 @@ it in a terminal separates its lifetime from the agent's completed work.
   are retained as compressed, in-memory snapshots, not ten live canvases.
   Page history is cleared by Start over, editing a completed manuscript, or
   leaving the visit. Export pages individually if you want to keep them.
+- **Write something random** starts continuous writing from 12 bundled
+  public-domain poems and sonnets by Shakespeare, Blake, Wordsworth, Keats,
+  and Shelley. Titles and authors are written too. Readings are shuffled
+  without immediate repeats at a cycle boundary and share a sheet when there
+  is room; a work ending does not force a page turn. This mode continues beyond
+  page ten until you pause, switch modes, or leave the tab. Only the latest
+  ten physical pages, including the current one, stay available for browsing
+  and individual export. Unshaped text is bounded and only one active page
+  layout/engine is retained, so the transcript does not grow indefinitely.
+  While paused, handwriting/size/alignment still reflow only the unwritten
+  words. **New reading** resets to fresh pages and waits for Begin; **Use my
+  words** stops automatic writing and restores your typed draft. Switching
+  modes clears the old rendered pages, not that held draft. Automatic mode
+  and words are not saved between visits. **Sources & credits** lists the
+  original editions, publication dates, and public-domain evidence, also
+  bundled in `public/texts/CREDITS.md`. There is no runtime text API or network
+  retrieval, and source spellings are preserved with documented ASCII
+  punctuation normalization.
 - The editor starts at a compact 18px for Correspondence, with calibrated
   sizes for the other faces. Pinch over the textbox with a trackpad or two
   fingers, or use **A- / A+**, to resize **both the editor and actual paper
@@ -305,8 +323,10 @@ fallbacks; playback intent is not stored.
 
 - English ASCII letters, digits, spaces, newlines, and standard punctuation
   only. Unsupported characters get a visible error; they are never discarded.
-  There is a 20,000-character safety ceiling and a ten-page physical capacity
-  limit. Words and long unbroken text wrap without dropping characters. The
+  Typed manuscripts have a 20,000-character safety ceiling and a ten-page
+  physical capacity limit. Continuous readings keep only their latest ten
+  pages and use a bounded 20,000-character working buffer rather than a total
+  transcript limit. Words and long unbroken text wrap without dropping characters. The
   page animation is a lightweight slide/dissolve, not a physically simulated
   curled sheet. PNG export is per page, not a combined PDF.
 - These are 34 user-selected styles, not arbitrary font imports. Correspondence

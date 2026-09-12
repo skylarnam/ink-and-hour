@@ -126,9 +126,13 @@ legend span { float: right; font-size: 9px; letter-spacing: 0; color: #888675; t
 .tactile-actions { display: flex; justify-content: space-between; border-top: 1px solid #e6e2d7; padding-top: 13px; }
 .tactile-actions button { display: flex; gap: 6px; padding: 0; align-items: center; font-size: 9px; color: #76755e; }
 .tactile-actions .icon { width: 15px; height: 15px; }
-.writing-editor { flex-shrink: 0; padding: 18px 25px 12px; background: #f1eee4; border-top: 1px solid #e1ddcf; }
+.writing-editor { flex-shrink: 0; max-height: calc(100% - 95px); overflow-y: auto; padding: 18px 25px 12px; background: #f1eee4; border-top: 1px solid #e1ddcf; }
 .editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .editor-heading h2 { font: normal 17px var(--serif); margin: 0; letter-spacing: -0.3px; }
+.random-writing { display: flex; align-items: center; gap: 7px; min-height: 32px; margin: -4px 0 10px; padding: 4px 0; color: #556548; font-size: 10px; }
+.random-writing .icon { width: 14px; height: 14px; }
+.reading-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; color: #777d69; font-size: 9px; line-height: 1.5; }
+.reading-status button { padding: 0; font-size: inherit; text-decoration: underline; text-underline-offset: 3px; color: #556548; }
 .tiny-nib { color: #9c906d; }
 .tiny-nib .icon { width: 15px; height: 15px; }
 .lettering-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; }
@@ -229,6 +233,8 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .camera-hint { display: none; }
 }
 @media (max-width: 720px) {
+  .random-writing { min-height: 44px; font-size: 12px; }
+  .reading-status { font-size: 10px; }
   .page-controls button { min-width: 44px; min-height: 44px; }
   .quiet-view-button { top: 16px; right: 16px; min-height: 44px; }
   .site-header { height: auto; min-height: 123px; padding: 12px 20px; gap: 10px; flex-wrap: wrap; }
@@ -258,7 +264,7 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .panel-tabs { padding: 0 25px; height: 52px; order: 1; top: 0; border-top: 1px solid var(--line); }
   .panel-tabs button { font-size: 12px; min-height: 44px; }
   .settings-content { order: 2; padding: 24px; flex: none; overflow: visible; }
-  .writing-editor { order: 0; padding: 23px 24px 15px; border-top: 0; }
+  .writing-editor { order: 0; max-height: none; overflow: visible; padding: 23px 24px 15px; border-top: 0; }
   .writing-editor h2 { font-size: 20px; }
   .lettering-alignment .choice { min-height: 40px; padding: 8px 12px; }
   .editor-zoom button { min-width: 40px; min-height: 40px; }

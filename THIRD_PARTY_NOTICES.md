@@ -1,5 +1,19 @@
 # Third-party notices
 
+## Classical reading collection: public domain
+
+`src/readings.ts` bundles 12 original English poems and sonnets by William
+Shakespeare, William Blake, William Wordsworth, John Keats, and Percy Bysshe
+Shelley. The originals were published in 1609-1824 and the authors died in
+1616-1850. Only public-domain poem text is reproduced, not modern commentary,
+translations, website wrappers, or scanned media.
+
+Transcriptions are credited to Wikisource contributors and follow identified
+historical editions. Detailed publication/death evidence, source URLs, reuse
+terms and ASCII-normalization notes accompany the distribution in
+[public/texts/CREDITS.md](public/texts/CREDITS.md). This text collection has no
+runtime text-service dependency and is separate from font and music rights.
+
 ## Stroke lettering: public domain
 
 The bundled file `src/writing/fonts.json` contains the `scripts` ("Script

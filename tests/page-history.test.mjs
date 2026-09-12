@@ -44,3 +44,17 @@ test('invalid page counts and indexes are explicit failures', () => {
   for (const index of [-1, 0.5, NaN, Infinity]) assert.throws(() => history.set(index, snapshot(0)), RangeError);
   assert.equal(history.size, 0);
 });
+
+test('continuous history makes room for the current page and keeps its readable text', () => {
+  const history = new PageHistory();
+  for (let index = 0; index < 10; index++) history.set(index, { ...snapshot(index), text: `Words on page ${index}` });
+  history.trimBefore(1);
+  assert.equal(history.size, 9);
+  assert.equal(history.oldest, 1);
+  assert.equal(history.get(0), undefined);
+  history.set(10, { ...snapshot(10), text: 'Current reading' });
+  assert.equal(history.size, 10);
+  assert.equal(history.get(10).text, 'Current reading');
+  for (const invalid of [-1, NaN, 0.5]) assert.throws(() => history.trimBefore(invalid), RangeError);
+  assert.equal(history.size, 10);
+});

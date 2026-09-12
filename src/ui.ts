@@ -2,6 +2,7 @@ import { LOFI_TRACKS } from './music-library.ts';
 import { HANDWRITING_STYLES } from './handwriting.ts';
 import { soundPresentation } from './sound-startup.ts';
 import { DEFAULT_WRITING_SOUND, WRITING_SOUNDS, writingSoundDescriptor } from './writing-sounds.ts';
+import { READINGS } from './readings.ts';
 
 export const icons = {
   nib: '<path d="m12 2-7 13 7 7 7-7-7-13Z"/><path d="M12 3v11"/><circle cx="12" cy="15" r="1.7"/>',
@@ -28,6 +29,7 @@ export const icons = {
   roll: '<path d="M4 5h15v14H4M4 5c-4 0-4 14 0 14s4-14 0-14Zm7 0v14m3-9 4 4m-4 0 4-4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
   quiet: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
+  shuffle: '<path d="M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4M3 18h3c2 0 3-2 4-4m4-4c1-2 2-4 4-4h3m-4-4 4 4-4 4"/>',
 };
 
 export function icon(name: keyof typeof icons, className = ''): string {
@@ -148,6 +150,8 @@ export function renderUI(): string {
         </div>
         <section class="writing-editor" aria-labelledby="editor-heading">
           <div class="editor-heading"><h2 id="editor-heading">What will you leave here?</h2></div>
+          <button type="button" id="random-writing" class="random-writing">${icon('shuffle')}<span>Write something random</span></button>
+          <div id="reading-status" class="reading-status" hidden><span>Public-domain poetry / continues until paused</span><button type="button" id="reading-credits">Sources &amp; credits</button></div>
           <div class="lettering-controls">
             <div class="choices lettering-alignment" role="group" aria-label="Lettering alignment">
               ${choice('textAlignment', 'left', `${icon('alignLeft')}Left`)}
@@ -209,6 +213,12 @@ Stay a little while.</textarea>
         <p>Three locally bundled lo-fi recordings, shared by their creators under CC0. No streaming account or outside playback service. Lo-fi is on by default and starts with your first interaction. Use the mini-player to pause, or choose Off in Sound.</p>
         <ul class="music-attribution">${LOFI_TRACKS.map((track) => `<li><a href="${track.source}" target="_blank" rel="noopener noreferrer">${track.title}</a><span>${track.artist} / <a href="${track.license}" target="_blank" rel="noopener noreferrer">CC0 1.0</a></span></li>`).join('')}</ul>
         <p class="small-note"><a href="/audio/lofi/CREDITS.txt" target="_blank" rel="noopener">Recording sources and credits</a>. Felt notes and Glass garden are the original synthesized soundscapes.</p>
+      </section>
+      <section id="reading-attribution" aria-labelledby="reading-attribution-title">
+        <h3 id="reading-attribution-title">Words from another time.</h3>
+        <p>Write something random draws from ${READINGS.length} locally bundled public-domain poems and sonnets. Titles and authors are included in the writing. It fills each sheet, turns the page, and continues until you pause. Only the latest ten pages are kept in this visit; your typed draft is held separately until you choose Use my words.</p>
+        <ul class="music-attribution">${READINGS.map((reading) => `<li><a href="${reading.source}" target="_blank" rel="noopener noreferrer">${reading.title}</a><span>${reading.author} / ${reading.year}</span></li>`).join('')}</ul>
+        <p class="small-note">Original wording with ASCII punctuation for the writing engine. <a href="/texts/CREDITS.md" target="_blank" rel="noopener">Source editions and public-domain notes</a>. No live text service, account, or generated attribution.</p>
       </section>
       <p class="small-note">Room geometry, textures and synthesized material/weather sounds are original. No account, analytics or runtime CDN.</p>
     </dialog>

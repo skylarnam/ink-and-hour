@@ -22,6 +22,21 @@ export interface BookLayout {
   characterCount: number;
 }
 
+export interface PageConsumption {
+  ok: boolean;
+  error: string | null;
+  page: BookPage | null;
+  remainder: string;
+  characterCount: number;
+  /** A physical boundary was reached, even if its newline consumed the last input character. */
+  full: boolean;
+}
+
+interface PaginationResult extends BookLayout {
+  remainder: string;
+  full: boolean;
+}
+
 interface Glyph {
   strokes: Point[][];
   advance: number;
@@ -90,11 +105,11 @@ function emptyLayout(message: string, characterCount: number): LayoutResult {
 // Single sheets and books share this forward-only layout pass, including continuation anchors.
 function paginate(
   input: string, options: LayoutTextOptions, maxPages: number,
-  multiple: boolean, continuation?: Continuation, allowBlank = false,
-): BookLayout {
+  multiple: boolean, continuation?: Continuation, allowBlank = false, firstOnly = false,
+): PaginationResult {
   const text = input.replace(/\r\n?/g, '\n');
-  const error = (message: string): BookLayout => ({
-    ok: false, error: message, pages: [], characterCount: text.length,
+  const error = (message: string): PaginationResult => ({
+    ok: false, error: message, pages: [], characterCount: text.length, remainder: text, full: false,
   });
   if (text.length > MAX_CHARACTERS) {
     return error(`This manuscript accepts up to ${MAX_CHARACTERS} characters. Your note has ${text.length}.`);
@@ -207,8 +222,16 @@ function paginate(
       layout: { ok: true, error: null, strokes, lineCount, characterCount: pageText.length, characters },
     });
   };
+  const pageEnd = (): PaginationResult => {
+    if (!firstOnly) return error(fullMessage);
+    finishPage();
+    return {
+      ok: true, error: null, pages, characterCount: text.length,
+      remainder: text.slice(characterIndex), full: true,
+    };
+  };
   const nextPage = (): boolean => {
-    if (!multiple || pages.length + 1 >= maxPages) return false;
+    if (firstOnly || !multiple || pages.length + 1 >= maxPages) return false;
     finishPage();
     strokes = [];
     characters = [];
@@ -236,14 +259,14 @@ function paginate(
   for (const token of text.slice(characterIndex).match(/\n| +|[^ \n]+/g) ?? []) {
     if (token === '\n') {
       characterIndex++;
-      if (!newline()) return error(fullMessage);
+      if (!newline()) return pageEnd();
       continue;
     }
     if (token[0] === ' ') {
       for (let index = 0; index < token.length; index++) {
         characterIndex++;
         if (x + font.space * scale > right) {
-          if (!newline()) return error(fullMessage);
+          if (!newline()) return pageEnd();
         } else {
           x += font.space * scale;
         }
@@ -252,20 +275,20 @@ function paginate(
     }
     // Let explicit newlines consume their break before moving a retained old-font line to a new page.
     if (lineTop < top || lineTop + fontHeight > bottom) {
-      if (!nextPage()) return error(fullMessage);
+      if (!nextPage()) return pageEnd();
     }
     if (protectPreviousInk) {
       x -= Math.min(0, glyph(token[0]).minX) * scale;
       protectPreviousInk = false;
     }
     if (x > originX && !wordFits(token, x) && wordFits(token, originX)) {
-      if (!newline()) return error(fullMessage);
+      if (!newline()) return pageEnd();
     }
     for (const character of token) {
       const letter = glyph(character);
       if (x + letter.maxX * scale > right) {
         if (x === originX) return error('This sheet is too narrow for the selected handwriting.');
-        if (!newline()) return error(fullMessage);
+        if (!newline()) return pageEnd();
         if (x + letter.maxX * scale > right) return error('This sheet is too narrow for the selected handwriting.');
       }
       const y = lineTop - font.minY * scale;
@@ -293,7 +316,7 @@ function paginate(
     }
   }
   finishPage();
-  return { ok: true, error: null, pages, characterCount: text.length };
+  return { ok: true, error: null, pages, characterCount: text.length, remainder: '', full: false };
 }
 
 export function layoutText(input: string, options: LayoutTextOptions, continuation?: Continuation): LayoutResult {
@@ -302,7 +325,14 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
 }
 
 export function layoutPages(input: string, options: LayoutOptions, maxPages = MAX_PAGES): BookLayout {
-  return paginate(input, options, maxPages, true);
+  const { ok, error, pages, characterCount } = paginate(input, options, maxPages, true);
+  return { ok, error, pages, characterCount };
+}
+
+/** Consume one sheet without shaping its suffix or applying the typed-manuscript page limit. */
+export function consumePage(input: string, options: LayoutOptions): PageConsumption {
+  const { ok, error, pages, remainder, characterCount, full } = paginate(input, options, 1, true, undefined, true, true);
+  return { ok, error, page: pages[0] ?? null, remainder, characterCount, full };
 }
 
 function retainedCharacters(previous: LayoutResult, startedStrokes: number): LayoutCharacter[] {
@@ -354,5 +384,18 @@ export function restyleRemainingPages(
   const result = paginate(input, options, maxPages, true,
     last ? { index: last.index + 1, cursor: last.after } : undefined, true);
   if (result.ok) result.pages[0].layout = appendRemaining(previous, retained, result.pages[0].layout);
-  return { ...result, fromStroke };
+  const { ok, error, pages, characterCount } = result;
+  return { ok, error, pages, characterCount, fromStroke };
+}
+
+export function restyleFirstPage(
+  input: string, previous: LayoutResult, options: LayoutOptions, startedStrokes: number,
+): PageConsumption & { fromStroke: number } {
+  const retained = retainedCharacters(previous, startedStrokes);
+  const last = retained.at(-1);
+  const fromStroke = last?.strokeEnd ?? 0;
+  const { ok, error, pages, remainder, characterCount, full } = paginate(input, options, 1, true,
+    last ? { index: last.index + 1, cursor: last.after } : undefined, true, true);
+  if (ok) pages[0].layout = appendRemaining(previous, retained, pages[0].layout);
+  return { ok, error, page: pages[0] ?? null, remainder, characterCount, full, fromStroke };
 }

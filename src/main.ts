@@ -4,6 +4,7 @@ import { createSoundStartup, soundPresentation } from './sound-startup.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { createQuietView } from './quiet-view.ts';
 import { PageHistory } from './page-history.ts';
+import { READINGS } from './readings.ts';
 import { DeskScene } from './scene.ts';
 import { inkColor, inkLabel, isInkColor } from './ink.ts';
 import { LOFI_TRACKS } from './music-library.ts';
@@ -15,7 +16,7 @@ import { icon, renderUI } from './ui.ts';
 import { writingSoundDescriptor } from './writing-sounds.ts';
 import { PAGE } from './types.ts';
 import type { CameraPreset, InteractionCue, LayoutOptions, PenSample, Settings, WritingStatus } from './types.ts';
-import { layoutPages, MAX_CHARACTERS, MAX_PAGES, WritingBook } from './writing/index.ts';
+import { createContinuousBook, layoutPages, MAX_CHARACTERS, MAX_PAGES, WritingBook } from './writing/index.ts';
 
 function element<T extends Element>(selector: string): T {
   const found = document.querySelector<T>(selector);
@@ -56,6 +57,8 @@ const paper = new PaperSurface();
 paper.setPaper(settings.paper);
 let layout = layoutPages(textarea.value, letteringOptions());
 let engine = layout.ok ? new WritingBook(layout, settings) : null;
+let randomWriting = false;
+let manualDraft = textarea.value;
 const pageHistory = new PageHistory(MAX_PAGES);
 let viewedPage = 0;
 let loadingPage = false;
@@ -99,15 +102,25 @@ function syncPageControls(): void {
   const count = status === 'idle' ? Math.max(1, layout.pages.length) : engine!.pageCount;
   const turning = engine?.turnProgress != null;
   const canBrowse = (status === 'paused' || status === 'complete') && !loadingPage && !turning;
-  element<HTMLElement>('#page-controls').hidden = count <= 1;
+  element<HTMLElement>('#page-controls').hidden = !randomWriting && count <= 1;
   element<HTMLElement>('#page-controls').setAttribute('aria-busy', String(loadingPage));
-  element<HTMLElement>('#page-position').textContent = `Page ${viewedPage + 1} of ${count}`;
+  element<HTMLElement>('#page-position').textContent = randomWriting
+    ? `Page ${viewedPage + 1} / continuous` : `Page ${viewedPage + 1} of ${count}`;
   element<HTMLButtonElement>('#previous-page').disabled = !canBrowse || !pageHistory.has(viewedPage - 1);
   element<HTMLButtonElement>('#next-page').disabled = !canBrowse || !engine
     || viewedPage >= engine.activePageIndex || !pageHistory.has(viewedPage + 1);
   const quietPage = element<HTMLElement>('#quiet-page');
-  quietPage.hidden = count <= 1;
-  quietPage.textContent = `${viewedPage + 1} / ${count}`;
+  quietPage.hidden = !randomWriting && count <= 1;
+  quietPage.textContent = randomWriting ? `Page ${viewedPage + 1}` : `${viewedPage + 1} / ${count}`;
+}
+
+function syncReadingPreview(): void {
+  if (!randomWriting || !engine) return;
+  const text = viewedPage === engine.activePageIndex
+    ? engine.activePage.text : pageHistory.get(viewedPage)?.text ?? engine.activePage.text;
+  if (textarea.value !== text) textarea.value = text;
+  element<HTMLElement>('#character-count').textContent = `${textarea.value.length.toLocaleString()} on this page`;
+  element<HTMLElement>('#character-count').title = 'Continuous public-domain writing. The latest ten pages stay available in this visit.';
 }
 
 async function showPage(index: number): Promise<void> {
@@ -116,7 +129,7 @@ async function showPage(index: number): Promise<void> {
     notify('Pause the pen after the page turn to look through the written pages.');
     return;
   }
-  if (viewedPage === engine.activePageIndex) pageHistory.set(viewedPage, paper.snapshot());
+  if (viewedPage === engine.activePageIndex) pageHistory.set(viewedPage, { ...paper.snapshot(), text: engine.activePage.text });
   const snapshot = pageHistory.get(index);
   if (!snapshot) { notify('That page has not been written yet.'); return; }
   const revision = ++pageRevision;
@@ -127,6 +140,7 @@ async function showPage(index: number): Promise<void> {
     if (!restored || disposed || revision !== pageRevision) return;
     viewedPage = index;
     scene?.setPaperFinish(snapshot.paper);
+    syncReadingPreview();
   } catch (error) {
     if (!disposed && revision === pageRevision) {
       notify(`The saved page could not be opened. ${error instanceof Error ? error.message : ''}`);
@@ -312,19 +326,23 @@ function updateSettings(next: unknown): void {
 }
 
 function validateDraft(): void {
-  layout = layoutPages(textarea.value, letteringOptions());
+  if (randomWriting && engine) {
+    layout = { ok: true, error: null, pages: [...engine.pages], characterCount: textarea.value.length };
+  } else layout = layoutPages(textarea.value, letteringOptions());
   const error = element<HTMLParagraphElement>('#input-error');
   error.textContent = layout.error;
   error.hidden = layout.ok;
   textarea.setAttribute('aria-invalid', String(!layout.ok));
   element<HTMLElement>('#character-count').textContent = `${textarea.value.length.toLocaleString()} characters`;
   element<HTMLElement>('#character-count').title = `Up to ${MAX_CHARACTERS.toLocaleString()} characters and ${MAX_PAGES} physical pages.`;
+  if (randomWriting) syncReadingPreview();
   beginButton.disabled = !scene || !layout.ok;
   element<HTMLButtonElement>('#quiet-play').disabled = beginButton.disabled;
   syncPageControls();
 }
 
 function syncWriting(): void {
+  syncReadingPreview();
   const status = engine?.status ?? 'idle';
   const active = status === 'writing';
   const paused = status === 'paused';
@@ -340,7 +358,22 @@ function syncWriting(): void {
   quietPlay.innerHTML = `${icon(buttonIcon)}<span>${active ? 'Pause' : paused ? 'Resume' : complete ? 'Replay' : 'Write'}</span>`;
   quietPlay.setAttribute('aria-label', label);
   quietPlay.disabled = beginButton.disabled;
-  textarea.readOnly = active || paused || loadingPage || earlier;
+  textarea.readOnly = randomWriting || active || paused || loadingPage || earlier;
+  textarea.placeholder = randomWriting ? 'Begin writing to choose a public-domain reading.' : '';
+  const randomButton = element<HTMLButtonElement>('#random-writing');
+  randomButton.disabled = !scene;
+  element<HTMLSpanElement>('#random-writing span').textContent = randomWriting ? 'Use my words' : 'Write something random';
+  randomButton.title = randomWriting ? 'Stop automatic writing and return to your typed draft'
+    : 'Start fresh pages of continuous public-domain poetry; your typed draft is kept';
+  element<HTMLElement>('#reading-status').hidden = !randomWriting;
+  element<HTMLElement>('#editor-heading').textContent = randomWriting ? 'Let the words find you.' : 'What will you leave here?';
+  element<HTMLElement>('#input-hint').textContent = randomWriting
+    ? 'Automatic writing / latest ten pages kept' : 'English letters & punctuation / up to 10 pages';
+  const resetButton = element<HTMLButtonElement>('#new-sheet');
+  element<HTMLSpanElement>('#new-sheet span').textContent = randomWriting ? 'New reading' : 'Start over';
+  resetButton.title = randomWriting ? 'Choose another reading; begin whenever you like'
+    : 'Start again with fresh pages and keep your words';
+  resetButton.setAttribute('aria-label', randomWriting ? 'Choose a new reading' : 'Start again with fresh pages');
   styleSelect.disabled = letteringLocked;
   editorZoom.setEnabled(!letteringLocked);
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting="textAlignment"]')) {
@@ -351,7 +384,7 @@ function syncWriting(): void {
   }
   element<HTMLInputElement>('#custom-ink-color').disabled = loadingPage || earlier;
   element<HTMLInputElement>('[data-range="speed"]').disabled = loadingPage || earlier;
-  element<HTMLButtonElement>('#export-sheet').hidden = loadingPage || (!complete && !earlier);
+  element<HTMLButtonElement>('#export-sheet').hidden = loadingPage || (!complete && !earlier && !(randomWriting && paused));
   element<HTMLElement>('#scene-status').textContent = earlier ? 'A page, kept.' : turning ? 'Making room for more words.'
     : active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
   element<HTMLElement>('#writing-note').textContent = earlier ? `Resume returns to page ${engine!.activePageIndex + 1}.`
@@ -362,7 +395,44 @@ function syncWriting(): void {
   lastStatus = status;
 }
 
+function prepareRandomWriting(start: boolean, sound = true): boolean {
+  let replacement: WritingBook;
+  try {
+    replacement = createContinuousBook(READINGS, letteringOptions(), settings, notify);
+  } catch (error) {
+    notify(`The reading could not start. ${error instanceof Error ? error.message : ''}`);
+    return false;
+  }
+  if (!randomWriting) manualDraft = textarea.value;
+  randomWriting = true;
+  audio.updateContact({ contact: false, speed: 0, pressure: 0 });
+  resetPageHistory();
+  paper.clear();
+  paper.setPaper(settings.paper);
+  scene?.setPaperFinish(settings.paper);
+  engine = replacement;
+  engine.setReducedMotion(reducedMotionEnabled);
+  syncReadingPreview();
+  validateDraft();
+  if (sound) playMaterialCue('paper');
+  if (start) {
+    if (capped) { capped = false; scene?.setCapped(false); playMaterialCue('cap'); }
+    if (settings.pen === 'dip') playMaterialCue('ink');
+    engine.start();
+  } else {
+    capped = settings.pen === 'fountain';
+    scene?.setCapped(capped);
+  }
+  syncSettings();
+  syncWriting();
+  return true;
+}
+
 function newSheet({ announce = true, sound = true }: { announce?: boolean; sound?: boolean } = {}): void {
+  if (randomWriting) {
+    if (prepareRandomWriting(false, sound) && announce) notify('Fresh pages. Begin to choose your next reading.');
+    return;
+  }
   audio.updateContact({ contact: false, speed: 0, pressure: 0 });
   resetPageHistory();
   paper.clear();
@@ -445,7 +515,7 @@ beginButton.addEventListener('click', async () => {
   if (engine?.status === 'paused' && viewingEarlierPage()) {
     const resumingBook = engine;
     await showPage(resumingBook.activePageIndex);
-    if (disposed || engine !== resumingBook || loadingPage || viewingEarlierPage()) return;
+    if (disposed || document.hidden || engine !== resumingBook || loadingPage || viewingEarlierPage()) return;
   }
   if (engine?.status === 'writing') {
     engine.pause();
@@ -460,7 +530,8 @@ beginButton.addEventListener('click', async () => {
     paper.clear();
     paper.setPaper(settings.paper);
     scene?.setPaperFinish(settings.paper);
-    engine = new WritingBook(layout, settings);
+    if (!randomWriting) engine = new WritingBook(layout, settings);
+    if (!engine) { notify('Choose a reading or add some words before beginning.'); return; }
     engine.setReducedMotion(reducedMotionEnabled);
     if (capped) { capped = false; scene?.setCapped(false); playMaterialCue('cap'); }
     if (settings.pen === 'dip') playMaterialCue('ink');
@@ -471,6 +542,12 @@ beginButton.addEventListener('click', async () => {
 });
 
 textarea.addEventListener('input', () => {
+  if (randomWriting) {
+    syncReadingPreview();
+    notify('Choose Use my words to edit your own text.');
+    return;
+  }
+  manualDraft = textarea.value;
   if (engine?.status === 'complete') {
     resetPageHistory();
     engine = null;
@@ -480,6 +557,15 @@ textarea.addEventListener('input', () => {
   }
   validateDraft();
   syncWriting();
+});
+
+element<HTMLButtonElement>('#random-writing').addEventListener('click', () => {
+  if (randomWriting) {
+    randomWriting = false;
+    textarea.value = manualDraft;
+    newSheet({ announce: false });
+    notify('Your own words are back, ready when you are.');
+  } else prepareRandomWriting(true);
 });
 
 function updateLettering(change: Partial<Pick<Settings, 'style' | 'textScale' | 'textAlignment'>>, announce = true): boolean {
@@ -501,6 +587,7 @@ function updateLettering(change: Partial<Pick<Settings, 'style' | 'textScale' | 
     const alignmentChanged = next.textAlignment !== settings.textAlignment;
     layout = revised;
     updateSettings(next);
+    syncReadingPreview();
     syncWriting();
     if (announce) notify(alignmentChanged
       ? 'Lines with ink keep their place. New lines and pages use your chosen alignment.'
@@ -596,7 +683,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-camera]
 element<HTMLButtonElement>('#reset-view').addEventListener('click', () => camera('desk'));
 element<HTMLButtonElement>('#new-sheet').addEventListener('click', () => newSheet());
 element<HTMLButtonElement>('#export-sheet').addEventListener('click', () => {
-  paper.exportPNG(engine && engine.pageCount > 1 ? `ink-and-hour-page-${viewedPage + 1}.png` : 'ink-and-hour.png');
+  paper.exportPNG(engine && (randomWriting || engine.pageCount > 1) ? `ink-and-hour-page-${viewedPage + 1}.png` : 'ink-and-hour.png');
 });
 element<HTMLButtonElement>('#previous-page').addEventListener('click', () => { void showPage(viewedPage - 1); });
 element<HTMLButtonElement>('#next-page').addEventListener('click', () => { void showPage(viewedPage + 1); });
@@ -620,6 +707,10 @@ element<HTMLButtonElement>('#about-button').addEventListener('click', () => { di
 element<HTMLButtonElement>('#music-credits').addEventListener('click', () => {
   dialog.showModal();
   element<HTMLElement>('#music-attribution').scrollIntoView({ block: 'start' });
+});
+element<HTMLButtonElement>('#reading-credits').addEventListener('click', () => {
+  dialog.showModal();
+  element<HTMLElement>('#reading-attribution').scrollIntoView({ block: 'start' });
 });
 element<HTMLButtonElement>('#close-about').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
@@ -652,19 +743,22 @@ function frame(timestamp: number): void {
     paper.flush(lastInkTimestamp === undefined ? 0 : Math.max(0, (timestamp - lastInkTimestamp) / 1000));
     lastInkTimestamp = timestamp;
     const wasTurning = engine?.turnProgress != null;
+    const previousText = engine?.activePage.text;
     const result = engine?.tick(delta) ?? { pen: currentPen(), segments: [], pageChanged: false, previousPageIndex: null };
     if (result.pageChanged && engine) {
-      if (result.previousPageIndex !== null) pageHistory.set(result.previousPageIndex, paper.snapshot());
+      if (result.previousPageIndex !== null) pageHistory.set(result.previousPageIndex, { ...paper.snapshot(), text: previousText });
       paper.clear();
       paper.setPaper(settings.paper);
       scene.setPaperFinish(settings.paper);
       viewedPage = engine.activePageIndex;
+      if (randomWriting) pageHistory.trimBefore(Math.max(0, viewedPage - MAX_PAGES + 1));
+      syncReadingPreview();
       playMaterialCue('paper');
     }
     paper.draw(result.segments, inkColor(settings));
     paper.flush();
     if (engine?.status === 'complete' && lastStatus !== 'complete') {
-      pageHistory.set(engine.activePageIndex, paper.snapshot());
+      pageHistory.set(engine.activePageIndex, { ...paper.snapshot(), text: engine.activePage.text });
     }
     scene.setPageTurn(engine?.turnProgress ?? null);
     const shownPen: PenSample = loadingPage || viewingEarlierPage()
@@ -690,10 +784,15 @@ if (import.meta.env.DEV) {
     configurable: true,
     get: () => ({
       scene: scene?.diagnostics ?? null, writing: {
-        ...currentPen(), strokeCount: engine?.pages[engine.activePageIndex]?.layout.strokes.length ?? 0,
+        ...currentPen(), strokeCount: engine?.activePage.layout.strokes.length ?? 0,
         pageCount: (engine?.status ?? 'idle') === 'idle' ? layout.pages.length : engine?.pageCount ?? 0,
         activePageIndex: engine?.activePageIndex ?? 0, viewedPage, turnProgress: engine?.turnProgress ?? null,
         savedPages: pageHistory.size, loadingPage,
+        random: randomWriting,
+        bufferedPages: engine?.bufferedPageCount ?? 0,
+        bufferedCharacters: engine?.bufferedCharacterCount ?? 0,
+        sourceReads: engine?.sourceReadCount ?? 0,
+        oldestSavedPage: pageHistory.oldest ?? null,
       },
       audio: audio.diagnostics, settings: { ...settings }, validInput: layout.ok, inputError: layout.error,
       music: recordedMusic.state,
