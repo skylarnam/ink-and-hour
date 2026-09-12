@@ -158,7 +158,7 @@ export function renderUI(): string {
           <label class="visually-hidden" for="message">Your English text</label>
           <textarea id="message" spellcheck="false" rows="3" aria-describedby="input-hint editor-size-hint input-error">Let the world wait.
 Stay a little while.</textarea>
-          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation / pinch to resize</span><span id="editor-size-hint">Editor &amp; paper size / 100%</span></span><span id="character-count"></span></div>
+          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation / up to 10 pages</span><span id="editor-size-hint">Editor &amp; paper size / 100%</span></span><span id="character-count"></span></div>
           <p id="input-error" class="input-error" role="status" hidden></p>
           <div class="writing-options">
             <label><span>Handwriting</span><select id="style" aria-label="Handwriting style" aria-describedby="handwriting-note">${HANDWRITING_STYLES.map((style) => `<option value="${style.id}">${style.label}</option>`).join('')}</select></label>
@@ -167,7 +167,12 @@ Stay a little while.</textarea>
           <p class="handwriting-note" id="handwriting-note" hidden>A font-inspired stroke study, with an interpreted pen order.</p>
           <div class="writing-actions">
             <button type="button" class="begin-button" id="begin-writing">${icon('play')}<span>Begin writing</span>${icon('arrow', 'begin-arrow')}</button>
-            <button type="button" class="new-sheet-button" id="new-sheet" title="Start a fresh sheet" aria-label="Start a fresh sheet">${icon('freshSheet')}<span>Fresh sheet</span></button>
+            <button type="button" class="new-sheet-button" id="new-sheet" title="Start again with fresh pages and keep your words" aria-label="Start again with fresh pages">${icon('freshSheet')}<span>Start over</span></button>
+          </div>
+          <div id="page-controls" class="page-controls" role="group" aria-label="Written pages" hidden>
+            <button type="button" id="previous-page" aria-label="Previous written page" title="Previous written page" disabled>${icon('chevron')}</button>
+            <span id="page-position" aria-live="polite">Page 1 of 1</span>
+            <button type="button" id="next-page" aria-label="Next written page" title="Next written page" disabled>${icon('chevron')}</button>
           </div>
           <div class="sheet-actions"><span id="writing-note">No hurry. No right words.</span><button type="button" id="export-sheet" hidden>${icon('download')}Keep this page</button></div>
         </section>
@@ -176,6 +181,7 @@ Stay a little while.</textarea>
     <div id="quiet-toolbar" class="quiet-toolbar" role="group" aria-label="Quiet view controls" aria-describedby="quiet-help" hidden>
       <span id="quiet-help" class="visually-hidden">Press Escape or Show controls to leave Quiet view. Writing and sound continue unchanged.</span>
       <button type="button" id="quiet-play" aria-label="Begin writing">${icon('play')}<span>Write</span></button>
+      <span id="quiet-page" class="quiet-page" hidden>Page 1</span>
       <button type="button" id="quiet-sound" aria-pressed="true" aria-label="${sound.label}. ${sound.action}." title="${sound.action}">${icon('sound')}</button>
       <button type="button" id="exit-quiet-view">${icon('quiet')}<span>Show controls</span></button>
     </div>
@@ -188,8 +194,9 @@ Stay a little while.</textarea>
       <p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p>
       <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
       <p>Quiet view fills the window with your desk, hides the editor and room controls, and stops automatic camera following without interrupting the pen. A small bar keeps writing, sound and Show controls within reach. Escape returns to the editor.</p>
-      <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page when it finishes.</p>
-      <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: started letters keep their shape, and lines with ink keep their place. Choices that would overflow the remaining page are rejected. A fresh sheet applies your choices to the whole note. Lettering preferences are saved, but your words stay private to this visit.</p>
+      <p>English letters, digits and standard punctuation are supported. Manuscripts can fill up to ten physical pages, with a 20,000-character safety limit. A gentle sheet-slide makes room for the next page; reduced motion replaces it without the animation. Pause or finish to browse written pages. Resume returns to your current writing position, and Start over clears the pages but keeps your words. Keep this page exports the page you are viewing.</p>
+      <p>Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page only when the manuscript finishes.</p>
+      <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: earlier pages and started letters keep their shape, and lines with ink keep their place. The remaining text can reflow onto later pages; choices exceeding ten pages are rejected without changing your ink. Start over applies your choices to the whole manuscript. Lettering preferences are saved, but your words and page history stay private to this visit.</p>
       <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of Google Fonts licensed for commercial use. The editor shows each original font; the pen follows inferred centerlines, not its outline. Branches use pen lifts instead of drawing back over completed strokes. The inferred order is not a recording of a calligrapher's hand.</p>
       <p>Nib pressure and material sounds are expressive interpretations, not a fluid-dynamics or manufacturer-specific simulation. There is no hand model, arbitrary font import, or physical ink depletion.</p>
       <details class="font-credits">

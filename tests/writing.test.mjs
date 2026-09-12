@@ -38,7 +38,7 @@ test('every printable English glyph is defined in selected script and print hand
 });
 
 test('input validation is visible rather than silently dropping characters', () => {
-  for (const input of ['', '   ', '안녕', 'café', 'hello\tworld', 'hello 🌱', 'a'.repeat(421)]) {
+  for (const input of ['', '   ', '안녕', 'café', 'hello\tworld', 'hello 🌱', 'a'.repeat(MAX_CHARACTERS + 1)]) {
     const result = layoutText(input, options);
     assert.equal(result.ok, false);
     assert.ok(result.error);
@@ -186,7 +186,7 @@ test('newlines normalize consistently and explicit blank lines consume capacity'
 });
 
 test('length limit and physical capacity are separate atomic validations', () => {
-  assert.equal(MAX_CHARACTERS, 420);
+  assert.equal(MAX_CHARACTERS, 20_000);
   for (const style of ['correspondence', 'pangolin']) {
     const narrow = layoutText('i'.repeat(420), { ...options, style });
     assert.equal(narrow.ok, true, narrow.error);
@@ -197,8 +197,10 @@ test('length limit and physical capacity are separate atomic validations', () =>
     assert.match(crowded.error, /end of the sheet/);
     assert.equal(crowded.characterCount, 420);
     assert.deepEqual(crowded.strokes, []);
-    const excessive = layoutText('i'.repeat(421), { ...options, style });
-    assert.match(excessive.error, /420/);
+    const beyondOldCap = layoutText('i'.repeat(421), { ...options, style });
+    assert.equal(beyondOldCap.ok, true, beyondOldCap.error);
+    const excessive = layoutText('i'.repeat(MAX_CHARACTERS + 1), { ...options, style });
+    assert.match(excessive.error, /20000/);
     assert.deepEqual(excessive.strokes, []);
   }
 });

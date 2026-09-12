@@ -56,15 +56,26 @@ it in a terminal separates its lifetime from the agent's completed work.
   select **Begin writing**. Pause/resume preserves the exact writing position.
   While paused, handwriting and size can change for the unwritten letters. A partially
   written letter finishes in its original style and size; existing ink is never erased
-  or moved. The remaining text reflows within the page, and a choice that would
-  overflow is rejected without changing the sheet or editor size. Lettering controls stay
+  or moved. The remaining text reflows across the current and future pages; choices
+  exceeding ten pages are rejected without changing the ink or editor size. Lettering controls stay
   locked while the pen is moving.
   Correspondence is joined by 33 locally bundled Google
   Fonts families. The editable text uses the selected handwriting's source font;
   the additional pen styles are interpreted centerline studies of those faces.
-  **Write it again** replays a completed note. **Fresh sheet** clears the ink but
-  keeps the words. **Keep this page** exports the completed sheet as a 1560 x 2080 PNG.
-  When writing finishes, the pen lifts and settles beside the completed sheet.
+  **Write it again** replays a completed manuscript. **Start over** clears all
+  pages but keeps the words. **Keep this page** exports the viewed completed
+  sheet as a 1560 x 2080 PNG, with page numbers in multi-page filenames.
+  When the whole manuscript finishes, the pen lifts and settles beside it.
+- Long manuscripts flow across **up to ten physical pages**, with a separate
+  **20,000-character safety limit**. Actual capacity depends on handwriting,
+  lettering size and line breaks. A gentle slide/dissolve replaces a full page,
+  with the pen lifted throughout; reduced motion skips this animation. Pause
+  also pauses a page turn. Previous/next controls browse already written pages
+  while paused or finished; **Resume writing** restores the active page and
+  exact pen position. Earlier pages are read-only. Their original paper and ink
+  are retained as compressed, in-memory snapshots, not ten live canvases.
+  Page history is cleared by Start over, editing a completed manuscript, or
+  leaving the visit. Export pages individually if you want to keep them.
 - The editor starts at a compact 18px for Correspondence, with calibrated
   sizes for the other faces. Pinch over the textbox with a trackpad or two
   fingers, or use **A- / A+**, to resize **both the editor and actual paper
@@ -73,7 +84,7 @@ it in a terminal separates its lifetime from the agent's completed work.
   **Left** is the default alignment; **Center** centers each new line by its
   actual ink bounds within the page margins. On a paused page, any line with
   existing ink keeps its anchor; alignment applies to subsequent untouched lines.
-  A fresh sheet or replay applies the choices to the whole note.
+  Start over or replay applies the choices to the whole manuscript.
   Size and alignment carry across handwriting choices and are saved for the
   next visit. They do not change camera or browser zoom. The textbox remains
   scrollable and resizable while its words are read-only during a run.
@@ -294,8 +305,10 @@ fallbacks; playback intent is not stored.
 
 - English ASCII letters, digits, spaces, newlines, and standard punctuation
   only. Unsupported characters get a visible error; they are never discarded.
-  There is a 420-character input ceiling and a stricter physical sheet-capacity
-  check. Words and long unbroken text wrap; there is no automatic second page.
+  There is a 20,000-character safety ceiling and a ten-page physical capacity
+  limit. Words and long unbroken text wrap without dropping characters. The
+  page animation is a lightweight slide/dissolve, not a physically simulated
+  curled sheet. PNG export is per page, not a combined PDF.
 - These are 34 user-selected styles, not arbitrary font imports. Correspondence
   uses historical ordered centerlines; the other 33 approximate font shapes and
   infer their writing order. They are not recordings of a calligrapher's motion.

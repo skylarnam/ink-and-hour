@@ -3,6 +3,7 @@ import { RitualAudio } from './audio.ts';
 import { createSoundStartup, soundPresentation } from './sound-startup.ts';
 import { createEditorZoom } from './editor-zoom.ts';
 import { createQuietView } from './quiet-view.ts';
+import { PageHistory } from './page-history.ts';
 import { DeskScene } from './scene.ts';
 import { inkColor, inkLabel, isInkColor } from './ink.ts';
 import { LOFI_TRACKS } from './music-library.ts';
@@ -14,7 +15,7 @@ import { icon, renderUI } from './ui.ts';
 import { writingSoundDescriptor } from './writing-sounds.ts';
 import { PAGE } from './types.ts';
 import type { CameraPreset, InteractionCue, LayoutOptions, PenSample, Settings, WritingStatus } from './types.ts';
-import { layoutText, restyleRemainingText, MAX_CHARACTERS, WritingEngine } from './writing/index.ts';
+import { layoutPages, MAX_CHARACTERS, MAX_PAGES, WritingBook } from './writing/index.ts';
 
 function element<T extends Element>(selector: string): T {
   const found = document.querySelector<T>(selector);
@@ -53,13 +54,17 @@ const beginButton = element<HTMLButtonElement>('#begin-writing');
 const styleSelect = element<HTMLSelectElement>('#style');
 const paper = new PaperSurface();
 paper.setPaper(settings.paper);
-let layout = layoutText(textarea.value, letteringOptions());
-let engine = layout.ok ? new WritingEngine(layout, settings) : null;
+let layout = layoutPages(textarea.value, letteringOptions());
+let engine = layout.ok ? new WritingBook(layout, settings) : null;
+const pageHistory = new PageHistory(MAX_PAGES);
+let viewedPage = 0;
+let loadingPage = false;
+let pageRevision = 0;
+let reducedMotionEnabled = false;
 let scene: DeskScene | null = null;
 let rollOpen = false;
 let capped = settings.pen === 'fountain';
 let lastStatus: WritingStatus = 'idle';
-let dirtyDraft = false;
 let disposed = false;
 let lastTimestamp = 0;
 let lastInkTimestamp: number | undefined;
@@ -75,6 +80,63 @@ function currentPen(): PenSample {
   return engine?.peek() ?? {
     x: 0, y: 0, contact: false, lift: 0.42, pressure: 0, speed: 0, angle: 0, progress: 0, status: 'idle',
   };
+}
+
+function viewingEarlierPage(): boolean {
+  return !!engine && viewedPage !== engine.activePageIndex;
+}
+
+function resetPageHistory(): void {
+  pageRevision++;
+  loadingPage = false;
+  viewedPage = 0;
+  pageHistory.clear();
+  scene?.setPageTurn(null);
+}
+
+function syncPageControls(): void {
+  const status = engine?.status ?? 'idle';
+  const count = status === 'idle' ? Math.max(1, layout.pages.length) : engine!.pageCount;
+  const turning = engine?.turnProgress != null;
+  const canBrowse = (status === 'paused' || status === 'complete') && !loadingPage && !turning;
+  element<HTMLElement>('#page-controls').hidden = count <= 1;
+  element<HTMLElement>('#page-controls').setAttribute('aria-busy', String(loadingPage));
+  element<HTMLElement>('#page-position').textContent = `Page ${viewedPage + 1} of ${count}`;
+  element<HTMLButtonElement>('#previous-page').disabled = !canBrowse || !pageHistory.has(viewedPage - 1);
+  element<HTMLButtonElement>('#next-page').disabled = !canBrowse || !engine
+    || viewedPage >= engine.activePageIndex || !pageHistory.has(viewedPage + 1);
+  const quietPage = element<HTMLElement>('#quiet-page');
+  quietPage.hidden = count <= 1;
+  quietPage.textContent = `${viewedPage + 1} / ${count}`;
+}
+
+async function showPage(index: number): Promise<void> {
+  if (!engine || loadingPage || index === viewedPage) return;
+  if (engine.status === 'writing' || engine.turnProgress !== null) {
+    notify('Pause the pen after the page turn to look through the written pages.');
+    return;
+  }
+  if (viewedPage === engine.activePageIndex) pageHistory.set(viewedPage, paper.snapshot());
+  const snapshot = pageHistory.get(index);
+  if (!snapshot) { notify('That page has not been written yet.'); return; }
+  const revision = ++pageRevision;
+  loadingPage = true;
+  syncWriting();
+  try {
+    const restored = await paper.restore(snapshot);
+    if (!restored || disposed || revision !== pageRevision) return;
+    viewedPage = index;
+    scene?.setPaperFinish(snapshot.paper);
+  } catch (error) {
+    if (!disposed && revision === pageRevision) {
+      notify(`The saved page could not be opened. ${error instanceof Error ? error.message : ''}`);
+    }
+  } finally {
+    if (!disposed && revision === pageRevision) {
+      loadingPage = false;
+      syncWriting();
+    }
+  }
 }
 
 function playMaterialCue(cue: InteractionCue): void {
@@ -241,6 +303,7 @@ function updateSettings(next: unknown): void {
   if (previous.ink !== settings.ink) playMaterialCue('ink');
   if (previous.nib !== settings.nib) playMaterialCue('cap');
   scene?.configure(settings);
+  scene?.setPaperFinish(paper.kind);
   audio.configure(settings);
   engine?.updateOptions(settings);
   if (previous.writingSound !== settings.writingSound) audio.updateContact(currentPen());
@@ -249,14 +312,16 @@ function updateSettings(next: unknown): void {
 }
 
 function validateDraft(): void {
-  layout = layoutText(textarea.value, letteringOptions());
+  layout = layoutPages(textarea.value, letteringOptions());
   const error = element<HTMLParagraphElement>('#input-error');
   error.textContent = layout.error;
   error.hidden = layout.ok;
   textarea.setAttribute('aria-invalid', String(!layout.ok));
-  element<HTMLElement>('#character-count').textContent = `${textarea.value.length} / ${MAX_CHARACTERS}`;
+  element<HTMLElement>('#character-count').textContent = `${textarea.value.length.toLocaleString()} characters`;
+  element<HTMLElement>('#character-count').title = `Up to ${MAX_CHARACTERS.toLocaleString()} characters and ${MAX_PAGES} physical pages.`;
   beginButton.disabled = !scene || !layout.ok;
   element<HTMLButtonElement>('#quiet-play').disabled = beginButton.disabled;
+  syncPageControls();
 }
 
 function syncWriting(): void {
@@ -264,6 +329,10 @@ function syncWriting(): void {
   const active = status === 'writing';
   const paused = status === 'paused';
   const complete = status === 'complete';
+  const earlier = viewingEarlierPage();
+  const turning = engine?.turnProgress != null;
+  const letteringLocked = active || loadingPage || earlier;
+  beginButton.disabled = !scene || loadingPage || (!active && !paused && !layout.ok);
   const buttonIcon = active ? 'pause' : complete ? 'reset' : 'play';
   const label = active ? 'Pause for a moment' : paused ? 'Resume writing' : complete ? 'Write it again' : 'Begin writing';
   beginButton.innerHTML = `${icon(buttonIcon)}<span>${label}</span>${icon('arrow', 'begin-arrow')}`;
@@ -271,31 +340,43 @@ function syncWriting(): void {
   quietPlay.innerHTML = `${icon(buttonIcon)}<span>${active ? 'Pause' : paused ? 'Resume' : complete ? 'Replay' : 'Write'}</span>`;
   quietPlay.setAttribute('aria-label', label);
   quietPlay.disabled = beginButton.disabled;
-  textarea.readOnly = active || paused;
-  styleSelect.disabled = active;
-  editorZoom.setEnabled(!active);
+  textarea.readOnly = active || paused || loadingPage || earlier;
+  styleSelect.disabled = letteringLocked;
+  editorZoom.setEnabled(!letteringLocked);
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting="textAlignment"]')) {
-    button.disabled = active;
+    button.disabled = letteringLocked;
   }
-  element<HTMLButtonElement>('#export-sheet').hidden = !complete;
-  element<HTMLElement>('#scene-status').textContent = active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
-  element<HTMLElement>('#writing-note').textContent = active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep it, or begin again.' : 'No hurry. No right words.';
-  element<HTMLButtonElement>('#toggle-cap').disabled = active;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-setting]')) {
+    if (['pen', 'nib', 'paper', 'ink'].includes(button.dataset.setting ?? '')) button.disabled = loadingPage || earlier;
+  }
+  element<HTMLInputElement>('#custom-ink-color').disabled = loadingPage || earlier;
+  element<HTMLInputElement>('[data-range="speed"]').disabled = loadingPage || earlier;
+  element<HTMLButtonElement>('#export-sheet').hidden = loadingPage || (!complete && !earlier);
+  element<HTMLElement>('#scene-status').textContent = earlier ? 'A page, kept.' : turning ? 'Making room for more words.'
+    : active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
+  element<HTMLElement>('#writing-note').textContent = earlier ? `Resume returns to page ${engine!.activePageIndex + 1}.`
+    : turning ? paused ? 'The page turn is paused.' : 'Turning to the next sheet.'
+      : active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep a page, or begin again.' : 'No hurry. No right words.';
+  element<HTMLButtonElement>('#toggle-cap').disabled = active || turning || loadingPage || earlier;
+  syncPageControls();
   lastStatus = status;
 }
 
 function newSheet({ announce = true, sound = true }: { announce?: boolean; sound?: boolean } = {}): void {
   audio.updateContact({ contact: false, speed: 0, pressure: 0 });
-  engine?.reset();
+  resetPageHistory();
   paper.clear();
-  dirtyDraft = false;
+  paper.setPaper(settings.paper);
+  scene?.setPaperFinish(settings.paper);
   validateDraft();
+  engine = layout.ok ? new WritingBook(layout, settings) : null;
+  engine?.setReducedMotion(reducedMotionEnabled);
   capped = settings.pen === 'fountain';
   scene?.setCapped(capped);
   if (sound) playMaterialCue('paper');
   syncSettings();
   syncWriting();
-  if (announce) notify('A fresh sheet. The words are still here if you want them.');
+  if (announce) notify('Fresh pages. Your words are still here if you want them.');
 }
 
 function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
@@ -306,8 +387,8 @@ function handleInteraction(action: 'roll' | 'cap' | 'ink'): void {
     element<HTMLButtonElement>('#toggle-roll').setAttribute('aria-pressed', String(rollOpen));
     element<HTMLSpanElement>('#toggle-roll span').textContent = rollOpen ? 'Tie leather roll' : 'Untie leather roll';
   } else if (action === 'cap' && settings.pen === 'fountain') {
-    if (engine?.status === 'writing') {
-      notify('Pause the pen before replacing its cap.');
+    if (engine?.status === 'writing' || engine?.turnProgress != null || loadingPage || viewingEarlierPage()) {
+      notify('Pause on the current page, after any page turn, before replacing the cap.');
       return;
     }
     capped = !capped;
@@ -324,11 +405,15 @@ try {
   scene = new DeskScene(element<HTMLCanvasElement>('#desk-canvas'), paper, settings, handleInteraction, () => audio.thunder());
   scene.setCapped(capped);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  reducedMotionEnabled = reducedMotion.matches;
   scene.setReducedMotion(reducedMotion.matches);
   paper.setReducedMotion(reducedMotion.matches);
+  engine?.setReducedMotion(reducedMotion.matches);
   const motionChanged = (event: MediaQueryListEvent): void => {
+    reducedMotionEnabled = event.matches;
     scene?.setReducedMotion(event.matches);
     paper.setReducedMotion(event.matches);
+    engine?.setReducedMotion(event.matches);
   };
   reducedMotion.addEventListener('change', motionChanged);
   disposeMotionPreference = () => reducedMotion.removeEventListener('change', motionChanged);
@@ -355,7 +440,13 @@ const quietView = createQuietView({
 element<HTMLButtonElement>('#quiet-play').addEventListener('click', () => beginButton.click());
 element<HTMLButtonElement>('#quiet-sound').addEventListener('click', () => { void toggleSound(); });
 
-beginButton.addEventListener('click', () => {
+beginButton.addEventListener('click', async () => {
+  if (loadingPage) return;
+  if (engine?.status === 'paused' && viewingEarlierPage()) {
+    const resumingBook = engine;
+    await showPage(resumingBook.activePageIndex);
+    if (disposed || engine !== resumingBook || loadingPage || viewingEarlierPage()) return;
+  }
   if (engine?.status === 'writing') {
     engine.pause();
     audio.updateContact(engine.peek());
@@ -365,54 +456,55 @@ beginButton.addEventListener('click', () => {
   } else {
     validateDraft();
     if (!layout.ok) return;
-    if (engine?.status === 'complete' || dirtyDraft) paper.clear();
-    engine = new WritingEngine(layout, settings);
+    resetPageHistory();
+    paper.clear();
+    paper.setPaper(settings.paper);
+    scene?.setPaperFinish(settings.paper);
+    engine = new WritingBook(layout, settings);
+    engine.setReducedMotion(reducedMotionEnabled);
     if (capped) { capped = false; scene?.setCapped(false); playMaterialCue('cap'); }
     if (settings.pen === 'dip') playMaterialCue('ink');
     engine.start();
-    dirtyDraft = false;
   }
   syncSettings();
   syncWriting();
 });
 
 textarea.addEventListener('input', () => {
-  dirtyDraft = true;
   if (engine?.status === 'complete') {
-    engine.reset();
+    resetPageHistory();
+    engine = null;
     paper.clear();
-    syncWriting();
+    paper.setPaper(settings.paper);
+    scene?.setPaperFinish(settings.paper);
   }
   validateDraft();
+  syncWriting();
 });
 
 function updateLettering(change: Partial<Pick<Settings, 'style' | 'textScale' | 'textAlignment'>>, announce = true): boolean {
   const next = sanitizeSettings({ ...settings, ...change });
   if (next.style === settings.style && next.textScale === settings.textScale
     && next.textAlignment === settings.textAlignment) return true;
-  if (engine?.status === 'writing') {
-    notify('Pause the pen before changing the lettering.');
+  if (engine?.status === 'writing' || loadingPage || viewingEarlierPage()) {
+    notify('Pause on the current page before changing the lettering.');
     syncSettings();
     return false;
   }
   if (engine?.status === 'paused') {
-    const revised = restyleRemainingText(textarea.value, layout, letteringOptions(next), engine.startedStrokeCount);
-    if (!revised.layout.ok) {
-      notify(`The remaining words do not fit at that lettering size or style. Your ink is unchanged. ${revised.layout.error}`);
+    const revised = engine.reflow(letteringOptions(next));
+    if (!revised.ok) {
+      notify(`Your ink is unchanged. ${revised.error}`);
       syncSettings();
       return false;
     }
-    const hasNewLetters = revised.fromStroke < layout.strokes.length;
     const alignmentChanged = next.textAlignment !== settings.textAlignment;
-    if (hasNewLetters) engine.replaceUnwrittenStrokes(revised.fromStroke, revised.layout.strokes.slice(revised.fromStroke));
-    layout = revised.layout;
+    layout = revised;
     updateSettings(next);
     syncWriting();
-    if (announce) notify(!hasNewLetters
-      ? 'This is the last letter. Your lettering choice is ready for the next sheet.'
-      : alignmentChanged
-        ? 'Lines with ink keep their place. New lines use your chosen alignment.'
-        : 'The current letter keeps its shape. Your new lettering starts with the next letter.');
+    if (announce) notify(alignmentChanged
+      ? 'Lines with ink keep their place. New lines and pages use your chosen alignment.'
+      : 'Written pages and the current letter keep their shape. The remaining words use your new lettering.');
     return true;
   }
   updateSettings(next);
@@ -503,7 +595,11 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-camera]
 }
 element<HTMLButtonElement>('#reset-view').addEventListener('click', () => camera('desk'));
 element<HTMLButtonElement>('#new-sheet').addEventListener('click', () => newSheet());
-element<HTMLButtonElement>('#export-sheet').addEventListener('click', () => paper.exportPNG());
+element<HTMLButtonElement>('#export-sheet').addEventListener('click', () => {
+  paper.exportPNG(engine && engine.pageCount > 1 ? `ink-and-hour-page-${viewedPage + 1}.png` : 'ink-and-hour.png');
+});
+element<HTMLButtonElement>('#previous-page').addEventListener('click', () => { void showPage(viewedPage - 1); });
+element<HTMLButtonElement>('#next-page').addEventListener('click', () => { void showPage(viewedPage + 1); });
 element<HTMLButtonElement>('#toggle-roll').addEventListener('click', () => handleInteraction('roll'));
 element<HTMLButtonElement>('#toggle-cap').addEventListener('click', () => handleInteraction('cap'));
 element<HTMLButtonElement>('#enable-sound').addEventListener('click', () => { void toggleSound(); });
@@ -555,14 +651,29 @@ function frame(timestamp: number): void {
     // Ink still dries while the tab is hidden; age old marks before adding a new frame.
     paper.flush(lastInkTimestamp === undefined ? 0 : Math.max(0, (timestamp - lastInkTimestamp) / 1000));
     lastInkTimestamp = timestamp;
-    const result = engine?.tick(delta) ?? { pen: currentPen(), segments: [] };
+    const wasTurning = engine?.turnProgress != null;
+    const result = engine?.tick(delta) ?? { pen: currentPen(), segments: [], pageChanged: false, previousPageIndex: null };
+    if (result.pageChanged && engine) {
+      if (result.previousPageIndex !== null) pageHistory.set(result.previousPageIndex, paper.snapshot());
+      paper.clear();
+      paper.setPaper(settings.paper);
+      scene.setPaperFinish(settings.paper);
+      viewedPage = engine.activePageIndex;
+      playMaterialCue('paper');
+    }
     paper.draw(result.segments, inkColor(settings));
     paper.flush();
-    scene.updatePen(result.pen, delta);
-    audio.updateContact(result.pen);
+    if (engine?.status === 'complete' && lastStatus !== 'complete') {
+      pageHistory.set(engine.activePageIndex, paper.snapshot());
+    }
+    scene.setPageTurn(engine?.turnProgress ?? null);
+    const shownPen: PenSample = loadingPage || viewingEarlierPage()
+      ? { ...result.pen, status: 'idle', contact: false, pressure: 0, speed: 0, lift: 0.42 } : result.pen;
+    scene.updatePen(shownPen, delta);
+    audio.updateContact(shownPen);
     scene.update(delta, elapsed);
     audio.updateSpatial(scene.soundPlacement);
-    if (result.pen.status !== lastStatus) syncWriting();
+    if (result.pen.status !== lastStatus || result.pageChanged || wasTurning !== (engine?.turnProgress != null)) syncWriting();
   }
   animationId = requestAnimationFrame(frame);
 }
@@ -578,7 +689,12 @@ if (import.meta.env.DEV) {
   Object.defineProperty(window, '__inkAndHour', {
     configurable: true,
     get: () => ({
-      scene: scene?.diagnostics ?? null, writing: { ...currentPen(), strokeCount: layout.strokes.length },
+      scene: scene?.diagnostics ?? null, writing: {
+        ...currentPen(), strokeCount: engine?.pages[engine.activePageIndex]?.layout.strokes.length ?? 0,
+        pageCount: (engine?.status ?? 'idle') === 'idle' ? layout.pages.length : engine?.pageCount ?? 0,
+        activePageIndex: engine?.activePageIndex ?? 0, viewedPage, turnProgress: engine?.turnProgress ?? null,
+        savedPages: pageHistory.size, loadingPage,
+      },
       audio: audio.diagnostics, settings: { ...settings }, validInput: layout.ok, inputError: layout.error,
       music: recordedMusic.state,
       editor: { zoom: editorZoom.scale, alignment: settings.textAlignment },
@@ -591,6 +707,7 @@ if (import.meta.env.DEV) {
 function dispose(): void {
   if (disposed) return;
   disposed = true;
+  pageRevision++;
   cancelAnimationFrame(animationId);
   clearTimeout(noticeTimer);
   soundStartup.dispose();

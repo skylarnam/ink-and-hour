@@ -79,6 +79,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .quiet-toolbar .icon { width: 15px; height: 15px; }
 #quiet-sound { min-width: 44px; padding: 8px; }
 #quiet-sound[aria-pressed="false"] { color: #d0c4aa; }
+.quiet-page { padding: 0 4px; font-size: 9px; color: #d5d8c7; white-space: nowrap; }
 .ritual-panel { background: var(--paper); border-left: 1px solid #dad6c7; display: flex; flex-direction: column; overflow: hidden; }
 .panel-tabs { display: flex; flex-shrink: 0; height: 55px; gap: 14px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--paper); position: sticky; top: 0; z-index: 5; }
 .panel-tabs button { display: flex; align-items: center; justify-content: center; flex: 1; gap: 6px; font-size: 11px; padding: 0; color: #8b8c7f; position: relative; }
@@ -163,6 +164,10 @@ input[type="range"] { width: 100%; accent-color: #7c8b67; cursor: pointer; heigh
 .sheet-actions > span { color: #898a78; font-size: 8px; }
 .sheet-actions button { font-size: 9px; padding: 2px 0; color: #59684a; white-space: nowrap; }
 .sheet-actions .icon { width: 12px; height: 12px; margin-right: 2px; }
+.page-controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; color: #68735c; font-size: 10px; }
+.page-controls button { display: grid; place-items: center; min-height: 32px; min-width: 32px; border: 1px solid #d6d8c9; border-radius: 4px; }
+.page-controls .icon { width: 13px; height: 13px; }
+#previous-page .icon { transform: rotate(180deg); }
 .mood-choices { display: grid; gap: 8px; }
 .mood-choices .choice { display: flex; padding: 7px; text-align: left; align-items: center; gap: 10px; }
 .mood-thumbnail { width: 45px; height: 40px; border-radius: 3px; position: relative; overflow: hidden; background: linear-gradient(0deg, #88684c 0 40%, transparent 40%), linear-gradient(90deg, #7c8069 0 20%, #ccd0b7 20% 46%, #7c8069 46% 53%, #ccd0b7 53% 79%, #7c8069 79%); }
@@ -224,6 +229,7 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .camera-hint { display: none; }
 }
 @media (max-width: 720px) {
+  .page-controls button { min-width: 44px; min-height: 44px; }
   .quiet-view-button { top: 16px; right: 16px; min-height: 44px; }
   .site-header { height: auto; min-height: 123px; padding: 12px 20px; gap: 10px; flex-wrap: wrap; }
   .header-audio { width: 100%; gap: 10px; justify-content: space-between; }

@@ -4,10 +4,23 @@ import { isHandwritingId, type HandwritingId } from '../handwriting.ts';
 import { handwritingFontData } from './font-data.ts';
 import { parseStrokePath, smoothStroke } from './paths.ts';
 
-export const MAX_CHARACTERS = 420;
+export const MAX_CHARACTERS = 20_000;
+export const MAX_PAGES = 10;
 
 export type LayoutStyle = HandwritingId;
 export type LayoutTextOptions = LayoutOptions;
+
+export interface BookPage {
+  text: string;
+  layout: LayoutResult;
+}
+
+export interface BookLayout {
+  ok: boolean;
+  error: string | null;
+  pages: BookPage[];
+  characterCount: number;
+}
 
 interface Glyph {
   strokes: Point[][];
@@ -70,16 +83,25 @@ interface Continuation {
   cursor: LayoutCursor;
 }
 
-export function layoutText(input: string, options: LayoutTextOptions, continuation?: Continuation): LayoutResult {
+function emptyLayout(message: string, characterCount: number): LayoutResult {
+  return { ok: false, error: message, strokes: [], lineCount: 0, characterCount, characters: [] };
+}
+
+// Single sheets and books share this forward-only layout pass, including continuation anchors.
+function paginate(
+  input: string, options: LayoutTextOptions, maxPages: number,
+  multiple: boolean, continuation?: Continuation, allowBlank = false,
+): BookLayout {
   const text = input.replace(/\r\n?/g, '\n');
-  const error = (message: string): LayoutResult => ({
-    ok: false,
-    error: message,
-    strokes: [],
-    lineCount: 0,
-    characterCount: text.length,
-    characters: [],
+  const error = (message: string): BookLayout => ({
+    ok: false, error: message, pages: [], characterCount: text.length,
   });
+  if (text.length > MAX_CHARACTERS) {
+    return error(`This manuscript accepts up to ${MAX_CHARACTERS} characters. Your note has ${text.length}.`);
+  }
+  if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > MAX_PAGES) {
+    return error(`Choose a page limit between 1 and ${MAX_PAGES}.`);
+  }
   const style = String(options.style);
   if (!isHandwritingId(style)) {
     return error('Choose one of the bundled handwriting styles for this sheet.');
@@ -103,10 +125,7 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
     return error(`English ASCII letters, numbers, punctuation, spaces and line breaks only. `
       + `Please replace ${JSON.stringify(unsupported)} (U+${code}).`);
   }
-  if (text.length > MAX_CHARACTERS) {
-    return error(`This sheet accepts up to ${MAX_CHARACTERS} characters. Your note has ${text.length}.`);
-  }
-  if (!/[!-~]/.test(text)) return error('A word, a thought, a little hello. Add something to write.');
+  if (!allowBlank && !/[!-~]/.test(text)) return error('A word, a thought, a little hello. Add something to write.');
   if (continuation && (!Number.isInteger(continuation.index) || continuation.index < 0 || continuation.index > text.length
     || !Number.isFinite(continuation.cursor.x) || !Number.isFinite(continuation.cursor.y)
     || !Number.isInteger(continuation.cursor.line) || continuation.cursor.line < 1
@@ -137,62 +156,109 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
     if (!result) throw new Error(`Missing ASCII centerline glyph: ${character}`);
     return result;
   };
-  const wordRight = (word: string, start: number): number => {
+  const wordFits = (word: string, start: number): boolean => {
     let cursor = start;
-    let extent = start;
     for (const character of word) {
       const letter = glyph(character);
-      extent = Math.max(extent, cursor + letter.maxX * scale);
+      if (cursor + letter.maxX * scale > right) return false;
       cursor += letter.advance * scale;
     }
-    return extent;
+    return true;
   };
-  const fullMessage = continuation
+  const fullMessage = multiple
+    ? `This manuscript reaches the ${maxPages}-page limit. `
+      + 'Shorten it or reduce the lettering size; nothing has been left out.'
+    : continuation
     ? 'The selected handwriting needs more room than remains on this sheet.'
     : `This note reaches the end of the sheet (${maxLines} lines). `
       + 'Shorten it, reduce the lettering size or remove a few line breaks; nothing has been left out.';
-  const strokes: Point[][] = [];
-  const characters: LayoutCharacter[] = [];
+  const pages: BookPage[] = [];
+  let strokes: Point[][] = [];
+  let characters: LayoutCharacter[] = [];
   const lines = new Map<number, { start: number; end: number; min: number; max: number }>();
   let x = continuation?.cursor.x ?? originX;
   let lineCount = continuation?.cursor.line ?? 1;
   let lineTop = continuation?.cursor.y ?? top;
   let linePitch = Math.max(continuation?.cursor.lineHeight ?? lineHeight, lineHeight);
   let characterIndex = continuation?.index ?? 0;
+  let pageStart = 0;
+  let anchorLine = continuation?.cursor.line;
   let protectPreviousInk = continuation !== undefined
     && (continuation.cursor.style !== style || (continuation.cursor.textScale ?? 1) !== textScale);
-  if (lineTop < top || lineTop + fontHeight > bottom) return error(fullMessage);
+  const finishPage = (): void => {
+    if (textAlignment === 'center') {
+      const offsets = new Map<number, number>();
+      for (const [number, line] of lines) {
+        // A line that already has ink keeps its anchor; only untouched lines can be recentered.
+        if (anchorLine === number) continue;
+        const offset = (left + right - line.min - line.max) / 2;
+        offsets.set(number, offset);
+        for (let index = line.start; index < line.end; index++) {
+          for (const point of strokes[index]) point.x += offset;
+        }
+      }
+      for (const character of characters) {
+        character.after.x += offsets.get(character.after.line) ?? 0;
+      }
+    }
+    const pageText = text.slice(pageStart, characterIndex);
+    pages.push({
+      text: pageText,
+      layout: { ok: true, error: null, strokes, lineCount, characterCount: pageText.length, characters },
+    });
+  };
+  const nextPage = (): boolean => {
+    if (!multiple || pages.length + 1 >= maxPages) return false;
+    finishPage();
+    strokes = [];
+    characters = [];
+    lines.clear();
+    pageStart = characterIndex;
+    x = originX;
+    lineCount = 1;
+    lineTop = top;
+    linePitch = lineHeight;
+    anchorLine = undefined;
+    protectPreviousInk = false;
+    return true;
+  };
+  if (!multiple && (lineTop < top || lineTop + fontHeight > bottom)) return error(fullMessage);
   const newline = (): boolean => {
+    if (lineTop + linePitch + fontHeight > bottom) return nextPage();
     x = originX;
     lineTop += linePitch;
     linePitch = lineHeight;
     protectPreviousInk = false;
     lineCount++;
-    return lineTop + fontHeight <= bottom;
+    return true;
   };
 
   for (const token of text.slice(characterIndex).match(/\n| +|[^ \n]+/g) ?? []) {
     if (token === '\n') {
-      if (!newline()) return error(fullMessage);
       characterIndex++;
+      if (!newline()) return error(fullMessage);
       continue;
     }
     if (token[0] === ' ') {
       for (let index = 0; index < token.length; index++) {
+        characterIndex++;
         if (x + font.space * scale > right) {
           if (!newline()) return error(fullMessage);
         } else {
           x += font.space * scale;
         }
       }
-      characterIndex += token.length;
       continue;
+    }
+    // Let explicit newlines consume their break before moving a retained old-font line to a new page.
+    if (lineTop < top || lineTop + fontHeight > bottom) {
+      if (!nextPage()) return error(fullMessage);
     }
     if (protectPreviousInk) {
       x -= Math.min(0, glyph(token[0]).minX) * scale;
       protectPreviousInk = false;
     }
-    if (x > originX && wordRight(token, x) > right && wordRight(token, originX) <= right) {
+    if (x > originX && !wordFits(token, x) && wordFits(token, originX)) {
       if (!newline()) return error(fullMessage);
     }
     for (const character of token) {
@@ -217,39 +283,51 @@ export function layoutText(input: string, options: LayoutTextOptions, continuati
       }
       x += letter.advance * scale;
       characters.push({
-        index: characterIndex++, strokeStart, strokeEnd: strokes.length,
+        index: characterIndex++ - pageStart, strokeStart, strokeEnd: strokes.length,
         after: {
           x, y: lineTop, line: lineCount, lineHeight: linePitch, style, textScale,
-          textAlignment: continuation?.cursor.line === lineCount
-            ? continuation.cursor.textAlignment ?? 'left' : textAlignment,
+          textAlignment: anchorLine === lineCount
+            ? continuation!.cursor.textAlignment ?? 'left' : textAlignment,
         },
       });
     }
   }
-  if (textAlignment === 'center') {
-    for (const [number, line] of lines) {
-      // A line that already has ink keeps its anchor; only untouched lines can be recentered.
-      if (continuation?.cursor.line === number) continue;
-      const offset = (left + right - line.min - line.max) / 2;
-      for (let index = line.start; index < line.end; index++) {
-        for (const point of strokes[index]) point.x += offset;
-      }
-      for (const character of characters) {
-        if (character.after.line === number) character.after.x += offset;
-      }
-    }
+  finishPage();
+  return { ok: true, error: null, pages, characterCount: text.length };
+}
+
+export function layoutText(input: string, options: LayoutTextOptions, continuation?: Continuation): LayoutResult {
+  const result = paginate(input, options, 1, false, continuation);
+  return result.ok ? result.pages[0].layout : emptyLayout(result.error!, result.characterCount);
+}
+
+export function layoutPages(input: string, options: LayoutOptions, maxPages = MAX_PAGES): BookLayout {
+  return paginate(input, options, maxPages, true);
+}
+
+function retainedCharacters(previous: LayoutResult, startedStrokes: number): LayoutCharacter[] {
+  if (!previous.ok || !Number.isInteger(startedStrokes) || startedStrokes < 0 || startedStrokes > previous.strokes.length) {
+    throw new Error('Only an existing sheet with a valid writing position can change handwriting.');
   }
-  return { ok: true, error: null, strokes, lineCount, characterCount: text.length, characters };
+  return previous.characters.filter((character) => character.strokeStart < startedStrokes);
+}
+
+function appendRemaining(previous: LayoutResult, retained: LayoutCharacter[], tail: LayoutResult): LayoutResult {
+  const fromStroke = retained.at(-1)?.strokeEnd ?? 0;
+  return {
+    ...tail,
+    strokes: [...previous.strokes.slice(0, fromStroke), ...tail.strokes],
+    characters: [...retained, ...tail.characters.map((character) => ({
+      ...character, strokeStart: character.strokeStart + fromStroke, strokeEnd: character.strokeEnd + fromStroke,
+    }))],
+  };
 }
 
 export function restyleRemainingText(
   input: string, previous: LayoutResult, options: LayoutTextOptions, startedStrokes: number,
 ): { layout: LayoutResult; fromStroke: number } {
   const text = input.replace(/\r\n?/g, '\n');
-  if (!previous.ok || !Number.isInteger(startedStrokes) || startedStrokes < 0 || startedStrokes > previous.strokes.length) {
-    throw new Error('Only an existing sheet with a valid writing position can change handwriting.');
-  }
-  const retained = previous.characters.filter((character) => character.strokeStart < startedStrokes);
+  const retained = retainedCharacters(previous, startedStrokes);
   const last = retained.at(-1);
   const fromStroke = last?.strokeEnd ?? 0;
   const index = last ? last.index + 1 : 0;
@@ -259,12 +337,22 @@ export function restyleRemainingText(
   if (!tail.ok) return { layout: tail, fromStroke };
   return {
     fromStroke,
-    layout: {
-      ...tail,
-      strokes: [...previous.strokes.slice(0, fromStroke), ...tail.strokes],
-      characters: [...retained, ...tail.characters.map((character) => ({
-        ...character, strokeStart: character.strokeStart + fromStroke, strokeEnd: character.strokeEnd + fromStroke,
-      }))],
-    },
+    layout: appendRemaining(previous, retained, tail),
   };
+}
+
+export function restyleRemainingPages(
+  input: string, previous: LayoutResult, options: LayoutOptions, startedStrokes: number, maxPages = MAX_PAGES,
+): BookLayout & { fromStroke: number } {
+  const retained = retainedCharacters(previous, startedStrokes);
+  const last = retained.at(-1);
+  const fromStroke = last?.strokeEnd ?? 0;
+  const text = input.replace(/\r\n?/g, '\n');
+  if (last && last.index + 1 === text.length) {
+    return { ok: true, error: null, pages: [{ text, layout: previous }], characterCount: text.length, fromStroke };
+  }
+  const result = paginate(input, options, maxPages, true,
+    last ? { index: last.index + 1, cursor: last.after } : undefined, true);
+  if (result.ok) result.pages[0].layout = appendRemaining(previous, retained, result.pages[0].layout);
+  return { ...result, fromStroke };
 }

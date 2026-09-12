@@ -7,6 +7,7 @@ import { configureCameraDrag, createCameraControls, panCameraWithKey } from './c
 import { OutdoorView } from './outdoors.ts';
 import { inkColor } from './ink.ts';
 import { cameraRelativePan } from './spatial-audio.ts';
+import { pageTurnPose } from './page-turn.ts';
 import type { CameraDragMode } from './camera-controls.ts';
 import type { PaperSurface } from './textures.ts';
 import { PAGE, PAPER_COLORS, PAPER_FINISH } from './types.ts';
@@ -115,6 +116,9 @@ export class DeskScene {
   private readonly inkMaterial = material('#24384d', 0.23);
   private readonly pageEdgeMaterial = material('#ece3d0', 0.95);
   private readonly paperMaterial = new THREE.MeshStandardMaterial({ roughness: 0.76, side: THREE.DoubleSide });
+  private pageSurface: THREE.Mesh | null = null;
+  private pageTurnProgress: number | null = null;
+  private pagePenStart: { position: THREE.Vector3; rotation: THREE.Quaternion } | null = null;
   private readonly shadeMaterial = material('#ead7ae', 0.78);
   private readonly lampBulbMaterial = new THREE.MeshStandardMaterial({ color: '#ffe2a4', emissive: '#ffbe64', emissiveIntensity: 1.5 });
   private readonly outdoors = new OutdoorView();
@@ -294,6 +298,7 @@ export class DeskScene {
     surface.name = 'writing-paper';
     surface.rotation.x = -Math.PI / 2;
     surface.castShadow = false;
+    this.pageSurface = surface;
   }
 
   private buildLamp(): void {
@@ -522,9 +527,7 @@ export class DeskScene {
     this.bookMaterial.color.set(palette.book);
     this.leafMaterial.color.set(palette.foliage);
     this.inkMaterial.color.set(inkColor(settings));
-    this.pageEdgeMaterial.color.set(PAPER_COLORS[settings.paper]);
-    this.paperMaterial.roughness = PAPER_FINISH[settings.paper].roughness;
-    this.paperMaterial.bumpScale = PAPER_FINISH[settings.paper].bumpScale;
+    this.setPaperFinish(settings.paper);
     this.shadeMaterial.color.set(settings.mood === 'storybook' ? '#e3beaf' : settings.mood === 'atelier' ? '#f4ead5' : '#e4c997');
     this.storyStars.visible = settings.mood === 'storybook';
     const daylight = Math.max(0, Math.sin((settings.time - 6) / 12 * Math.PI));
@@ -556,6 +559,7 @@ export class DeskScene {
     this.reducedMotion = reduced;
     this.controls.enableDamping = !reduced;
     this.dust.visible = !reduced;
+    this.setPageTurn(this.pageTurnProgress);
     if (reduced) {
       this.flashLight.intensity = 0;
       this.lightningRemaining = 0;
@@ -601,6 +605,28 @@ export class DeskScene {
   holdCamera(): void {
     this.movingCamera = false;
     this.followNib = false;
+  }
+
+  setPageTurn(progress: number | null): void {
+    const pose = pageTurnPose(progress, this.reducedMotion);
+    this.pageTurnProgress = progress;
+    if (progress === null) this.pagePenStart = null;
+    if (!this.pageSurface) throw new Error('The writing paper is not initialized.');
+    this.pageSurface.position.set(0, PAPER_Y + pose.lift, pose.slide);
+    this.pageSurface.rotation.set(-Math.PI / 2, 0, pose.rotation);
+    this.paperMaterial.opacity = pose.opacity;
+    const transparent = progress !== null && !this.reducedMotion;
+    if (this.paperMaterial.transparent !== transparent) {
+      this.paperMaterial.transparent = transparent;
+      this.paperMaterial.depthWrite = !transparent;
+      this.paperMaterial.needsUpdate = true;
+    }
+  }
+
+  setPaperFinish(kind: Settings['paper']): void {
+    this.pageEdgeMaterial.color.set(PAPER_COLORS[kind]);
+    this.paperMaterial.roughness = PAPER_FINISH[kind].roughness;
+    this.paperMaterial.bumpScale = PAPER_FINISH[kind].bumpScale;
   }
 
   get soundPlacement(): { pen: number; window: number } {
@@ -649,7 +675,27 @@ export class DeskScene {
     const z = (sample.y / PAGE.height - 0.5) * PAPER_HEIGHT;
     const idle = sample.status === 'idle';
     if (sample.status !== 'complete') this.penReturn = null;
-    if (idle) {
+    if (this.pageTurnProgress != null && !this.reducedMotion) {
+      if (!this.pagePenStart) {
+        this.pagePenStart = {
+          position: new THREE.Vector3(x, PAPER_Y + 0.018, z),
+          rotation: this.pen.quaternion.clone(),
+        };
+      }
+      const hover = PEN_REST_POSITION.clone().add(new THREE.Vector3(0, 0.75, 0));
+      if (this.pageTurnProgress < 0.5) {
+        const travel = THREE.MathUtils.smoothstep(this.pageTurnProgress * 2, 0, 1);
+        this.pen.position.copy(this.pagePenStart.position).lerp(hover, travel);
+        this.pen.position.y += 0.35 * Math.sin(Math.PI * travel);
+        this.pen.quaternion.copy(this.pagePenStart.rotation).slerp(PEN_REST_ROTATION, travel);
+      } else {
+        const travel = THREE.MathUtils.smoothstep((this.pageTurnProgress - 0.5) * 2, 0, 1);
+        const destination = new THREE.Vector3(x, PAPER_Y + 0.42 * 0.48, z);
+        this.pen.position.copy(hover).lerp(destination, travel);
+        this.pen.position.y += 0.35 * Math.sin(Math.PI * travel);
+        this.pen.quaternion.copy(PEN_REST_ROTATION).slerp(this.penOrientation, travel);
+      }
+    } else if (idle) {
       this.pen.position.copy(PEN_REST_POSITION);
       this.pen.quaternion.copy(PEN_REST_ROTATION);
     } else if (sample.status === 'complete') {
@@ -691,7 +737,7 @@ export class DeskScene {
     // The mouth seats at the barrel; the closed crown faces the nib, with the clip still on top.
     const attachedRotation = this.pen.quaternion.clone().multiply(CAP_REVERSE);
     this.cap.quaternion.copy(parkedRotation).slerp(attachedRotation, this.capAmount);
-    if (this.followNib && !this.movingCamera) {
+    if (this.followNib && !this.movingCamera && this.pageTurnProgress == null) {
       const look = this.pen.position.clone();
       look.y = 0.4;
       this.camera.position.add(look.clone().sub(this.controls.target));
@@ -759,6 +805,8 @@ export class DeskScene {
       paperRoughnessMapped: this.paperMaterial.roughnessMap !== null,
       paperRoughnessVersion: this.paperMaterial.roughnessMap?.version ?? 0,
       soundPlacement: this.soundPlacement,
+      pageTurnProgress: this.pageTurnProgress,
+      pageOpacity: this.paperMaterial.opacity,
       canvas: { width: this.renderer.domElement.width, height: this.renderer.domElement.height },
       drawCalls: this.renderer.info.render.calls,
     };

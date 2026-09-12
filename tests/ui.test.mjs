@@ -106,6 +106,19 @@ test('lettering controls describe their paper effect and expose left and center 
   assert.ok(html.includes('Editor &amp; paper size'));
 });
 
+test('multi-page writing exposes capacity, accessible page navigation and a clear reset action', () => {
+  const html = renderUI();
+  assert.ok(html.includes('up to 10 pages'));
+  assert.ok(html.includes('20,000-character safety limit'));
+  assert.match(html, /id="page-controls"[^>]+role="group"[^>]+aria-label="Written pages"/);
+  for (const label of ['Previous written page', 'Next written page']) assert.ok(html.includes(`aria-label="${label}"`));
+  assert.match(html, /id="page-position" aria-live="polite"/);
+  assert.ok(html.includes('id="quiet-page"'));
+  assert.ok(html.includes('Start over'));
+  assert.equal(html.includes('Long notes wrap within one finite sheet'), false);
+  assert.equal(html.includes('maxlength="420"'), false);
+});
+
 test('retired design pages and preview assets are removed, while shared editor fonts remain', () => {
   for (const path of ['designs.html', 'src/designs.ts', 'src/design-theme.css', 'src/design-gallery.ts', 'src/design-gallery.css',
     ...['nocturne', 'airmail', 'atelier', 'daydream', 'listening'].map((name) => `public/design-previews/${name}.jpg`)]) {

@@ -118,6 +118,7 @@ export class WritingEngine {
   private suspendedLift = REST_LIFT;
   private progressFloor = 0;
   private progressStartLength = 0;
+  private pageBoundaryPending = false;
 
   constructor(layout: LayoutResult, options: EngineOptions) {
     if (!layout.ok || !layout.strokes.length) throw new Error(layout.error ?? 'There is no handwriting to play.');
@@ -130,6 +131,7 @@ export class WritingEngine {
 
   get status(): WritingStatus { return this.state; }
   get progress(): number {
+    if (this.pageBoundaryPending && this.state !== 'complete') return this.progressFloor;
     return this.state === 'complete' ? 1 : this.progressFloor + (1 - this.progressFloor)
       * clamp((this.drawnLength - this.progressStartLength) / (this.totalLength - this.progressStartLength));
   }
@@ -161,7 +163,13 @@ export class WritingEngine {
     this.resumeProgress = null;
     this.suspendedLift = REST_LIFT;
     this.progressFloor = this.progressStartLength = 0;
-    const first = this.strokes[0].edges[0];
+    this.pageBoundaryPending = false;
+    const first = this.strokes[0]?.edges[0];
+    if (!first) {
+      this.pageBoundaryPending = true;
+      this.pressure = this.contactSpeed = 0;
+      return;
+    }
     this.position = { ...first.from };
     this.travelFrom = { ...first.from };
     this.travelTo = { ...first.from };
@@ -174,20 +182,31 @@ export class WritingEngine {
     this.options = normalizeOptions(options);
   }
 
-  replaceUnwrittenStrokes(from: number, points: Point[][]): void {
-    if (this.state !== 'paused' || !Number.isInteger(from) || from < this.startedStrokeCount || from > this.strokes.length) {
+  replaceUnwrittenStrokes(from: number, points: Point[][], allowPageBoundary = false): void {
+    const reopenCompletedPage = allowPageBoundary && this.state === 'complete';
+    if (this.state !== 'paused' && !reopenCompletedPage
+      || !Number.isInteger(from) || from < this.startedStrokeCount || from > this.strokes.length) {
       throw new Error('Pause the pen before replacing only its unwritten strokes.');
     }
     const next = [...this.strokes.slice(0, from), ...points.map((path, index) => compileStroke(path, from + index))];
     const totalLength = next.reduce((sum, stroke) => sum + stroke.length, 0);
-    if (!Number.isFinite(totalLength) || totalLength <= this.drawnLength) {
+    const atBoundary = this.strokeIndex === next.length;
+    if (!Number.isFinite(totalLength)
+      || (!allowPageBoundary || !atBoundary) && (atBoundary || totalLength <= this.drawnLength)) {
       throw new Error('The sheet must retain its ink and at least one remaining stroke.');
     }
     const progress = this.progress;
+    if (reopenCompletedPage) {
+      this.suspendedLift = this.peek().lift;
+      this.state = 'paused';
+      this.resumeProgress = null;
+    }
     this.strokes = next;
     this.totalLength = totalLength;
     this.progressFloor = progress;
     this.progressStartLength = this.drawnLength;
+    this.pageBoundaryPending = atBoundary;
+    if (atBoundary) return;
     if (from === this.strokeIndex) {
       this.phase = 'travel';
       this.phaseProgress = this.edgeIndex = this.edgeOffset = 0;
@@ -221,6 +240,12 @@ export class WritingEngine {
   tick(deltaSeconds: number): WritingFrame {
     const segments: InkSegment[] = [];
     if (this.state !== 'writing' || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
+      return { pen: this.peek(), segments };
+    }
+    if (this.pageBoundaryPending) {
+      this.state = 'complete';
+      this.drawnLength = this.totalLength;
+      this.contactSpeed = 0;
       return { pen: this.peek(), segments };
     }
     let remaining = deltaSeconds;

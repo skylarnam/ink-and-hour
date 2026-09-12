@@ -94,6 +94,11 @@ export function makeLabelTexture(title: string, subtitle: string): THREE.CanvasT
   return texture;
 }
 
+export interface PaperSnapshot {
+  readonly paper: PaperKind;
+  readonly ink: string;
+}
+
 export class PaperSurface {
   readonly canvas: HTMLCanvasElement;
   readonly texture: THREE.CanvasTexture;
@@ -111,6 +116,7 @@ export class PaperSurface {
   private readonly scale = 2;
   private dirty = false;
   private disposed = false;
+  private restoreRevision = 0;
 
   constructor() {
     [this.canvas, this.context] = canvas2D(PAGE.width * this.scale, PAGE.height * this.scale);
@@ -141,6 +147,34 @@ export class PaperSurface {
     } as const;
   }
 
+  get kind(): PaperKind { return this.paper; }
+
+  snapshot(): PaperSnapshot {
+    if (this.disposed) throw new Error('This paper surface has closed.');
+    return Object.freeze({ paper: this.paper, ink: this.inkCanvas.toDataURL('image/png') });
+  }
+
+  async restore(snapshot: PaperSnapshot): Promise<boolean> {
+    if (this.disposed) return false;
+    if (!snapshot || typeof snapshot.ink !== 'string' || !snapshot.ink.startsWith('data:image/png;base64,')
+      || !Object.hasOwn(PAPER_COLORS, snapshot.paper)) {
+      throw new Error('This saved page is not a valid local ink snapshot.');
+    }
+    const revision = ++this.restoreRevision;
+    const image = document.createElement('img');
+    image.src = snapshot.ink;
+    await image.decode();
+    if (this.disposed || revision !== this.restoreRevision) return false;
+    if (image.naturalWidth !== this.inkCanvas.width || image.naturalHeight !== this.inkCanvas.height) {
+      throw new Error('This saved page has an unexpected paper size.');
+    }
+    this.setPaper(snapshot.paper);
+    this.clear();
+    this.inkContext.drawImage(image, 0, 0);
+    this.compose();
+    return true;
+  }
+
   setReducedMotion(reduced: boolean): void {
     if (this.disposed) return;
     if (this.wetInk.setReducedMotion(reduced)) this.roughnessTexture.needsUpdate = true;
@@ -148,6 +182,7 @@ export class PaperSurface {
 
   setPaper(paper: PaperKind): void {
     if (this.disposed || paper === this.paper) return;
+    this.restoreRevision++;
     this.paper = paper;
     if (this.wetInk.clear()) this.roughnessTexture.needsUpdate = true;
     this.preparePaper();
@@ -156,6 +191,7 @@ export class PaperSurface {
 
   clear(): void {
     if (this.disposed) return;
+    this.restoreRevision++;
     if (this.wetInk.clear()) this.roughnessTexture.needsUpdate = true;
     this.inkContext.clearRect(0, 0, this.inkCanvas.width, this.inkCanvas.height);
     this.compose();
@@ -163,6 +199,7 @@ export class PaperSurface {
 
   draw(segments: InkSegment[], color: string): void {
     if (this.disposed || !segments.length) return;
+    this.restoreRevision++;
     const ctx = this.inkContext;
     ctx.save();
     ctx.scale(this.scale, this.scale);
@@ -267,10 +304,10 @@ export class PaperSurface {
     this.dirty = false;
   }
 
-  exportPNG(): void {
+  exportPNG(filename = 'ink-and-hour.png'): void {
     this.flush();
     const link = document.createElement('a');
-    link.download = 'ink-and-hour.png';
+    link.download = filename;
     link.href = this.canvas.toDataURL('image/png');
     link.click();
   }
@@ -278,6 +315,7 @@ export class PaperSurface {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.restoreRevision++;
     this.wetInk.dispose();
     this.texture.dispose();
     this.heightTexture.dispose();
