@@ -389,6 +389,7 @@ test('contact speed is actual canvas distance per second and angle is its tangen
   const dx = frame.pen.x - before.x;
   const dy = frame.pen.y - before.y;
   near(Math.hypot(dx, dy) / delta, frame.pen.speed, 1e-5);
+  near(frame.segments[0].speed, frame.pen.speed);
   near(Math.atan2(dy, dx), frame.pen.angle);
   assert.deepEqual(frame.segments[0].to, point(frame.pen));
 });

@@ -62,8 +62,10 @@ let lastStatus: WritingStatus = 'idle';
 let dirtyDraft = false;
 let disposed = false;
 let lastTimestamp = 0;
+let lastInkTimestamp: number | undefined;
 let elapsed = 0;
 let animationId = 0;
+let disposeMotionPreference = (): void => {};
 
 function letteringOptions(next = settings): LayoutOptions {
   return { ...PAGE, style: next.style, textScale: next.textScale, textAlignment: next.textAlignment };
@@ -323,7 +325,13 @@ try {
   scene.setCapped(capped);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   scene.setReducedMotion(reducedMotion.matches);
-  reducedMotion.addEventListener('change', (event) => scene?.setReducedMotion(event.matches));
+  paper.setReducedMotion(reducedMotion.matches);
+  const motionChanged = (event: MediaQueryListEvent): void => {
+    scene?.setReducedMotion(event.matches);
+    paper.setReducedMotion(event.matches);
+  };
+  reducedMotion.addEventListener('change', motionChanged);
+  disposeMotionPreference = () => reducedMotion.removeEventListener('change', motionChanged);
   scene.updatePen(currentPen());
   scene.update(0, 0);
   element<HTMLDivElement>('#scene-loading').hidden = true;
@@ -544,6 +552,9 @@ function frame(timestamp: number): void {
   lastTimestamp = timestamp;
   if (!document.hidden && scene) {
     elapsed += delta;
+    // Ink still dries while the tab is hidden; age old marks before adding a new frame.
+    paper.flush(lastInkTimestamp === undefined ? 0 : Math.max(0, (timestamp - lastInkTimestamp) / 1000));
+    lastInkTimestamp = timestamp;
     const result = engine?.tick(delta) ?? { pen: currentPen(), segments: [] };
     paper.draw(result.segments, inkColor(settings));
     paper.flush();
@@ -571,6 +582,7 @@ if (import.meta.env.DEV) {
       music: recordedMusic.state,
       editor: { zoom: editorZoom.scale, alignment: settings.textAlignment },
       quietView: quietView.active,
+      paper: paper.diagnostics,
     }),
   });
 }
@@ -582,6 +594,7 @@ function dispose(): void {
   clearTimeout(noticeTimer);
   soundStartup.dispose();
   quietView.dispose();
+  disposeMotionPreference();
   document.removeEventListener('visibilitychange', visibilityChanged);
   editorZoom.dispose();
   recordedMusic.dispose();

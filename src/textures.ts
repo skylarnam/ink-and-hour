@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PAGE, PAPER_COLORS } from './types.ts';
 import type { InkSegment, PaperKind } from './types.ts';
+import { fillInkSegment, inkPooling, WetInkMask } from './wet-ink.ts';
 
 export function randomSource(seed: number): () => number {
   let state = seed >>> 0;
@@ -97,6 +98,7 @@ export class PaperSurface {
   readonly canvas: HTMLCanvasElement;
   readonly texture: THREE.CanvasTexture;
   readonly heightTexture: THREE.CanvasTexture;
+  readonly roughnessTexture: THREE.CanvasTexture;
   private readonly context: CanvasRenderingContext2D;
   private readonly paperCanvas: HTMLCanvasElement;
   private readonly paperContext: CanvasRenderingContext2D;
@@ -104,9 +106,11 @@ export class PaperSurface {
   private readonly inkContext: CanvasRenderingContext2D;
   private readonly heightCanvas: HTMLCanvasElement;
   private readonly heightContext: CanvasRenderingContext2D;
+  private readonly wetInk: WetInkMask;
   private paper: PaperKind = 'smooth';
   private readonly scale = 2;
   private dirty = false;
+  private disposed = false;
 
   constructor() {
     [this.canvas, this.context] = canvas2D(PAGE.width * this.scale, PAGE.height * this.scale);
@@ -119,24 +123,46 @@ export class PaperSurface {
     this.texture.generateMipmaps = true;
     this.heightTexture = new THREE.CanvasTexture(this.heightCanvas);
     this.heightTexture.anisotropy = 8;
+    const [roughnessCanvas, roughnessContext] = canvas2D(PAGE.width, PAGE.height);
+    this.wetInk = new WetInkMask(roughnessContext);
+    this.roughnessTexture = new THREE.CanvasTexture(roughnessCanvas);
+    this.roughnessTexture.anisotropy = 4;
+    this.roughnessTexture.generateMipmaps = false;
+    this.roughnessTexture.minFilter = THREE.LinearFilter;
     this.preparePaper();
     this.compose();
   }
 
+  get diagnostics() {
+    return {
+      ...this.wetInk.diagnostics,
+      roughnessVersion: this.roughnessTexture.version,
+      colorVersion: this.texture.version,
+    } as const;
+  }
+
+  setReducedMotion(reduced: boolean): void {
+    if (this.disposed) return;
+    if (this.wetInk.setReducedMotion(reduced)) this.roughnessTexture.needsUpdate = true;
+  }
+
   setPaper(paper: PaperKind): void {
-    if (paper === this.paper) return;
+    if (this.disposed || paper === this.paper) return;
     this.paper = paper;
+    if (this.wetInk.clear()) this.roughnessTexture.needsUpdate = true;
     this.preparePaper();
     this.compose();
   }
 
   clear(): void {
+    if (this.disposed) return;
+    if (this.wetInk.clear()) this.roughnessTexture.needsUpdate = true;
     this.inkContext.clearRect(0, 0, this.inkCanvas.width, this.inkCanvas.height);
     this.compose();
   }
 
   draw(segments: InkSegment[], color: string): void {
-    if (!segments.length) return;
+    if (this.disposed || !segments.length) return;
     const ctx = this.inkContext;
     ctx.save();
     ctx.scale(this.scale, this.scale);
@@ -145,33 +171,20 @@ export class PaperSurface {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     for (const segment of segments) {
-      const { from, to, fromWidth, toWidth } = segment;
-      const dx = to.x - from.x;
-      const dy = to.y - from.y;
-      const length = Math.hypot(dx, dy);
-      const nx = length > 0 ? -dy / length : 0;
-      const ny = length > 0 ? dx / length : 1;
       const absorption = this.paper === 'cotton' ? 1.08 : 1;
-      const w0 = Math.max(0.4, fromWidth) * absorption / 2;
-      const w1 = Math.max(0.4, toWidth) * absorption / 2;
-      ctx.globalAlpha = this.paper === 'cotton' ? 0.9 : 0.96;
-      ctx.beginPath();
-      ctx.moveTo(from.x + nx * w0, from.y + ny * w0);
-      ctx.lineTo(to.x + nx * w1, to.y + ny * w1);
-      ctx.lineTo(to.x - nx * w1, to.y - ny * w1);
-      ctx.lineTo(from.x - nx * w0, from.y - ny * w0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(to.x, to.y, w1, 0, Math.PI * 2);
-      ctx.fill();
+      const pooling = inkPooling(segment);
+      ctx.globalAlpha = (this.paper === 'cotton' ? 0.9 : 0.96) + pooling * 0.032;
+      fillInkSegment(ctx, segment, absorption);
+      this.wetInk.add(segment, absorption, pooling);
     }
     ctx.restore();
     this.dirty = true;
   }
 
-  flush(): void {
+  flush(deltaSeconds = 0): void {
+    if (this.disposed) return;
     if (this.dirty) this.compose();
+    if (this.wetInk.flush(deltaSeconds)) this.roughnessTexture.needsUpdate = true;
   }
 
   private preparePaper(): void {
@@ -263,7 +276,11 @@ export class PaperSurface {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.wetInk.dispose();
     this.texture.dispose();
     this.heightTexture.dispose();
+    this.roughnessTexture.dispose();
   }
 }

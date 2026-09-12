@@ -45,6 +45,8 @@ export interface InkSegment {
   fromWidth: number;
   toWidth: number;
   pressure: number;
+  /** Logical page units per second while this segment was drawn. */
+  speed?: number;
 }
 
 export interface PenSample extends Point {

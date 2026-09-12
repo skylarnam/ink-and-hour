@@ -283,6 +283,7 @@ export class DeskScene {
     }
     this.paperMaterial.map = paper.texture;
     this.paperMaterial.bumpMap = paper.heightTexture;
+    this.paperMaterial.roughnessMap = paper.roughnessTexture;
     const surface = mesh(new THREE.PlaneGeometry(PAPER_WIDTH, PAPER_HEIGHT),
       this.paperMaterial, this.scene, 0, PAPER_Y, 0);
     surface.name = 'writing-paper';
@@ -740,6 +741,8 @@ export class DeskScene {
       penReturning: this.penReturn !== null && this.penReturn.elapsed < PEN_RETURN_DURATION,
       penResting: this.pen.position.distanceTo(PEN_REST_POSITION) < 0.001,
       reducedMotion: this.reducedMotion, lightningIntensity: this.flashLight.intensity,
+      paperRoughnessMapped: this.paperMaterial.roughnessMap !== null,
+      paperRoughnessVersion: this.paperMaterial.roughnessMap?.version ?? 0,
       canvas: { width: this.renderer.domElement.width, height: this.renderer.domElement.height },
       drawCalls: this.renderer.info.render.calls,
     };

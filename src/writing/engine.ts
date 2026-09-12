@@ -278,6 +278,7 @@ export class WritingEngine {
       if (step > 0) segments.push({
         from: previous, to: { ...this.position }, fromWidth: previousWidth,
         toWidth: this.width, pressure: (previousPressure + this.pressure) / 2,
+        speed,
       });
       if (spent === timeLeft) this.advanceEdge();
     }

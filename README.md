@@ -101,6 +101,11 @@ it in a terminal separates its lifetime from the agent's completed work.
   The custom shade persists. Cotton has warmer cellulose mottling, longer
   fibers, more matte relief, and slightly softer/wider absorbed ink; Smooth
   stays fine-grained and lightly finished.
+  Fresh strokes have a restrained wet finish that catches the room's light and
+  dries over four seconds, including while paused. Slower, loaded strokes leave
+  slightly denser ink within the same nib footprint, not enlarged blobs.
+  Reduced motion settles the sheen immediately; exported pages contain only
+  permanent ink and paper.
 - In rotation mode, click the pen/cap, glass bottle, or tied leather roll in the scene. The same
   cap and roll actions have labeled buttons. The roll unfolds into four pen
   pockets. The dip holder has no cap.
@@ -239,6 +244,12 @@ on the relationship between a fixed edge angle and stroke direction. Fine is
 restrained. The two holders have different flex/audio responses. A layered 2D
 paper/ink canvas is mapped onto the 3D sheet, with grain cached separately.
 Paper relief has its own cached height texture; ink changes do not rebuild it.
+Fresh ink uses a separate 780 x 1040 linear roughness mask, updated at most
+about 24 times a second. Only the latest 2,048 wet segments are retained;
+older permanent ink is never removed. Dry masks are exactly white and stop
+uploading, preserving the selected paper's matte finish. Aging does not rebuild
+paper grain or the full-resolution color texture. Pooling is a small density
+change based on actual segment speed and pressure, not a fluid simulation.
 
 Writing has four independently selectable sound profiles, with **Textured**
 as the default. They blend original, procedurally generated rubbing and irregular
