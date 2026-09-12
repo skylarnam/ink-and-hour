@@ -252,6 +252,13 @@ Stroke order in an ordinary font is **inferred**, not recorded by its designer.
 The graph traversal covers each retained segment once, lifting to reach a new
 branch rather than drawing back over completed ink. Compact raster junctions
 are merged with bounded endpoint movement to avoid tiny false branches.
+Meddon and Italianno additionally use a source-guarded cursive inference profile:
+tiny diagonal raster pockets and source-filled local cycles are removed without
+discarding real counters, dots or flourishes. A post-simplification guard rejects
+repeated centerline chords. Their lowercase trails follow inspected entry/body/
+exit ordering, with i/j dots after the body rather than before it. Other styles
+and the original font files are unchanged. This remains an interpretation:
+ornate capitals and some compound letters can have multiple plausible pen lifts.
 Tiny-glyph interpretations are recorded in the attribution
 data. Italianno's original font has a blank underscore: its editor face excludes
 that character so the system-serif fallback keeps it visible, while the pen
@@ -271,6 +278,10 @@ Existing selected centerlines are preserved by default. Use `--regenerate ID`
 to deliberately regenerate an approved face. `--audit-stroke-flow ID` reports
 unique retained graph length versus drawn trail length for that face. Changed source bytes require a
 refreshed catalog and explicit approval snapshot before generation will proceed.
+For the two cursive profiles, `--audit-inference meddon` or
+`--audit-inference italianno` also reports the source-based repairs and preserved
+counters. Apply a changed inference profile with explicit
+`--regenerate meddon --regenerate italianno`; do not relabel unregenerated data.
 `scripts/apply-font-selection.ts` requires both the approved `--revision` and
 `--sha256`; it never follows a changing checklist implicitly.
 

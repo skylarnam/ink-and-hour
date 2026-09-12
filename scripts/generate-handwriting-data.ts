@@ -10,6 +10,11 @@ import {
   extractSegments, key, neighbors, nodeOrder, pruneSegments,
   type Point,
 } from './stroke-routing.ts';
+import {
+  CURSIVE_INFERENCE_PROFILE, hasCursiveProfile, repairDiagonalPockets, removeRedundantCycles,
+  reweaveCursiveTrails, planCursiveStrokes, repeatedChordLength,
+  sourceCounters,
+} from './cursive-inference.ts';
 
 const PRINTABLE_ASCII = Array.from({ length: 94 }, (_, index) => String.fromCharCode(index + 33));
 const TARGET_X_HEIGHT = 10.5;
@@ -20,6 +25,7 @@ const { values: args } = parseArgs({
   options: {
     preview: { type: 'boolean' }, regenerate: { type: 'string', multiple: true },
     'inspect-glyph': { type: 'string' }, 'audit-stroke-flow': { type: 'string' },
+    'audit-inference': { type: 'string' },
   },
 });
 const regenerate = new Set(args.regenerate ?? []);
@@ -30,6 +36,10 @@ const approximations: ComponentApproximation[] = [];
 // traversal keeps penLength == inkLength (no backtracking); trailCount is the
 // number of separate pen-down strokes (lifts) used to cover it.
 const strokeFlowAudit: Array<{ inkLength: number; penLength: number; trailCount: number }> = [];
+const inferenceAudit: Array<{
+  referencePixels: number; sourceCounters: number[]; retainedCounters: number[];
+  changes: Array<{ kind: 'pocket' | 'cycle'; points: Point[] }>;
+}> = [];
 
 interface StrokeGlyph {
   d: string;
@@ -254,7 +264,10 @@ function simplify(points: Point[], tolerance: number): Point[] {
   return points.filter((_, index) => keep[index]).map((point) => ({ ...point }));
 }
 
-function extractTrails(bitmap: Uint8Array, width: number, height: number): Point[][] {
+function extractTrails(
+  bitmap: Uint8Array, width: number, height: number,
+  source?: { bitmap: Uint8Array; referencePixels: number; onRemove?: (points: Point[]) => void },
+): Point[][] {
   const graph = buildGraph(bitmap, width, height);
   const components = connectedComponents(bitmap, width, height).map((component) =>
     component.map((index) => key(index % width, Math.floor(index / width))));
@@ -271,7 +284,9 @@ function extractTrails(bitmap: Uint8Array, width: number, height: number): Point
     // rather than a clean 1px medial axis; contracting it first keeps segment
     // extraction (and therefore trail decomposition) working from the one real joint.
     const { nodes: contractedNodes, graph: contractedGraph } = contractMicroJunctions(component, graph);
-    const segments = pruneSegments(extractSegments(contractedNodes, contractedGraph))
+    const extracted = extractSegments(contractedNodes, contractedGraph);
+    const segments = pruneSegments(source
+      ? removeRedundantCycles(extracted, source.bitmap, width, source.referencePixels, source.onRemove) : extracted)
       .filter((segment) => segment.length >= 1 || segment.points.length <= 2)
       .map(decodeSegment);
     // decomposeIntoTrails covers every segment exactly once, splitting a fork or
@@ -366,6 +381,7 @@ function centerline(
   character: string,
   referenceHeight: number,
   id: string,
+  profiled = hasCursiveProfile(id),
 ): { strokes: Point[][]; advance: number } {
   const original = font.charToGlyph(character);
   if (!original.path.commands.length) {
@@ -396,7 +412,17 @@ function centerline(
     const raster = buildBitmap(font, character, renderScale, 128);
     const { bitmap, width, height } = raster;
     const components = connectedComponents(bitmap, width, height);
-    const skeleton = prune(thin(bitmap, width, height), width, height, 3);
+    const repaired = profiled ? repairDiagonalPockets(bitmap, width, height, referencePixels) : { bitmap, repairs: [] };
+    const inferred = repaired.bitmap;
+    const normalizedPoint = (point: Point): Point => ({
+      x: (point.x + 0.5 - raster.xOffset) * TARGET_X_HEIGHT / referencePixels,
+      y: BASELINE - (raster.yOffset - point.y - 0.5) * TARGET_X_HEIGHT / referencePixels,
+    });
+    const changes: Array<{ kind: 'pocket' | 'cycle'; points: Point[] }> = repaired.repairs.map(({ pixels }) => ({
+      kind: 'pocket',
+      points: pixels.map(pixel => normalizedPoint({ x: pixel % width, y: Math.floor(pixel / width) })),
+    }));
+    const skeleton = prune(thin(inferred, width, height), width, height, 3);
     const unresolved = components.flatMap((component, index) =>
       component.some((pixel) => skeleton[pixel] && neighbors(skeleton, width, pixel % width, Math.floor(pixel / width)).length)
         ? [] : [{ component, index }]);
@@ -407,7 +433,12 @@ function centerline(
       })));
       continue;
     }
-    const strokes = extractTrails(skeleton, width, height)
+    const extracted = extractTrails(skeleton, width, height,
+      profiled ? {
+        bitmap: inferred, referencePixels,
+        onRemove: (points) => changes.push({ kind: 'cycle', points: points.map(normalizedPoint) }),
+      } : undefined);
+    const strokes = (profiled ? reweaveCursiveTrails(extracted, id, character, normalizedPoint) : extracted)
       .map((stroke) => normalizeStroke(stroke, raster, renderScale, referenceHeight));
     const marks = unresolved.map(({ component, index }) => ({
       component, index,
@@ -427,8 +458,19 @@ function centerline(
       });
     }
     if (!strokes.length) continue;
+    const planned = profiled ? planCursiveStrokes(strokes, id, character) : strokes;
+    if (profiled && repeatedChordLength(planned) > 0.01) {
+      throw new Error(`Repeated simplified centerline in ${id}:${character}; inspect its source topology.`);
+    }
+    if (profiled && args['audit-inference']) {
+      inferenceAudit.push({
+        referencePixels, changes,
+        sourceCounters: sourceCounters(bitmap, width, height).map(pixels => pixels.length),
+        retainedCounters: sourceCounters(inferred, width, height).map(pixels => pixels.length),
+      });
+    }
     const advance = font.charToGlyph(character).advanceWidth * (TARGET_X_HEIGHT / referenceHeight);
-    return { strokes, advance: round(advance) };
+    return { strokes: planned, advance: round(advance) };
   }
   throw new Error(`No reliable source centerline for ${id}:${character}, even with adaptive high-resolution rasterization.`);
 }
@@ -505,6 +547,20 @@ function auditRetainedMarks(style: (typeof HANDWRITING_STYLES)[number], data: Ge
 
 const digest = (bytes: string | Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const hash = (path: string): string => digest(readFileSync(new URL(`../public${path}`, import.meta.url)));
+if (args['audit-inference']) {
+  const id = args['audit-inference'];
+  const style = HANDWRITING_STYLES.find(style => style.id === id);
+  if (!style || !hasCursiveProfile(id)) throw new Error('Audit the Meddon or Italianno inference profile.');
+  const font = parseFont(new URL(`../public${style.publicFontPath}`, import.meta.url).pathname);
+  const referenceHeight = measureReferenceHeight(font);
+  for (const character of PRINTABLE_ASCII) {
+    inferenceAudit.length = 0;
+    const before = centerline(font, character, referenceHeight, id, false);
+    const after = centerline(font, character, referenceHeight, id);
+    console.log(JSON.stringify({ id, character, before, after, audit: inferenceAudit }));
+  }
+  process.exit(0);
+}
 if (args['inspect-glyph']) {
   const [id, character] = args['inspect-glyph'].split(':');
   const style = HANDWRITING_STYLES.find((style) => style.id === id);
@@ -574,6 +630,9 @@ for (const style of addedStyles) {
     if (priorSource.centerlineSha256 && priorSource.centerlineSha256 !== digest(JSON.stringify(existing[style.id]))) {
       throw new Error(`The saved centerline bytes changed for ${style.id}; use explicit --regenerate to replace them.`);
     }
+    if (hasCursiveProfile(style.id) && priorSource.inferenceProfile !== CURSIVE_INFERENCE_PROFILE) {
+      throw new Error(`Use --regenerate ${style.id} to apply its source-guarded inference profile.`);
+    }
     data[style.id] = existing[style.id];
     if (previousAttribution.version === 2) {
       approximations.push(...previousAttribution.approximations.filter((record) => record.id === style.id));
@@ -585,6 +644,12 @@ for (const style of addedStyles) {
   const name = existing[style.id]?.name ?? `Ink Stroke Study ${String(++studyNumber).padStart(2, '0')}`;
   try {
     data[style.id] = fontData(style, name);
+    if (hasCursiveProfile(style.id) && existing[style.id]) {
+      if (data[style.id].chars.some((glyph, index) => glyph.o !== existing[style.id].chars[index].o)) {
+        throw new Error(`The approved glyph advances changed for ${style.id}.`);
+      }
+      data[style.id] = { ...existing[style.id], chars: data[style.id].chars };
+    }
     generatedCount++;
     console.log(`Generated ${style.id}: ${data[style.id].chars.length} centerline glyphs.`);
   } catch (error) {
@@ -595,7 +660,9 @@ for (const style of addedStyles) {
 }
 if (generationErrors.length) throw new AggregateError(generationErrors, 'No generated files were changed; resolve the source glyph failures above.');
 for (const style of addedStyles) {
-  if (!snapshot.preservedCenterlines.some((record) => record.id === style.id)) fitNewStudyToLine(style, data[style.id]);
+  if (!hasCursiveProfile(style.id) && !snapshot.preservedCenterlines.some((record) => record.id === style.id)) {
+    fitNewStudyToLine(style, data[style.id]);
+  }
 }
 
 writeFileSync(
@@ -636,6 +703,10 @@ writeFileSync(new URL('../public/data/HANDWRITING-ATTRIBUTION.json', import.meta
     preservedOriginalStudy: snapshot.preservedCenterlines.some((record) => record.id === style.id && record.sha256 === digest(JSON.stringify(data[style.id]))),
     writingScale: data[style.id].scale, lineHeight: data[style.id].lineHeight,
     heuristicStrokeOrder: true,
+    ...(hasCursiveProfile(style.id) ? {
+      inferenceProfile: CURSIVE_INFERENCE_PROFILE,
+      inferenceNotes: 'Guarded diagonal raster-pocket repair and source-supported local cycle cleanup; cursive trail direction and body-before-mark planning. Original font, advances and study metrics are unchanged.',
+    } : {}),
   })),
 }, null, 2)}\n`);
 

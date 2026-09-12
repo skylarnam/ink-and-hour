@@ -930,11 +930,13 @@
       "fontSha256": "f6ae96dea0da46c73370eb0575848ab0eda190315bdfda3f5b252bba3dc9173c",
       "licenseFile": "/fonts/italianno/OFL.txt",
       "licenseSha256": "bce79721f0203586872bbd7016922baf449980bdd1c44550a821112a3b547185",
-      "centerlineSha256": "f2996fafbaeff55436e1f723170f4e1b467389f841fe507cf56517f8b1a088fe",
+      "centerlineSha256": "010ad8b694b73a9816b8364c5a0357f869acb35dd0bb00fca5077bd54cc1778d",
       "preservedOriginalStudy": false,
       "writingScale": 1.5338,
       "lineHeight": 66,
-      "heuristicStrokeOrder": true
+      "heuristicStrokeOrder": true,
+      "inferenceProfile": "source-guarded-cursive-v1",
+      "inferenceNotes": "Guarded diagonal raster-pocket repair and source-supported local cycle cleanup; cursive trail direction and body-before-mark planning. Original font, advances and study metrics are unchanged."
     },
     {
       "id": "kaushan-script",
@@ -962,11 +964,13 @@
       "fontSha256": "c983e998ff7e01242544659c971bf4055bfb43a9fc5a0dd83ca7dafd105f94da",
       "licenseFile": "/fonts/meddon/OFL.txt",
       "licenseSha256": "eb1992aec1cf892ec94ffc116d79b62c7cb03dc108141b94a57a4195d210b514",
-      "centerlineSha256": "4c6c14e69e2958a9d21e4aa7e33a5f6c98313aea70b8ce5410c10489a6b4c387",
+      "centerlineSha256": "bb65e9d7a77da56b3bdbb3563a78676d7c1d9106405c48bfc40d5fae959a3d10",
       "preservedOriginalStudy": false,
       "writingScale": 1.2123,
       "lineHeight": 66,
-      "heuristicStrokeOrder": true
+      "heuristicStrokeOrder": true,
+      "inferenceProfile": "source-guarded-cursive-v1",
+      "inferenceNotes": "Guarded diagonal raster-pocket repair and source-supported local cycle cleanup; cursive trail direction and body-before-mark planning. Original font, advances and study metrics are unchanged."
     },
     {
       "id": "meie-script",
