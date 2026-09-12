@@ -64,6 +64,15 @@ test('initial sound UI says ready, not playing, before the browser has a user ge
   assert.ok(html.includes('Your browser waits for a first click, tap, or keypress'));
 });
 
+test('Quiet view has an accessible entry and a hidden compact writing, mute and exit bar', () => {
+  const html = renderUI();
+  assert.match(html, /id="enter-quiet-view"[^>]+aria-pressed="false"[^>]+aria-controls="quiet-toolbar"/);
+  assert.match(html, /id="quiet-toolbar"[^>]+role="group"[^>]+aria-label="Quiet view controls"[^>]+hidden/);
+  for (const id of ['quiet-play', 'quiet-sound', 'exit-quiet-view']) assert.ok(html.includes(`id="${id}"`));
+  assert.ok(html.includes('Press Escape or Show controls'));
+  assert.match(html, /id="quiet-sound"[^>]+aria-label="Sound ready\./);
+});
+
 test('all 34 approved handwriting choices expose their source licenses and the inferred-order limitation', () => {
   const html = renderUI();
   const selector = html.match(/<select id="style"[\s\S]*?<\/select>/)[0];

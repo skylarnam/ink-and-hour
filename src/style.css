@@ -71,6 +71,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .hint-dot { padding: 0 3px; opacity: 0.5; }
 .stage-icon { border: 1px solid #d8dece66; border-radius: 50%; height: 28px; width: 28px; display: grid; place-items: center; color: #eeeada; }
 .stage-icon .icon { width: 13px; height: 13px; }
+.quiet-view-button { position: absolute; z-index: 2; right: 22px; top: 78px; display: flex; align-items: center; gap: 7px; padding: 8px 11px; min-height: 36px; color: #faf6e9; font-size: 10px; background: #303b2dde; border: 1px solid #e6e4d455; border-radius: 6px; }
+.quiet-view-button .icon { width: 14px; height: 14px; }
+.quiet-toolbar { position: fixed; z-index: 9; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 4px; max-width: calc(100vw - 24px); padding: 5px; color: #faf6e9; background: #283328ed; border: 1px solid #d8dec455; border-radius: 8px; box-shadow: 0 4px 20px #17221630; }
+.quiet-toolbar button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 8px 12px; color: inherit; font-size: 11px; white-space: nowrap; border-radius: 4px; }
+.quiet-toolbar button:hover { background: #ffffff12; }
+.quiet-toolbar .icon { width: 15px; height: 15px; }
+#quiet-sound { min-width: 44px; padding: 8px; }
+#quiet-sound[aria-pressed="false"] { color: #d0c4aa; }
 .ritual-panel { background: var(--paper); border-left: 1px solid #dad6c7; display: flex; flex-direction: column; overflow: hidden; }
 .panel-tabs { display: flex; flex-shrink: 0; height: 55px; gap: 14px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--paper); position: sticky; top: 0; z-index: 5; }
 .panel-tabs button { display: flex; align-items: center; justify-content: center; flex: 1; gap: 6px; font-size: 11px; padding: 0; color: #8b8c7f; position: relative; }
@@ -216,6 +224,7 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .camera-hint { display: none; }
 }
 @media (max-width: 720px) {
+  .quiet-view-button { top: 16px; right: 16px; min-height: 44px; }
   .site-header { height: auto; min-height: 123px; padding: 12px 20px; gap: 10px; flex-wrap: wrap; }
   .header-audio { width: 100%; gap: 10px; justify-content: space-between; }
   .header-audio .sound-toggle { min-height: 42px; flex-shrink: 0; }
@@ -271,6 +280,13 @@ dialog a { color: #556b45; text-underline-offset: 3px; }
   .site-footer { height: auto; min-height: 57px; padding: 15px 22px; gap: 13px; flex-wrap: wrap; }
   .site-footer button { font-size: 9px; }
   .toast { bottom: 22px; }
+}
+html[data-quiet-view="true"], html[data-quiet-view="true"] body { overflow: hidden; }
+html[data-quiet-view="true"] .workspace { position: fixed; inset: 0; z-index: 8; display: block; height: 100dvh; min-height: 0; }
+html[data-quiet-view="true"] .stage { width: 100%; height: 100%; min-height: 0; max-height: none; }
+@media (max-width: 390px) {
+  .quiet-toolbar { gap: 0; }
+  .quiet-toolbar button { font-size: 10px; padding: 8px; gap: 5px; }
 }
 @media (max-width: 390px) {
   .sound-toggle .icon { display: none; }

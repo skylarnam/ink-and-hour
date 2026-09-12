@@ -2,6 +2,7 @@ import './style.css';
 import { RitualAudio } from './audio.ts';
 import { createSoundStartup, soundPresentation } from './sound-startup.ts';
 import { createEditorZoom } from './editor-zoom.ts';
+import { createQuietView } from './quiet-view.ts';
 import { DeskScene } from './scene.ts';
 import { inkColor, inkLabel, isInkColor } from './ink.ts';
 import { LOFI_TRACKS } from './music-library.ts';
@@ -159,11 +160,15 @@ function updateAudioButtons(): void {
   element<HTMLSpanElement>('#panel-enable-sound span').textContent = presentation.panelLabel;
   element<HTMLButtonElement>('#panel-enable-sound').setAttribute('aria-pressed', String(enabled));
   element<HTMLParagraphElement>('#sound-note').textContent = presentation.note;
+  const quietSound = element<HTMLButtonElement>('#quiet-sound');
+  quietSound.setAttribute('aria-pressed', String(enabled));
+  quietSound.setAttribute('aria-label', `${presentation.label}. ${presentation.action}.`);
+  quietSound.title = presentation.action;
   syncMusicAvailability();
 }
 
 async function toggleSound(): Promise<void> {
-  const buttons = [element<HTMLButtonElement>('#enable-sound'), element<HTMLButtonElement>('#panel-enable-sound')];
+  const buttons = ['#enable-sound', '#panel-enable-sound', '#quiet-sound'].map((selector) => element<HTMLButtonElement>(selector));
   buttons.forEach((button) => { button.disabled = true; });
   if (audio.enabled) {
     recordedMusic.setAvailable(false);
@@ -249,6 +254,7 @@ function validateDraft(): void {
   textarea.setAttribute('aria-invalid', String(!layout.ok));
   element<HTMLElement>('#character-count').textContent = `${textarea.value.length} / ${MAX_CHARACTERS}`;
   beginButton.disabled = !scene || !layout.ok;
+  element<HTMLButtonElement>('#quiet-play').disabled = beginButton.disabled;
 }
 
 function syncWriting(): void {
@@ -259,6 +265,10 @@ function syncWriting(): void {
   const buttonIcon = active ? 'pause' : complete ? 'reset' : 'play';
   const label = active ? 'Pause for a moment' : paused ? 'Resume writing' : complete ? 'Write it again' : 'Begin writing';
   beginButton.innerHTML = `${icon(buttonIcon)}<span>${label}</span>${icon('arrow', 'begin-arrow')}`;
+  const quietPlay = element<HTMLButtonElement>('#quiet-play');
+  quietPlay.innerHTML = `${icon(buttonIcon)}<span>${active ? 'Pause' : paused ? 'Resume' : complete ? 'Replay' : 'Write'}</span>`;
+  quietPlay.setAttribute('aria-label', label);
+  quietPlay.disabled = beginButton.disabled;
   textarea.readOnly = active || paused;
   styleSelect.disabled = active;
   editorZoom.setEnabled(!active);
@@ -324,6 +334,18 @@ try {
   message.textContent = `This little room needs WebGL 2. Try a recent browser with hardware acceleration enabled. ${error instanceof Error ? error.message : ''}`;
   console.error('Ink & Hour could not render the desk:', error);
 }
+
+const quietView = createQuietView({
+  document, root: document.documentElement, viewport: window,
+  enter: element<HTMLButtonElement>('#enter-quiet-view'),
+  exit: element<HTMLButtonElement>('#exit-quiet-view'),
+  toolbar: element<HTMLElement>('#quiet-toolbar'),
+  chrome: ['.site-header', '.ritual-panel', '.site-footer', '.stage-heading', '.camera-controls', '.stage-bottom', '#enter-quiet-view']
+    .map((selector) => element<HTMLElement>(selector)),
+  onEnter: () => scene?.holdCamera(),
+});
+element<HTMLButtonElement>('#quiet-play').addEventListener('click', () => beginButton.click());
+element<HTMLButtonElement>('#quiet-sound').addEventListener('click', () => { void toggleSound(); });
 
 beginButton.addEventListener('click', () => {
   if (engine?.status === 'writing') {
@@ -548,6 +570,7 @@ if (import.meta.env.DEV) {
       audio: audio.diagnostics, settings: { ...settings }, validInput: layout.ok, inputError: layout.error,
       music: recordedMusic.state,
       editor: { zoom: editorZoom.scale, alignment: settings.textAlignment },
+      quietView: quietView.active,
     }),
   });
 }
@@ -558,6 +581,7 @@ function dispose(): void {
   cancelAnimationFrame(animationId);
   clearTimeout(noticeTimer);
   soundStartup.dispose();
+  quietView.dispose();
   document.removeEventListener('visibilitychange', visibilityChanged);
   editorZoom.dispose();
   recordedMusic.dispose();

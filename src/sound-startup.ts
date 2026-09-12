@@ -34,7 +34,7 @@ export function createSoundStartup(document: Document, options: SoundStartupOpti
     if (!event.isTrusted || document.hidden || disposed || pending || !options.enabled() || options.running()) return;
     if (event.type === 'pointerup' && !(event.target instanceof Element && event.target.closest('#desk-canvas'))) return;
     if (event.target instanceof Element
-      && (event.target.closest('#enable-sound, #panel-enable-sound')
+      && (event.target.closest('#enable-sound, #panel-enable-sound, #quiet-sound')
         || event.target.closest('#music-play') && options.musicRequested())) return;
     if (event.type === 'keydown' && 'key' in event && typeof event.key === 'string'
       && ['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;

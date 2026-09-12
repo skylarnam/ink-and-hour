@@ -592,6 +592,11 @@ export class DeskScene {
     this.renderer.domElement.dataset.dragMode = mode;
   }
 
+  holdCamera(): void {
+    this.movingCamera = false;
+    this.followNib = false;
+  }
+
   adjustCamera(key: string, pan = false): boolean {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(key)) return false;
     this.movingCamera = false;

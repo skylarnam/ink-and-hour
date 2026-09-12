@@ -27,6 +27,7 @@ export const icons = {
   alignCenter: '<path d="M4 5h16M7 10h10M4 15h16M7 20h10"/>',
   roll: '<path d="M4 5h15v14H4M4 5c-4 0-4 14 0 14s4-14 0-14Zm7 0v14m3-9 4 4m-4 0 4-4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
+  quiet: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
 };
 
 export function icon(name: keyof typeof icons, className = ''): string {
@@ -72,6 +73,7 @@ export function renderUI(): string {
           <button type="button" data-camera="overhead" aria-pressed="false">Overhead</button>
           <button type="button" id="move-view" class="drag-mode" aria-label="Move view by dragging" aria-pressed="false" title="Turn on to drag across the desk. Turn off to rotate. Shift-drag also moves.">${icon('move')}Move</button>
         </div>
+        <button type="button" id="enter-quiet-view" class="quiet-view-button" aria-pressed="false" aria-controls="quiet-toolbar" title="Hide controls without moving the camera">${icon('quiet')}Quiet view</button>
         <div class="stage-bottom">
           <div class="ritual-status"><span class="status-light"></span><span id="scene-status">Take your time.</span></div>
           <span class="camera-hint">${icon('orbit')}<span id="camera-drag-hint">Drag to rotate / Shift-drag to move</span><span class="hint-dot">/</span>Scroll to zoom</span>
@@ -168,6 +170,12 @@ Stay a little while.</textarea>
         </section>
       </aside>
     </main>
+    <div id="quiet-toolbar" class="quiet-toolbar" role="group" aria-label="Quiet view controls" aria-describedby="quiet-help" hidden>
+      <span id="quiet-help" class="visually-hidden">Press Escape or Show controls to leave Quiet view. Writing and sound continue unchanged.</span>
+      <button type="button" id="quiet-play" aria-label="Begin writing">${icon('play')}<span>Write</span></button>
+      <button type="button" id="quiet-sound" aria-pressed="true" aria-label="${sound.label}. ${sound.action}." title="${sound.action}">${icon('sound')}</button>
+      <button type="button" id="exit-quiet-view">${icon('quiet')}<span>Show controls</span></button>
+    </div>
     <footer class="site-footer"><button id="about-button" type="button">About this little world ${icon('info')}</button></footer>
     <div id="notice" class="toast" role="status" hidden><span></span><button id="dismiss-notice" aria-label="Dismiss message">${icon('close')}</button></div>
     <dialog id="about-dialog">
@@ -176,6 +184,7 @@ Stay a little while.</textarea>
       <h2>Nothing to finish.<br>Just something to feel.</h2>
       <p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p>
       <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
+      <p>Quiet view fills the window with your desk, hides the editor and room controls, and stops automatic camera following without interrupting the pen. A small bar keeps writing, sound and Show controls within reach. Escape returns to the editor.</p>
       <p>English letters, digits and standard punctuation are supported. Long notes wrap within one finite sheet. Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page when it finishes.</p>
       <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: started letters keep their shape, and lines with ink keep their place. Choices that would overflow the remaining page are rejected. A fresh sheet applies your choices to the whole note. Lettering preferences are saved, but your words stay private to this visit.</p>
       <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of Google Fonts licensed for commercial use. The editor shows each original font; the pen follows inferred centerlines, not its outline. Branches use pen lifts instead of drawing back over completed strokes. The inferred order is not a recording of a calligrapher's hand.</p>

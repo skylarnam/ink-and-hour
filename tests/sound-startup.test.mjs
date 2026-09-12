@@ -120,7 +120,7 @@ test('a material cue waiting for startup cannot outlive a mute, hidden page, or 
 
 test('mute-before-start and music-pause gestures do not accidentally unlock the default sound', (t) => {
   const { document, state } = setup(t);
-  for (const id of ['enable-sound', 'panel-enable-sound', 'music-play']) {
+  for (const id of ['enable-sound', 'panel-enable-sound', 'quiet-sound', 'music-play']) {
     document.send('click', { target: new FakeElement(id) });
     document.send('keydown', { key: ' ', target: new FakeElement(id) });
   }

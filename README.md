@@ -86,6 +86,12 @@ it in a terminal separates its lifetime from the agent's completed work.
   **Overhead**, and the reset button offer accessible camera presets. With the
   canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan,
   plus/minus zoom, and Home restores the desk framing. Presets recenter panning.
+- **Quiet view** fills the window with the desk and hides the editor, settings,
+  headings, and camera controls without interrupting writing or sound. It holds
+  the current camera position rather than automatically following the nib;
+  deliberate camera drags and zoom still work. A small bar retains writing,
+  sound, and **Show controls**. Escape also exits, restoring keyboard focus and
+  the previous scroll position. Quiet view is not saved between visits.
 - **Tools** offers a lacquer fountain pen and a wooden dip holder, three nib
   characters (fine, broad edge, soft flex), three paper surfaces, four preset inks,
   and a **rainbow color picker** for a custom shade.

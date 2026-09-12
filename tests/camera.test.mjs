@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MOUSE, TOUCH, PerspectiveCamera, Vector3 } from 'three';
+import { DeskScene } from '../src/scene.ts';
 import {
   CAMERA_PAN_RADIUS, configureCameraDrag, createCameraControls, panCameraWithKey,
 } from '../src/camera-controls.ts';
@@ -18,6 +19,22 @@ function cameraRig(target = new Vector3(-0.15, 0.65, -0.45), offset = new Vector
 function close(actual, expected, tolerance = 1e-8) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`);
 }
+
+test('holding the Quiet view camera cancels automatic movement without changing its pose or drag controls', () => {
+  const { camera, controls } = cameraRig();
+  const scene = Object.assign(Object.create(DeskScene.prototype), { camera, controls, movingCamera: true, followNib: true });
+  const position = camera.position.clone();
+  const target = controls.target.clone();
+  const rotation = camera.quaternion.clone();
+  scene.holdCamera();
+  assert.equal(scene.movingCamera, false);
+  assert.equal(scene.followNib, false);
+  assert.ok(camera.position.equals(position));
+  assert.ok(camera.quaternion.equals(rotation));
+  assert.ok(controls.target.equals(target));
+  assert.equal(controls.enablePan, true);
+  assert.equal(controls.enableRotate, true);
+});
 
 test('orbit remains the default while mouse and touch panning are enabled and bounded', () => {
   const { controls } = cameraRig();
