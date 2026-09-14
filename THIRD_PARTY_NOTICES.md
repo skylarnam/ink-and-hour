@@ -1,5 +1,18 @@
 # Third-party notices
 
+## Brand wordmark: Manrope
+
+The brand uses an original pen-and-dial symbol and Manrope lettering converted
+to vector outlines. The source face is from the official
+[Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/manrope)
+under the SIL Open Font License 1.1, included in
+`public/brand/MANROPE-LICENSE.txt`.
+
+`public/brand/ink-and-hour-horizontal.svg` is the approved 16px-gap header
+lockup; `public/brand/ink-and-hour-stacked.svg` preserves the approved 20px-gap
+stacked version. Both retain the selected Manrope 450 artwork and require no
+runtime font download. `public/favicon.svg` uses the same pen-and-dial symbol.
+
 ## Classical reading collection: public domain
 
 `src/readings.ts` bundles 12 original English poems and sonnets by William

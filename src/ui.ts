@@ -49,8 +49,7 @@ export function renderUI(): string {
   return `
     <header class="site-header">
       <a class="brand" href="./" aria-label="Ink and Hour home">
-        <span class="brand-mark">${icon('nib')}</span>
-        <span><span class="brand-name">Ink <i>&amp;</i> Hour</span><span class="brand-note">A WRITING RITUAL</span></span>
+        <img class="brand-logo" src="/brand/ink-and-hour-horizontal.svg" width="162" height="48" alt="Ink &amp; Hour">
       </a>
       <p class="header-thought">For the pleasure of putting pen to paper.</p>
       <div class="header-audio">
