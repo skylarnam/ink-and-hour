@@ -25,7 +25,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 [hidden] { display: none !important; }
 .icon { width: 19px; height: 19px; flex-shrink: 0; vertical-align: middle; }
 .site-header { height: 91px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 22px; border-bottom: 1px solid #e0dcd0; }
-.brand { text-decoration: none; color: var(--ink); display: flex; align-items: center; gap: 13px; }
+.brand { text-decoration: none; color: var(--ink); display: flex; align-items: center; gap: 13px; width: 220px; flex-shrink: 0; }
+.brand-logo { display: block; }
 .brand-mark { display: grid; place-items: center; width: 37px; height: 44px; border: 1px solid #b9a77f; border-radius: 17px 17px 12px 12px; color: #8a7145; }
 .brand-mark .icon { width: 25px; height: 29px; }
 .brand-name { display: block; font-family: var(--serif); font-size: 28px; line-height: 1.1; letter-spacing: -1.2px; white-space: nowrap; }
