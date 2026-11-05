@@ -50,9 +50,9 @@ export function renderUI(): string {
     <header class="site-header">
       <a class="brand" href="./" aria-label="Ink and Hour home">
         <span class="brand-mark">${icon('nib')}</span>
-        <span><span class="brand-name">Ink <i>&amp;</i> Hour</span><span class="brand-note">A WRITING RITUAL</span></span>
+        <span><span class="brand-name">Ink <i>&amp;</i> Hour</span></span>
       </a>
-      <p class="header-thought">For the pleasure of putting pen to paper.</p>
+
       <div class="header-audio">
         <div class="music-player" role="group" aria-label="Lo-fi mini music player">
           <button class="music-info" id="music-credits" type="button" aria-label="Music details and credits" title="Music details and credits"><span id="music-title">First Snow</span><small id="music-detail">Lo-fi / ready</small></button>
@@ -68,7 +68,7 @@ export function renderUI(): string {
     <main class="workspace">
       <section class="stage" aria-label="Interactive three-dimensional writing desk">
         <canvas id="desk-canvas" tabindex="0" aria-label="Writing desk. Drag to rotate, or enable Move and drag to pan. Shift-drag, right-drag, or two-finger drag also pans. Arrow keys rotate; Shift and arrow keys pan. Scroll, pinch, or plus and minus zoom. Home resets the camera."></canvas>
-        <div class="stage-heading"><span class="eyebrow">YOUR QUIET CORNER</span><h1 id="room-title">Rainy Study</h1><p id="room-description">Walnut, lamplight, and nowhere else to be.</p></div>
+        <div class="stage-heading"><h1 id="room-title">Rainy Study</h1><p id="room-description">Walnut desk · Warm lamplight</p></div>
         <div class="camera-controls" role="group" aria-label="Camera views and movement">
           <button type="button" data-camera="desk" class="active" aria-pressed="true">Desk</button>
           <button type="button" data-camera="detail" aria-pressed="false">Nib close-up</button>
@@ -77,14 +77,46 @@ export function renderUI(): string {
         </div>
         <button type="button" id="enter-quiet-view" class="quiet-view-button" aria-pressed="false" aria-controls="quiet-toolbar" title="Hide controls without moving the camera">${icon('quiet')}Quiet view</button>
         <div class="stage-bottom">
-          <div class="ritual-status"><span class="status-light"></span><span id="scene-status">Take your time.</span></div>
+          <div class="ritual-status"><span class="status-light"></span><span id="scene-status">Ready to write</span></div>
           <span class="camera-hint">${icon('orbit')}<span id="camera-drag-hint">Drag to rotate / Shift-drag to move</span><span class="hint-dot">/</span>Scroll to zoom</span>
           <button type="button" id="reset-view" class="stage-icon" aria-label="Reset camera to the desk" title="Reset camera">${icon('reset')}</button>
         </div>
-        <div class="scene-loading" id="scene-loading"><span class="loading-nib">${icon('nib')}</span><p>Making a little room for you...</p></div>
+        <div class="scene-loading" id="scene-loading"><span class="loading-nib">${icon('nib')}</span><p>Loading the writing desk…</p></div>
         <div class="scene-error" id="scene-error" hidden role="alert"></div>
       </section>
       <aside class="ritual-panel" aria-label="Your writing ritual">
+        <section class="writing-editor" aria-labelledby="editor-heading">
+          <div class="editor-heading"><h2 id="editor-heading">Your page</h2></div>
+          <button type="button" id="random-writing" class="random-writing">${icon('shuffle')}<span>Write something random</span></button>
+          <div id="reading-status" class="reading-status" hidden><span>Public-domain poetry / continues until paused</span><button type="button" id="reading-credits">Sources &amp; credits</button></div>
+          <div class="lettering-controls">
+            <div class="choices lettering-alignment" role="group" aria-label="Lettering alignment">
+              ${choice('textAlignment', 'left', `${icon('alignLeft')}Left`)}
+              ${choice('textAlignment', 'center', `${icon('alignCenter')}Center`)}
+            </div>
+            <div class="editor-zoom" role="group" aria-label="Lettering size in editor and on paper"><button id="smaller-editor-text" type="button" aria-label="Smaller lettering" aria-controls="message desk-canvas" title="Smaller lettering in editor and on paper">A-</button><button id="larger-editor-text" type="button" aria-label="Larger lettering" aria-controls="message desk-canvas" title="Larger lettering in editor and on paper">A+</button></div>
+          </div>
+          <label class="visually-hidden" for="message">Your English text</label>
+          <textarea id="message" spellcheck="false" rows="3" aria-describedby="input-hint editor-size-hint input-error">Dear friend,
+I thought I would write.</textarea>
+          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation / up to 10 pages</span><span id="editor-size-hint">Editor &amp; paper size / 100%</span></span><span id="character-count"></span></div>
+          <p id="input-error" class="input-error" role="status" hidden></p>
+          <div class="writing-options">
+            <label><span>Handwriting</span><select id="style" aria-label="Handwriting style" aria-describedby="handwriting-note">${HANDWRITING_STYLES.map((style) => `<option value="${style.id}">${style.label}</option>`).join('')}</select></label>
+            <label class="pace-control"><span>Pace <output id="speed-label">1x</output></span><input type="range" data-range="speed" min="0.5" max="2" step="0.1" aria-label="Writing pace"></label>
+          </div>
+          <p class="handwriting-note" id="handwriting-note" hidden>A font-inspired stroke study, with an interpreted pen order.</p>
+          <div class="writing-actions">
+            <button type="button" class="begin-button" id="begin-writing">${icon('play')}<span>Begin writing</span>${icon('arrow', 'begin-arrow')}</button>
+            <button type="button" class="new-sheet-button" id="new-sheet" title="Start again with fresh pages and keep your words" aria-label="Start again with fresh pages">${icon('freshSheet')}<span>Start over</span></button>
+          </div>
+          <div id="page-controls" class="page-controls" role="group" aria-label="Written pages" hidden>
+            <button type="button" id="previous-page" aria-label="Previous written page" title="Previous written page" disabled>${icon('chevron')}</button>
+            <span id="page-position" aria-live="polite">Page 1 of 1</span>
+            <button type="button" id="next-page" aria-label="Next written page" title="Next written page" disabled>${icon('chevron')}</button>
+          </div>
+          <div class="sheet-actions"><span id="writing-note">Ready when you are.</span><button type="button" id="export-sheet" hidden>${icon('download')}Save image</button></div>
+        </section>
         <div class="panel-tabs" role="tablist" aria-label="Ritual settings">
           <button id="tab-tools" type="button" role="tab" aria-controls="panel-tools" aria-selected="true" tabindex="0" data-tab="tools">${icon('tools')}Tools</button>
           <button id="tab-room" type="button" role="tab" aria-controls="panel-room" aria-selected="false" tabindex="-1" data-tab="room">${icon('room')}Room</button>
@@ -92,7 +124,7 @@ export function renderUI(): string {
         </div>
         <div class="settings-content">
           <section id="panel-tools" role="tabpanel" aria-labelledby="tab-tools" class="settings-panel">
-            <div class="panel-intro"><h2>A few favorite things.</h2><p>Find the combination that feels like you.</p></div>
+            <div class="panel-intro"><h2>Pen & paper</h2><p>Choose your materials.</p></div>
             <fieldset><legend>THE PEN</legend><div class="choices pen-choices">
               ${choice('pen', 'fountain', '<span class="pen-illustration fountain-illustration"></span><span>Fountain pen<small>Lacquer &amp; brass</small></span>')}
               ${choice('pen', 'dip', '<span class="pen-illustration dip-illustration"></span><span>Dip pen<small>Wood &amp; steel</small></span>')}
@@ -115,7 +147,7 @@ export function renderUI(): string {
             <div class="tactile-actions"><button type="button" id="toggle-roll" aria-pressed="false">${icon('roll')}<span>Untie leather roll</span></button><button type="button" id="toggle-cap" aria-pressed="true">Uncap pen</button></div>
           </section>
           <section id="panel-room" role="tabpanel" aria-labelledby="tab-room" class="settings-panel" hidden>
-            <div class="panel-intro"><h2>A room of your own.</h2><p>Same little ritual. A different kind of day.</p></div>
+            <div class="panel-intro"><h2>The room</h2><p>Choose a setting and adjust the light.</p></div>
             <fieldset><legend>THE ATMOSPHERE</legend><div class="mood-choices">
               ${choice('mood', 'study', '<span class="mood-thumbnail study"></span><span>Rainy Study<small>Walnut, brass, warm lamplight</small></span>')}
               ${choice('mood', 'atelier', '<span class="mood-thumbnail atelier"></span><span>Sunlit Atelier<small>Pale wood, ivory, a clear mind</small></span>')}
@@ -128,7 +160,7 @@ export function renderUI(): string {
             <p class="small-note">Weather is independent of your room and time. Storms bring slow, occasional lightning, never a strobe.</p>
           </section>
           <section id="panel-sound" role="tabpanel" aria-labelledby="tab-sound" class="settings-panel" hidden>
-            <div class="panel-intro"><h2>Listen a little closer.</h2><p>Headphones welcome. Music entirely optional.</p></div>
+            <div class="panel-intro"><h2>Sound</h2><p>Mix pen sounds, weather, and music.</p></div>
             <button type="button" id="panel-enable-sound" class="audio-gate" aria-pressed="true">${icon('sound')}<span>${sound.panelLabel}</span></button>
             <fieldset aria-describedby="writing-sound-note"><legend>WRITING SOUND</legend><div class="choices writing-sound-choices">
               ${WRITING_SOUNDS.map((sound) => choice('writingSound', sound.id, sound.label)).join('')}
@@ -148,38 +180,6 @@ export function renderUI(): string {
             <p class="small-note" id="sound-note">${sound.note}</p>
           </section>
         </div>
-        <section class="writing-editor" aria-labelledby="editor-heading">
-          <div class="editor-heading"><h2 id="editor-heading">What will you leave here?</h2></div>
-          <button type="button" id="random-writing" class="random-writing">${icon('shuffle')}<span>Write something random</span></button>
-          <div id="reading-status" class="reading-status" hidden><span>Public-domain poetry / continues until paused</span><button type="button" id="reading-credits">Sources &amp; credits</button></div>
-          <div class="lettering-controls">
-            <div class="choices lettering-alignment" role="group" aria-label="Lettering alignment">
-              ${choice('textAlignment', 'left', `${icon('alignLeft')}Left`)}
-              ${choice('textAlignment', 'center', `${icon('alignCenter')}Center`)}
-            </div>
-            <div class="editor-zoom" role="group" aria-label="Lettering size in editor and on paper"><button id="smaller-editor-text" type="button" aria-label="Smaller lettering" aria-controls="message desk-canvas" title="Smaller lettering in editor and on paper">A-</button><button id="larger-editor-text" type="button" aria-label="Larger lettering" aria-controls="message desk-canvas" title="Larger lettering in editor and on paper">A+</button></div>
-          </div>
-          <label class="visually-hidden" for="message">Your English text</label>
-          <textarea id="message" spellcheck="false" rows="3" aria-describedby="input-hint editor-size-hint input-error">Let the world wait.
-Stay a little while.</textarea>
-          <div class="input-meta"><span class="input-guide"><span id="input-hint">English letters &amp; punctuation / up to 10 pages</span><span id="editor-size-hint">Editor &amp; paper size / 100%</span></span><span id="character-count"></span></div>
-          <p id="input-error" class="input-error" role="status" hidden></p>
-          <div class="writing-options">
-            <label><span>Handwriting</span><select id="style" aria-label="Handwriting style" aria-describedby="handwriting-note">${HANDWRITING_STYLES.map((style) => `<option value="${style.id}">${style.label}</option>`).join('')}</select></label>
-            <label class="pace-control"><span>Pace <output id="speed-label">1x</output></span><input type="range" data-range="speed" min="0.5" max="2" step="0.1" aria-label="Writing pace"></label>
-          </div>
-          <p class="handwriting-note" id="handwriting-note" hidden>A font-inspired stroke study, with an interpreted pen order.</p>
-          <div class="writing-actions">
-            <button type="button" class="begin-button" id="begin-writing">${icon('play')}<span>Begin writing</span>${icon('arrow', 'begin-arrow')}</button>
-            <button type="button" class="new-sheet-button" id="new-sheet" title="Start again with fresh pages and keep your words" aria-label="Start again with fresh pages">${icon('freshSheet')}<span>Start over</span></button>
-          </div>
-          <div id="page-controls" class="page-controls" role="group" aria-label="Written pages" hidden>
-            <button type="button" id="previous-page" aria-label="Previous written page" title="Previous written page" disabled>${icon('chevron')}</button>
-            <span id="page-position" aria-live="polite">Page 1 of 1</span>
-            <button type="button" id="next-page" aria-label="Next written page" title="Next written page" disabled>${icon('chevron')}</button>
-          </div>
-          <div class="sheet-actions"><span id="writing-note">No hurry. No right words.</span><button type="button" id="export-sheet" hidden>${icon('download')}Keep this page</button></div>
-        </section>
       </aside>
     </main>
     <div id="quiet-toolbar" class="quiet-toolbar" role="group" aria-label="Quiet view controls" aria-describedby="quiet-help" hidden>
@@ -189,7 +189,7 @@ Stay a little while.</textarea>
       <button type="button" id="quiet-sound" aria-pressed="true" aria-label="${sound.label}. ${sound.action}." title="${sound.action}">${icon('sound')}</button>
       <button type="button" id="exit-quiet-view">${icon('quiet')}<span>Show controls</span></button>
     </div>
-    <footer class="site-footer"><button id="about-button" type="button">About this little world ${icon('info')}</button></footer>
+    <footer class="site-footer"><button id="about-button" type="button">About Ink &amp; Hour ${icon('info')}</button></footer>
     <div id="notice" class="toast" role="status" hidden><span></span><button id="dismiss-notice" aria-label="Dismiss message">${icon('close')}</button></div>
     <dialog id="about-dialog">
       <button id="close-about" class="dialog-close" aria-label="Close about">${icon('close')}</button>
@@ -198,7 +198,7 @@ Stay a little while.</textarea>
       <p>A small, local-first writing ritual. Choose your materials, leave a few words on the page, and listen to the space between strokes.</p>
       <p>Drag to rotate, or turn on Move and drag to explore a little across the desk. Shift-drag and right-drag also move; on touchscreens, use two fingers. Scroll or pinch to zoom. With the canvas focused, arrow keys rotate (or pan in Move mode), Shift-arrow keys pan, plus/minus zoom, and Home resets the view. In rotation mode, click the leather roll, cap, or ink bottle to handle them.</p>
       <p>Quiet view fills the window with your desk, hides the editor and room controls, and stops automatic camera following without interrupting the pen. A small bar keeps writing, sound and Show controls within reach. Escape returns to the editor.</p>
-      <p>English letters, digits and standard punctuation are supported. Manuscripts can fill up to ten physical pages, with a 20,000-character safety limit. A gentle sheet-slide makes room for the next page; reduced motion replaces it without the animation. Pause or finish to browse written pages. Resume returns to your current writing position, and Start over clears the pages but keeps your words. Keep this page exports the page you are viewing.</p>
+      <p>English letters, digits and standard punctuation are supported. Manuscripts can fill up to ten physical pages, with a 20,000-character safety limit. A gentle sheet-slide makes room for the next page; reduced motion replaces it without the animation. Pause or finish to browse written pages. Resume returns to your current writing position, and Start over clears the pages but keeps your words. Save image exports the page you are viewing.</p>
       <p>Change ink, nib or paper while writing. The rainbow swatch opens a custom ink palette; new strokes use the chosen shade. The pen rests beside the page only when the manuscript finishes.</p>
       <p>Pinch the textbox or use A- / A+ to resize lettering in both the editor and on paper. Left and Center align each new line. Pause to change handwriting, size or alignment: earlier pages and started letters keep their shape, and lines with ink keep their place. The remaining text can reflow onto later pages; choices exceeding ten pages are rejected without changing your ink. Start over applies your choices to the whole manuscript. Lettering preferences are saved, but your words and page history stay private to this visit.</p>
       <p>Correspondence uses ordered Hershey centerlines. The other ${HANDWRITING_STYLES.length - 1} handpicked styles are interpreted stroke studies of Google Fonts licensed for commercial use. The editor shows each original font; the pen follows inferred centerlines, not its outline. Branches use pen lifts instead of drawing back over completed strokes. The inferred order is not a recording of a calligrapher's hand.</p>
@@ -209,13 +209,13 @@ Stay a little while.</textarea>
         <p class="small-note">Source fonts are unmodified. Added paper styles are separately named Ink Stroke Studies. <a href="/data/HANDWRITING-ATTRIBUTION.json" target="_blank" rel="noopener">Source versions, checksums and derivation notes</a>.</p>
       </details>
       <section id="music-attribution" aria-labelledby="music-attribution-title">
-        <h3 id="music-attribution-title">Records for a quiet corner.</h3>
+        <h3 id="music-attribution-title">Music credits</h3>
         <p>Three locally bundled lo-fi recordings, shared by their creators under CC0. No streaming account or outside playback service. Lo-fi is on by default and attempts playback on load; browser policy may still require a click. Music and ambience keep playing when you switch tabs. Use the mini-player to pause, or choose Off in Sound.</p>
         <ul class="music-attribution">${LOFI_TRACKS.map((track) => `<li><a href="${track.source}" target="_blank" rel="noopener noreferrer">${track.title}</a><span>${track.artist} / <a href="${track.license}" target="_blank" rel="noopener noreferrer">CC0 1.0</a></span></li>`).join('')}</ul>
         <p class="small-note"><a href="/audio/lofi/CREDITS.txt" target="_blank" rel="noopener">Recording sources and credits</a>. Felt notes and Glass garden are the original synthesized soundscapes.</p>
       </section>
       <section id="reading-attribution" aria-labelledby="reading-attribution-title">
-        <h3 id="reading-attribution-title">Words from another time.</h3>
+        <h3 id="reading-attribution-title">Reading sources</h3>
         <p>Write something random draws from ${READINGS.length} locally bundled public-domain poems and sonnets. Titles and authors are included in the writing. It fills each sheet, turns the page, and continues until you pause. Only the latest ten pages are kept in this visit; your typed draft is held separately until you choose Use my words.</p>
         <ul class="music-attribution">${READINGS.map((reading) => `<li><a href="${reading.source}" target="_blank" rel="noopener noreferrer">${reading.title}</a><span>${reading.author} / ${reading.year}</span></li>`).join('')}</ul>
         <p class="small-note">Original wording with ASCII punctuation for the writing engine. <a href="/texts/CREDITS.md" target="_blank" rel="noopener">Source editions and public-domain notes</a>. No live text service, account, or generated attribution.</p>

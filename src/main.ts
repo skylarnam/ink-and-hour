@@ -160,9 +160,9 @@ function playMaterialCue(cue: InteractionCue): void {
 }
 
 const rooms = {
-  study: { name: 'Rainy Study', description: 'Walnut, lamplight, and nowhere else to be.' },
-  atelier: { name: 'Sunlit Atelier', description: 'Open windows. A softer kind of afternoon.' },
-  storybook: { name: 'Storybook Nook', description: 'A little wonder, tucked between the pages.' },
+  study: { name: 'Rainy Study', description: 'Walnut desk · Warm lamplight' },
+  atelier: { name: 'Sunlit Atelier', description: 'Open windows · Afternoon light' },
+  storybook: { name: 'Storybook Nook', description: 'Pastel room · Soft light' },
 };
 
 function musicRequested(): boolean {
@@ -377,7 +377,7 @@ function syncWriting(): void {
   randomButton.title = randomWriting ? 'Stop automatic writing and return to your typed draft'
     : 'Start fresh pages of continuous public-domain poetry; your typed draft is kept';
   element<HTMLElement>('#reading-status').hidden = !randomWriting;
-  element<HTMLElement>('#editor-heading').textContent = randomWriting ? 'Let the words find you.' : 'What will you leave here?';
+  element<HTMLElement>('#editor-heading').textContent = randomWriting ? 'Poetry' : 'Your page';
   element<HTMLElement>('#input-hint').textContent = randomWriting
     ? 'Automatic writing / latest ten pages kept' : 'English letters & punctuation / up to 10 pages';
   const resetButton = element<HTMLButtonElement>('#new-sheet');
@@ -396,11 +396,11 @@ function syncWriting(): void {
   element<HTMLInputElement>('#custom-ink-color').disabled = loadingPage || earlier;
   element<HTMLInputElement>('[data-range="speed"]').disabled = loadingPage || earlier;
   element<HTMLButtonElement>('#export-sheet').hidden = loadingPage || (!complete && !earlier && !(randomWriting && paused));
-  element<HTMLElement>('#scene-status').textContent = earlier ? 'A page, kept.' : turning ? 'Making room for more words.'
-    : active ? 'One stroke at a time.' : paused ? 'A moment of stillness.' : complete ? 'Relax, and sit in your quiet corner.' : 'Take your time.';
+  element<HTMLElement>('#scene-status').textContent = earlier ? 'Previous page' : turning ? 'Turning the page'
+    : active ? 'Writing' : paused ? 'Paused' : complete ? 'Page finished' : 'Ready to write';
   element<HTMLElement>('#writing-note').textContent = earlier ? `Resume returns to page ${engine!.activePageIndex + 1}.`
     : turning ? paused ? 'The page turn is paused.' : 'Turning to the next sheet.'
-      : active ? 'The page is yours. Let it unfold.' : paused ? 'Your place is safe.' : complete ? 'Keep a page, or begin again.' : 'No hurry. No right words.';
+      : active ? 'You can pause at any time.' : paused ? 'Resume to keep writing.' : complete ? 'Save this page or start over.' : 'Ready when you are.';
   element<HTMLButtonElement>('#toggle-cap').disabled = active || turning || loadingPage || earlier;
   syncPageControls();
   lastStatus = status;

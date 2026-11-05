@@ -308,3 +308,85 @@ html[data-quiet-view="true"] .stage { width: 100%; height: 100%; min-height: 0; 
 @media (prefers-reduced-motion: reduce) {
   *, *:before, *:after { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Impeccable + taste refinement: the desk leads; controls read like stationery. */
+:root { --muted: #62665a; --line: #d7d2c5; --brass: #80653c; }
+::selection { background: #d9d4bd; color: #26372d; }
+textarea { caret-color: #80653c; }
+.site-header { height: 72px; padding-inline: 28px; }
+.brand-name { font-size: 30px; letter-spacing: -0.8px; }
+.brand-mark { border: 0; width: 28px; }
+.music-player { border: 0; background: transparent; width: 280px; }
+.music-info > span { font-size: 14px; }
+.music-info > small { font-size: 11px; color: var(--muted); }
+.music-transport button { width: 36px; height: 36px; }
+.sound-toggle { font-size: 12px; min-height: 40px; border-radius: 3px; }
+.workspace { grid-template-columns: minmax(0, 1fr) 396px; height: calc(100dvh - 108px); }
+.stage-heading { top: 26px; left: 28px; }
+.stage-heading h1 { font-size: 30px; }
+.stage-heading p { font-size: 12px; }
+.camera-controls { top: auto; bottom: 64px; right: 22px; background: #2c382eef; backdrop-filter: none; border-radius: 3px; }
+.camera-controls button { font-size: 11px; min-height: 36px; }
+.quiet-view-button { top: 24px; border-radius: 3px; font-size: 12px; }
+.camera-hint { display: none; }
+.ritual-status { font-size: 12px; }
+.stage-icon { min-width: 36px; min-height: 36px; }
+.writing-editor { order: 0; background: #f8f5ee; border-top: 0; border-bottom: 1px solid var(--line); padding: 24px 26px 16px; max-height: 66%; }
+.editor-heading h2 { font-size: 27px; letter-spacing: -0.6px; }
+.editor-heading { margin-bottom: 8px; }
+.random-writing { font-size: 12px; min-height: 36px; margin-bottom: 12px; }
+textarea { border-radius: 2px; background: #fffdf8; height: 100px; }
+.lettering-alignment .choice, .editor-zoom button { min-height: 32px; font-size: 11px; }
+.input-meta, .writing-options label > span, .pace-control output, .sheet-actions > span { font-size: 10px; color: var(--muted); }
+.writing-options { margin: 16px 0; }
+select { font-size: 12px; min-height: 32px; }
+.begin-button { min-height: 44px; font-size: 13px; border-radius: 2px; box-shadow: none; }
+.new-sheet-button { border-radius: 2px; }
+.new-sheet-button span, .sheet-actions button { font-size: 10px; }
+.panel-tabs { order: 1; height: 52px; padding-inline: 26px; background: #f0ede4; }
+.panel-tabs button { font-size: 13px; color: #62665a; }
+.settings-content { order: 2; padding: 22px 26px; background: #f0ede4; }
+.panel-intro { margin-bottom: 22px; }
+.panel-intro h2 { font-size: 23px; }
+.panel-intro p { font-size: 12px; }
+legend { font-size: 11px; letter-spacing: 0.04em; color: #535a4c; }
+legend span { font-size: 11px; color: #62665a; }
+fieldset { margin-bottom: 22px; }
+.choice { font-size: 12px; border-radius: 2px; min-height: 38px; }
+.choice small { font-size: 11px; color: #62665a; }
+.paper-choices .choice { color: #535a4c; }
+.ink-swatch { width: 32px; height: 32px; }
+.ink-swatch[aria-pressed="true"]:after { top: 9px; left: 9px; }
+.tactile-actions button, .volume-control > span, .weather-choices .choice { font-size: 12px; }
+.small-note, .volume-control small, .range-bookends, .reading-status { font-size: 11px; color: #62665a; }
+.volume-control output, .time-control output, .custom-ink-controls { font-size: 11px; }
+.site-footer { height: 36px; }
+.site-footer button { font-size: 11px; color: #62665a; }
+@media (max-width: 1080px) and (min-width: 721px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) 350px; }
+  .stage-heading { max-width: calc(100% - 40px); }
+  .quiet-view-button { top: 112px; }
+}
+@media (max-width: 720px) {
+  .site-header { height: auto; min-height: 120px; padding: 16px 20px; }
+  .brand-name { font-size: 28px; }
+  .music-player { width: auto; }
+  .workspace { height: auto; }
+  .stage { height: 48svh; min-height: 340px; }
+  .stage-heading { left: 20px; top: 20px; }
+  .stage-heading h1 { font-size: 25px; }
+  .stage-heading p { font-size: 11px; }
+  .quiet-view-button { top: 92px; right: 20px; min-height: 44px; }
+  .camera-controls button { min-height: 44px; font-size: 10px; }
+  .writing-editor { max-height: none; padding: 24px; }
+  .settings-content { padding: 24px; }
+  .choice, .editor-zoom button, .lettering-alignment .choice { min-height: 44px; }
+  .ink-swatch { width: 40px; height: 40px; }
+  .ink-swatch[aria-pressed="true"]:after { top: 13px; left: 13px; }
+  .tactile-actions button, .sheet-actions button { min-height: 44px; }
+  .site-footer { height: auto; }
+}
+
+textarea:read-only { opacity: 1; }
+.new-sheet-button, .time-control .eyebrow, .time-control output,
+.volume-control output, .tactile-actions button { color: #535d48; }
